@@ -36,7 +36,7 @@ function textTargets(fragment) {
 export function editableContent(item) {
   const template = contentDocument(item);
   const texts = textTargets(template.content).map(({ label, value }, index) => ({ label: `${label} ${index + 1}`, value }));
-  const images = item.type === 'image' ? [{ label: '图片 1', source: item.content }] : [...template.content.querySelectorAll('img, svg image')].map((node, index) => ({ label: node.getAttribute('alt') || `图片 ${index + 1}`, source: node.getAttribute('src') || node.getAttribute('href') || '' }));
+  const images = item.type === 'image' ? [{ label: '图片 1', source: item.content }] : [...template.content.querySelectorAll('img, svg image')].map((node, index) => ({ label: node.getAttribute('alt') || `图片 ${index + 1}`, source: node.getAttribute('src') || node.getAttribute('href') || '', vector: node.localName === 'image' }));
   if (!images.length && item.imageSlot) images.push({ label: '设置图片', source: '' });
   return { texts, images };
 }
@@ -50,7 +50,10 @@ export function updateTextContent(item, values) {
     if (attribute) node.setAttribute(attribute, values[index]);
     else {
       node.textContent = values[index];
-      if (node.nodeType === 3 && !values[index].trim()) node.parentElement.setAttribute('data-protolab-text', 'true');
+      if (node.nodeType === 3 && !values[index].trim()) {
+        if (!node.parentElement) { const span = document.createElement('span'); node.replaceWith(span); span.append(node); }
+        node.parentElement.setAttribute('data-protolab-text', 'true');
+      }
       else if (node.nodeType === 3) node.parentElement.removeAttribute('data-protolab-text');
     }
   });

@@ -53,10 +53,21 @@ export function sanitizeContent(content, type = 'html') {
   return template.innerHTML.trim();
 }
 export const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+/** SVG 内嵌图片通过 preserveAspectRatio 控制填充，而 HTML 图片使用 object-fit。 */
+export function fitSVGImages(content, fit) {
+  if (!['fill', 'cover', 'contain'].includes(fit)) return content;
+  const aspect = { fill: 'none', cover: 'xMidYMid slice', contain: 'xMidYMid meet' }[fit];
+  if (!aspect) return content;
+  return content.replace(/<image(?=[\s/>])(?:"[^"]*"|'[^']*'|[^"'<>])*>/gi, tag => {
+    // 跳过其他属性的引号内容，避免误改标题等文本。
+    const clean = tag.replace(/"[^"]*"|'[^']*'|(\s+preserveAspectRatio\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))/gi, (match, attribute) => attribute ? '' : match);
+    return clean.replace(/\s*\/?\s*>$/, ` preserveAspectRatio="${aspect}"${/\/\s*>$/.test(tag) ? '/>' : '>'}`);
+  });
+}
 /** 编辑、预览和导出共用结构，确保尺寸、边距及零圆角一致。 */
 export function itemHTML(item, canvas) {
   const appearance = appearancePresentation(item.appearance);
-  const inner = item.type === 'image' ? `<img src="${escapeHTML(item.content)}" alt="${escapeHTML(item.name)}" style="width:100%;height:100%;object-fit:contain">` : item.content;
+  const inner = item.type === 'image' ? `<img src="${escapeHTML(item.content)}" alt="${escapeHTML(item.name)}" style="width:100%;height:100%;object-fit:contain">` : fitSVGImages(item.content, item.appearance?.imageFit);
   const { hidden, angle } = orientationPresentation(item, canvas);
   const action = normalizeInteraction(item.interaction);
   const interaction = action ? ` data-action="${escapeHTML(action.type)}"${action.targetId ? ` data-target="${escapeHTML(action.targetId)}"` : ''} role="button" tabindex="0" aria-label="${escapeHTML(item.name)}"` : '';

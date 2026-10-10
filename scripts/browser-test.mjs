@@ -43,7 +43,7 @@ try {
 
   await page.locator('#propX').fill('0'); await page.locator('#propY').fill('0'); await page.locator('#propRadius').fill('0');
   await page.locator('#propName').fill('按钮 "测试" <名称>');
-  await page.locator('#propPadding').fill('4px'); await page.locator('#propMargin').fill('2px');
+  for (const side of ['Top', 'Right', 'Bottom', 'Left']) { await page.locator(`#propPadding${side}`).fill('4'); await page.locator(`#propMargin${side}`).fill('2'); }
   await page.locator('#selectionProps button[type="submit"]').click();
   assert.equal(await page.locator('#propX').inputValue(), '0');
   assert.equal(await page.locator('.editor-item > .prototype-item').evaluate(element => getComputedStyle(element).borderRadius), '0px');
@@ -282,6 +282,7 @@ try {
   await cameraExport.close();
   console.log('通过：刘海、灵动岛、打孔实际遮挡屏幕，状态栏避让、横屏旋转、历史、恢复和导出一致');
   for (const [id, x, y] of [['lib-slider', 30, 60], ['lib-textarea', 30, 120], ['lib-svg-line', 30, 260], ['lib-svg-circle', 30, 320], ['lib-svg-rect', 170, 320]]) {
+    await controls.locator(id.startsWith('lib-svg-') ? '#vectorTab' : '#basicTab').click();
     await controls.locator(`[data-comp-id="${id}"]`).click();
     await controls.locator('#propX').fill(String(x)); await controls.locator('#propY').fill(String(y));
     await controls.locator('#selectionProps button[type="submit"]').click();
@@ -298,6 +299,7 @@ try {
   assert.equal(await controlsPreview.locator('textarea').inputValue(), '多行\n文本');
   assert.equal(await controlsPreview.locator('.vector-item').count(), 3);
   await controls.locator('[data-close="previewDialog"]').click();
+  await controls.locator('#vectorTab').click();
   await controls.locator('#vectorList').scrollIntoViewIfNeeded();
   await controls.screenshot({ path: resolve(output, 'desktop-components.png') });
   await controlsContext.close();

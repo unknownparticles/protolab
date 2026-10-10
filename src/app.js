@@ -264,6 +264,7 @@ function renderProperties() {
     field.append(input); return field;
   }));
   $('imageProperties').hidden = !propertyContent.images.length;
+  for (const option of $('propImageFit').options) option.disabled = propertyContent.images.some(image => image.vector) && ['none', 'scale-down'].includes(option.value);
   $('propImageTarget').replaceChildren(...propertyContent.images.map(({ label }, index) => new Option(label, String(index))));
   $('propImageFile').value = ''; renderPropertyImage();
   const response = normalizeOrientationResponse(item.orientationResponse);
