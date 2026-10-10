@@ -32,7 +32,7 @@ try {
   assert.equal(await page.locator('#canvasGrid').isVisible(), false);
   assert.equal(await page.locator('[data-align="center"]').isDisabled(), true);
   await page.locator('#showGrid').check(); await page.locator('#gridSize').selectOption('10');
-  assert.equal(await page.locator('#canvasGrid').evaluate(node => getComputedStyle(node).backgroundSize), '10px 10px');
+  assert.equal(await page.locator('#canvasGrid').evaluate(node => getComputedStyle(node).backgroundSize), '10px 10px, 10px 10px');
   await page.locator('#showRulers').uncheck();
   assert.equal(await page.locator('#rulerHorizontal').isVisible(), false);
   assert.equal(await page.locator('#canvasGrid').isVisible(), true);

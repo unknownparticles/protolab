@@ -1,4 +1,4 @@
-import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, number, normalizeItem, resizeProject, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
+import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, normalizeItem, resizeProject, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
 import { COMPONENTS } from './presets.js';
 import { icon, componentIcon } from './icons.js';
 import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
@@ -160,8 +160,9 @@ function renderGuides(layout) {
   }
 }
 function updateGuides() {
+  const next = normalizeGuides({ rulers: $('showRulers').checked, grid: $('showGrid').checked, gridSize: Number($('gridSize').value) });
   finishGesture();
-  guides = normalizeGuides({ rulers: $('showRulers').checked, grid: $('showGrid').checked, gridSize: Number($('gridSize').value) });
+  guides = next;
   updateZoom();
   try { writeStorage(GUIDES_KEY, guides); }
   catch { notify('辅助线设置未保存，浏览器存储不可用或已满', true); }
@@ -249,7 +250,7 @@ function duplicateSelected() {
   if (!item) return;
   if (project.items.length + selectedIds.size > MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
   const moved = moveItems(project, selectionStarts(), 16, 16);
-  const copies = moved.items.filter(value => selectedIds.has(value.id)).map(value => ({ ...clone(value), id: uid(), name: `${value.name} 副本` }));
+  const copies = moved.items.filter(value => selectedIds.has(value.id)).map(value => normalizeItem({ ...clone(value), id: uid(), name: `${value.name} 副本` }, project.canvas));
   project.items.push(...copies); selectedIds = new Set(copies.map(value => value.id)); selectedId = copies.at(-1).id; commit(); notify('已复制所选组件');
 }
 function restore(direction) {
