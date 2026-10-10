@@ -5,6 +5,8 @@ import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, devic
 import { renderComponentPreview, clearComponentPreview } from './component-preview.js';
 import { FRAME_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLayout } from './frames.js';
 import { LIBRARY_KEY, PROJECT_KEY, readStorage, writeStorage, download, readFile } from './storage.js';
+import { alignItems, moveItems } from './layout.js';
+import { GUIDES_KEY, normalizeGuides, rulerMarkup } from './guides.js';
 
 const $ = id => document.getElementById(id);
 document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
@@ -14,6 +16,8 @@ document.head.append(sharedStyles);
 let library = clone(COMPONENTS);
 let project = { version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, frame: normalizeFrame(), items: [] };
 let selectedId = null;
+let selectedIds = new Set();
+let guides = normalizeGuides();
 let zoom = 1;
 let gesture = null;
 let saveTimer;
@@ -66,8 +70,11 @@ try {
   if (saved) project = saved;
 } catch { startupWarnings.push('草稿读取失败，已打开空画布'); }
 const history = createHistory(project);
+try { guides = readStorage(GUIDES_KEY, normalizeGuides) || guides; }
+catch { startupWarnings.push('辅助线设置读取失败，已使用默认设置'); }
 const itemNodes = new Map();
 const selectedItem = () => project.items.find(item => item.id === selectedId);
+const selectionStarts = () => new Map(project.items.filter(item => selectedIds.has(item.id)).map(item => [item.id, { x: item.x, y: item.y }]));
 
 function renderLibrary() {
   const query = $('componentSearch').value.trim().toLowerCase();
@@ -102,14 +109,19 @@ function renderProperties() {
   const item = selectedItem();
   $('noSelectionMsg').hidden = !!item;
   $('selectionProps').hidden = !item;
+  $('selectionCount').textContent = selectedIds.size ? `已选 ${selectedIds.size} 个` : '未选中';
+  const disabled = !selectedIds.size || $('alignReference').value === 'selection' && selectedIds.size < 2;
+  $('alignmentActions').querySelectorAll('button').forEach(button => { button.disabled = disabled; });
   if (!item) return;
+  $('selectionDetail').textContent = selectedIds.size > 1 ? `已选 ${selectedIds.size} 个组件，以下属性仅编辑「${item.name}」；拖动、复制、删除作用于全部所选组件。` : '按住 Shift 点击组件可多选并对齐。';
   for (const [field, key] of Object.entries({ propName: 'name', propX: 'x', propY: 'y', propW: 'width', propH: 'height', propRadius: 'radius', propPadding: 'padding', propMargin: 'margin' })) $(field).value = item[key];
 }
 function renderLayers() {
   $('layerList').replaceChildren();
   for (const item of [...project.items].reverse()) {
     const button = document.createElement('button');
-    button.className = `layer-item${item.id === selectedId ? ' selected' : ''}`;
+    button.className = `layer-item${selectedIds.has(item.id) ? ' selected' : ''}`;
+    button.setAttribute('aria-pressed', String(selectedIds.has(item.id)));
     button.dataset.itemId = item.id;
     button.innerHTML = `${icon(item.type === 'image' ? 'image' : item.type === 'svg' ? 'star' : 'layers')}<span>${escapeHTML(item.name)}</span>`;
     $('layerList').append(button);
@@ -123,14 +135,38 @@ function renderLayers() {
 }
 function updateZoom() {
   const layout = frameLayout(project.canvas, project.frame);
+  const inset = guides.rulers ? 22 : 0;
   $('canvasScaler').style.transform = `scale(${zoom})`;
-  $('canvasStage').style.width = `${layout.width * zoom}px`;
-  $('canvasStage').style.height = `${(layout.height + 28) * zoom}px`;
+  $('canvasScaler').style.left = $('canvasScaler').style.top = `${inset}px`;
+  $('canvasStage').style.width = `${layout.width * zoom + inset}px`;
+  $('canvasStage').style.height = `${(layout.height + 28) * zoom + inset}px`;
+  renderGuides(layout);
   const existing = [...$('zoomSelect').options].find(option => Number(option.value) === zoom);
   for (const option of [...$('zoomSelect').querySelectorAll('[data-custom]')]) if (option !== existing) option.remove();
   if (!existing) { const option = new Option(`${Math.round(zoom * 100)}%`, String(zoom)); option.dataset.custom = 'true'; $('zoomSelect').add(option); }
   $('zoomSelect').value = String(zoom);
 }
+function renderGuides(layout) {
+  $('showRulers').checked = guides.rulers; $('showGrid').checked = guides.grid;
+  $('gridSize').value = String(guides.gridSize);
+  $('canvasGrid').hidden = !guides.grid;
+  $('canvasGrid').style.setProperty('--grid-size', `${guides.gridSize}px`);
+  for (const [id, vertical, length] of [['rulerHorizontal', false, project.canvas.width], ['rulerVertical', true, project.canvas.height]]) {
+    const ruler = $(id); ruler.hidden = !guides.rulers;
+    if (!guides.rulers) continue;
+    ruler.style.left = vertical ? '0' : `${22 + layout.left * zoom}px`;
+    ruler.style.top = vertical ? `${22 + (28 + layout.top) * zoom}px` : '0';
+    ruler.innerHTML = rulerMarkup(length, zoom, vertical);
+  }
+}
+function updateGuides() {
+  finishGesture();
+  guides = normalizeGuides({ rulers: $('showRulers').checked, grid: $('showGrid').checked, gridSize: Number($('gridSize').value) });
+  updateZoom();
+  try { writeStorage(GUIDES_KEY, guides); }
+  catch { notify('辅助线设置未保存，浏览器存储不可用或已满', true); }
+}
+for (const id of ['showRulers', 'showGrid', 'gridSize']) $(id).addEventListener('change', updateGuides);
 let lastDeviceMarkup = '';
 function renderDevice() {
   const device = deviceMarkup(project.canvas, project.frame);
@@ -155,6 +191,8 @@ function renderDevice() {
   $('navigationStyle').value = frame.navigation;
 }
 function renderCanvas() {
+  selectedIds = new Set([...selectedIds].filter(id => project.items.some(item => item.id === id)));
+  if (!selectedIds.has(selectedId)) selectedId = [...selectedIds].at(-1) || null;
   const canvas = project.canvas;
   $('canvas').style.width = `${canvas.width}px`;
   $('canvas').style.height = `${canvas.height}px`;
@@ -168,7 +206,7 @@ function renderCanvas() {
   for (const item of project.items) {
     let node = itemNodes.get(item.id);
     if (!node) { node = document.createElement('div'); node.dataset.itemId = item.id; itemNodes.set(item.id, node); }
-    node.className = `editor-item${item.id === selectedId ? ' selected' : ''}`;
+    node.className = `editor-item${selectedIds.has(item.id) ? ' selected' : ''}`;
     Object.assign(node.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px`, borderRadius: `${item.radius}px` });
     const html = itemHTML(item);
     if (node.contentHTML !== html) {
@@ -183,29 +221,36 @@ function renderCanvas() {
   $('undoBtn').disabled = !history.canUndo; $('redoBtn').disabled = !history.canRedo;
   updateZoom(); renderProperties(); renderLayers();
 }
-function select(id) {
-  selectedId = project.items.some(item => item.id === id) ? id : null;
-  for (const [key, node] of itemNodes) node.classList.toggle('selected', key === selectedId);
+function select(id, toggle = false) {
+  if (!project.items.some(item => item.id === id)) id = null;
+  if (!toggle || !id) selectedIds.clear();
+  if (id) {
+    if (toggle && selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+  }
+  selectedId = selectedIds.has(id) ? id : [...selectedIds].at(-1) || null;
+  for (const [key, node] of itemNodes) node.classList.toggle('selected', selectedIds.has(key));
   renderProperties(); renderLayers();
 }
 function commit() { history.push(project); renderCanvas(); scheduleSave(); }
 function add(component, x = 40, y = 40) {
   if (project.items.length >= MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
   const item = createItem(component, project.canvas, x, y);
-  project.items.push(item); selectedId = item.id;
+  project.items.push(item); selectedId = item.id; selectedIds = new Set([item.id]);
   commit(); notify(`已添加「${item.name}」`);
 }
 function removeSelected() {
   if (!selectedItem()) return;
-  project.items = project.items.filter(item => item.id !== selectedId);
-  selectedId = null; commit(); notify('已删除组件，可撤销恢复');
+  project.items = project.items.filter(item => !selectedIds.has(item.id));
+  selectedId = null; selectedIds.clear(); commit(); notify('已删除所选组件，可撤销恢复');
 }
 function duplicateSelected() {
   const item = selectedItem();
   if (!item) return;
-  if (project.items.length >= MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
-  const copy = normalizeItem({ ...clone(item), id: uid(), name: `${item.name} 副本`, x: item.x + 16, y: item.y + 16 }, project.canvas);
-  project.items.push(copy); selectedId = copy.id; commit(); notify('已复制组件');
+  if (project.items.length + selectedIds.size > MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
+  const moved = moveItems(project, selectionStarts(), 16, 16);
+  const copies = moved.items.filter(value => selectedIds.has(value.id)).map(value => ({ ...clone(value), id: uid(), name: `${value.name} 副本` }));
+  project.items.push(...copies); selectedIds = new Set(copies.map(value => value.id)); selectedId = copies.at(-1).id; commit(); notify('已复制所选组件');
 }
 function restore(direction) {
   finishGesture();
@@ -216,11 +261,9 @@ function restore(direction) {
 function finishGesture(cancel = false) {
   if (!gesture) return;
   const old = gesture; gesture = null;
-  const item = project.items.find(value => value.id === old.id);
-  if (item) {
-    if (cancel) { item.x = old.x; item.y = old.y; renderCanvas(); }
-    else if (item.x !== old.x || item.y !== old.y) commit();
-  }
+  const changed = project.items.some(item => old.starts.has(item.id) && (item.x !== old.starts.get(item.id).x || item.y !== old.starts.get(item.id).y));
+  if (cancel) { project = moveItems(project, old.starts, 0, 0); renderCanvas(); }
+  else if (changed) commit();
   if (old.node.hasPointerCapture(old.pointerId)) old.node.releasePointerCapture(old.pointerId);
 }
 // 使用事件委托及指针捕获；选中时保留节点，避免原稿中拖拽引用失效。
@@ -229,18 +272,20 @@ $('canvas').addEventListener('pointerdown', event => {
   const node = event.target.closest('.editor-item');
   if (!node) { select(null); return; }
   event.preventDefault();
-  select(node.dataset.itemId);
-  const item = selectedItem();
-  gesture = { id: item.id, pointerId: event.pointerId, node, clientX: event.clientX, clientY: event.clientY, x: item.x, y: item.y };
+  if (event.shiftKey || !selectedIds.has(node.dataset.itemId)) select(node.dataset.itemId, event.shiftKey);
+  if (!selectedIds.has(node.dataset.itemId)) return;
+  selectedId = node.dataset.itemId; renderProperties();
+  gesture = { starts: selectionStarts(), pointerId: event.pointerId, node, clientX: event.clientX, clientY: event.clientY };
   node.setPointerCapture(event.pointerId);
   $('canvas').focus({ preventScroll: true });
 });
 $('canvas').addEventListener('pointermove', event => {
   if (!gesture || event.pointerId !== gesture.pointerId) return;
+  project = moveItems(project, gesture.starts, (event.clientX - gesture.clientX) / zoom, (event.clientY - gesture.clientY) / zoom);
+  for (const item of project.items) if (gesture.starts.has(item.id)) {
+    const node = itemNodes.get(item.id); node.style.left = `${item.x}px`; node.style.top = `${item.y}px`;
+  }
   const item = selectedItem();
-  item.x = number(gesture.x + (event.clientX - gesture.clientX) / zoom, 0, 0, project.canvas.width - item.width);
-  item.y = number(gesture.y + (event.clientY - gesture.clientY) / zoom, 0, 0, project.canvas.height - item.height);
-  gesture.node.style.left = `${item.x}px`; gesture.node.style.top = `${item.y}px`;
   $('propX').value = item.x; $('propY').value = item.y;
 });
 $('canvas').addEventListener('pointerup', event => { if (event.pointerId === gesture?.pointerId) finishGesture(); });
@@ -268,7 +313,14 @@ $('canvas').addEventListener('drop', safeAction(event => {
   add(component, point.x, point.y);
 }));
 $('componentSearch').addEventListener('input', renderLibrary);
-$('layerList').addEventListener('click', event => { const button = event.target.closest('[data-item-id]'); if (button) select(button.dataset.itemId); });
+$('layerList').addEventListener('click', event => { const button = event.target.closest('[data-item-id]'); if (button) select(button.dataset.itemId, event.shiftKey); });
+$('alignReference').addEventListener('change', renderProperties);
+$('alignmentActions').addEventListener('click', event => {
+  const button = event.target.closest('[data-align]');
+  if (!button || button.disabled) return;
+  finishGesture(); project = alignItems(project, selectedIds, button.dataset.align, $('alignReference').value);
+  commit(); notify(`已${button.textContent}（参照${$('alignReference').value === 'canvas' ? '画布' : '所选组件'}）`);
+});
 function changeLayer(delta) {
   const index = project.items.findIndex(item => item.id === selectedId);
   const target = index + delta;
@@ -337,8 +389,8 @@ function fitCanvas() {
   const layout = frameLayout(project.canvas, project.frame);
   const viewport = $('canvasViewport');
   const computed = getComputedStyle(viewport);
-  const availableWidth = viewport.clientWidth - parseFloat(computed.paddingLeft) - parseFloat(computed.paddingRight);
-  const availableHeight = viewport.clientHeight - parseFloat(computed.paddingTop) - parseFloat(computed.paddingBottom);
+  const availableWidth = viewport.clientWidth - parseFloat(computed.paddingLeft) - parseFloat(computed.paddingRight) - (guides.rulers ? 22 : 0);
+  const availableHeight = viewport.clientHeight - parseFloat(computed.paddingTop) - parseFloat(computed.paddingBottom) - (guides.rulers ? 22 : 0);
   zoom = Math.max(.1, Math.min(1, Math.floor(Math.min(availableWidth / layout.width, availableHeight / (layout.height + 28)) * 100) / 100));
   updateZoom();
 }
@@ -439,8 +491,7 @@ document.addEventListener('keydown', safeAction(event => {
   const item = selectedItem();
   if (item && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
     event.preventDefault(); const distance = event.shiftKey ? 10 : 1;
-    const next = normalizeItem({ ...item, x: item.x + (event.key === 'ArrowRight' ? distance : event.key === 'ArrowLeft' ? -distance : 0), y: item.y + (event.key === 'ArrowDown' ? distance : event.key === 'ArrowUp' ? -distance : 0) }, project.canvas);
-    project.items[project.items.indexOf(item)] = next; commit();
+    project = moveItems(project, selectionStarts(), event.key === 'ArrowRight' ? distance : event.key === 'ArrowLeft' ? -distance : 0, event.key === 'ArrowDown' ? distance : event.key === 'ArrowUp' ? -distance : 0); commit();
   }
 }));
 window.addEventListener('pagehide', () => { finishGesture(); if (saveTimer) persistProject(); });

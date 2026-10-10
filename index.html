@@ -64,12 +64,15 @@
       </div>
     </aside>
     <section class="canvas-area" aria-label="画布工作区">
-      <div class="canvas-topbar"><span class="canvas-breadcrumb"><span data-icon="layers"></span>未命名原型 <span>/</span> <strong id="presetLabel">手机 · 竖屏</strong></span><span class="canvas-dimensions" id="canvasSizeLabel">375 × 667</span></div>
+      <div class="canvas-topbar"><span class="canvas-breadcrumb"><span data-icon="layers"></span>未命名原型 <span>/</span> <strong id="presetLabel">手机 · 竖屏</strong></span><div class="canvas-view-controls"><label><input type="checkbox" id="showRulers" checked>标尺</label><label><input type="checkbox" id="showGrid">网格</label><span class="canvas-dimensions" id="canvasSizeLabel">375 × 667</span></div></div>
       <div class="canvas-viewport" id="canvasViewport">
         <div class="canvas-stage" id="canvasStage">
+          <div class="canvas-ruler horizontal" id="rulerHorizontal" aria-label="水平标尺，单位像素"></div>
+          <div class="canvas-ruler vertical" id="rulerVertical" aria-label="垂直标尺，单位像素"></div>
           <div class="canvas-scaler" id="canvasScaler">
             <div class="canvas-caption"><span>画板 01</span><span id="artboardSize">375 × 667</span></div>
             <div id="deviceShell" class="device-shell"><div class="canvas-container prototype" id="canvas" tabindex="0" aria-label="原型画布">
+              <div class="canvas-grid" id="canvasGrid" hidden aria-hidden="true"></div>
               <div class="empty-canvas-hint" id="emptyHint"><span class="empty-icon" data-icon="pointer"></span><strong>让想法，从这里开始</strong><span>从左侧拖拽组件到画布<br>也可以点击组件快速添加</span><span class="empty-chip">拖拽 · 编辑 · 导出</span></div>
             </div></div>
           </div>
@@ -84,6 +87,7 @@
           <div class="section-label">组件属性</div>
           <div id="noSelectionMsg" class="selection-empty"><span data-icon="pointer"></span><strong>未选中组件</strong><p>点击画布中的组件<br>在这里调整它的设计</p></div>
           <form id="selectionProps" hidden>
+            <p class="field-help" id="selectionDetail"></p>
             <label class="field">组件名称<input id="propName" maxlength="80" required></label>
             <div class="field-grid"><label class="field">X<input id="propX" type="number" min="0" required></label><label class="field">Y<input id="propY" type="number" min="0" required></label></div>
             <div class="field-grid"><label class="field">宽度<input id="propW" type="number" min="1" max="2000" required></label><label class="field">高度<input id="propH" type="number" min="1" max="2000" required></label></div>
@@ -94,7 +98,16 @@
             <div class="prop-actions"><button class="btn btn-sm" type="button" id="duplicateItemBtn"><span data-icon="copy"></span>复制</button><button class="btn btn-sm btn-danger" type="button" id="deleteItemBtn"><span data-icon="trash"></span>删除</button></div>
           </form>
         </section>
-        <section class="prop-section"><div class="section-label">画布设置</div><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
+        <section class="prop-section">
+          <div class="section-label">对齐与居中 <span id="selectionCount">未选中</span></div>
+          <label class="field">对齐参照<select id="alignReference"><option value="canvas">画布</option><option value="selection">所选组件</option></select></label>
+          <div class="alignment-actions" id="alignmentActions" role="group" aria-label="对齐与居中">
+            <button class="btn btn-sm" data-align="left" disabled>左对齐</button><button class="btn btn-sm" data-align="centerX" disabled>水平居中</button><button class="btn btn-sm" data-align="right" disabled>右对齐</button>
+            <button class="btn btn-sm" data-align="top" disabled>顶部对齐</button><button class="btn btn-sm" data-align="centerY" disabled>垂直居中</button><button class="btn btn-sm" data-align="bottom" disabled>底部对齐</button>
+            <button class="btn btn-sm align-center" data-align="center" disabled>整体居中</button>
+          </div><p class="field-help alignment-help">按住 Shift 点击画布或图层可多选。以画布为参照时，各组件分别对齐；以所选组件为参照时，至少选择两个组件。</p>
+        </section>
+        <section class="prop-section"><div class="section-label">画布设置</div><label class="field">网格间距<select id="gridSize"><option value="5">5 px</option><option value="10">10 px</option><option value="20" selected>20 px</option><option value="40">40 px</option><option value="50">50 px</option><option value="100">100 px</option></select></label><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
         <section class="prop-section">
           <div class="section-label">设备外框</div>
           <label class="field">设备类型<select id="frameDevice"><option value="phone">手机</option><option value="tablet">平板</option><option value="pc">电脑</option></select></label>
