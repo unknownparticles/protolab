@@ -17,7 +17,6 @@ try {
   const page = await context.newPage(); const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
-  await page.evaluate(() => window.addEventListener('message', event => { window.previewMessages ||= []; window.previewMessages.push({ data: event.data, frame: event.source === document.getElementById('previewFrame').contentWindow }); }));
   const canvas = { width: 600, height: 500, preset: 'custom' };
   const frame = { device: 'pc', style: 'none' };
   const item = (id, content, x, y, width, height, extra = {}) => ({ id, name: id, type: 'html', content, x, y, width, height, radius: 0, padding: '0', margin: '0', ...extra });
@@ -44,7 +43,6 @@ try {
     await preview.getByRole('button', { name: '保存文字', exact: true }).click();
   };
   await edit(preview.locator('[data-name="card"] strong'), '新标题 <安全文本>');
-  await page.waitForTimeout(500); console.log('调试', await page.evaluate(() => ({ messages: window.previewMessages, status: document.getElementById('statusMessage').textContent, text: document.querySelector('.editor-item strong')?.textContent })), await preview.locator('[data-name="card"] strong').textContent());
   await preview.locator('[data-name="card"] strong').filter({ hasText: '新标题 <安全文本>' }).waitFor();
   assert.equal(await preview.locator('[data-name="card"] p').textContent(), '保留正文 强调 尾部');
   assert.equal(await preview.locator('[data-prototype-page="details"]').isVisible(), false);
