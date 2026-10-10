@@ -3,7 +3,7 @@ import { COMPONENTS } from './presets.js';
 import { icon, componentIcon } from './icons.js';
 import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
 import { renderComponentPreview, clearComponentPreview } from './component-preview.js';
-import { FRAME_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLayout } from './frames.js';
+import { FRAME_STYLES, CAMERA_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLayout } from './frames.js';
 import { LIBRARY_KEY, PROJECT_KEY, readStorage, writeStorage, download, readFile } from './storage.js';
 import { alignItems, moveItems } from './layout.js';
 import { GUIDES_KEY, normalizeGuides, rulerMarkup } from './guides.js';
@@ -14,7 +14,7 @@ const sharedStyles = document.createElement('style');
 sharedStyles.textContent = PROTOTYPE_CSS;
 document.head.append(sharedStyles);
 let library = clone(COMPONENTS);
-let project = { version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, frame: normalizeFrame(), items: [] };
+let project = { version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, frame: normalizeFrame({ camera: 'island' }), items: [] };
 let selectedId = null;
 let selectedIds = new Set();
 let guides = normalizeGuides();
@@ -185,6 +185,9 @@ function renderDevice() {
   $('frameDevice').value = frame.device;
   $('frameStyle').replaceChildren(...Object.entries({ none: '无外框', ...FRAME_STYLES[frame.device], custom: '自定义 HTML' }).map(([value, label]) => new Option(label, value)));
   $('frameStyle').value = frame.style;
+  $('cameraSettings').hidden = frame.device !== 'phone' || frame.style === 'classic';
+  $('cameraStyle').replaceChildren(...Object.entries(CAMERA_STYLES).map(([value, label]) => new Option(label, value)));
+  $('cameraStyle').value = frame.camera;
   $('systemBarSettings').hidden = frame.device === 'pc';
   $('showStatusBar').checked = frame.statusBar;
   $('statusBarFields').hidden = !frame.statusBar;
@@ -357,6 +360,7 @@ $('frameStyle').addEventListener('change', () => {
   else updateFrame({ style: $('frameStyle').value });
 });
 $('editFrameBtn').addEventListener('click', openFrameDialog);
+$('cameraStyle').addEventListener('change', () => updateFrame({ camera: $('cameraStyle').value }));
 $('frameDialog').addEventListener('close', renderDevice);
 $('frameForm').addEventListener('submit', event => {
   event.preventDefault();

@@ -113,11 +113,12 @@
           <label class="field">设备类型<select id="frameDevice"><option value="phone">手机</option><option value="tablet">平板</option><option value="pc">电脑</option></select></label>
           <label class="field">外框样式<select id="frameStyle"></select></label>
           <button class="btn apply-button" id="editFrameBtn">编辑自定义 HTML 外框</button>
+          <div id="cameraSettings"><label class="field">屏内摄像头<select id="cameraStyle"></select></label><p class="field-help">摄像头会遮挡屏幕内容；横屏时转到左侧，请预留安全区。</p></div>
           <div id="systemBarSettings">
             <label class="checkbox-field"><input type="checkbox" id="showStatusBar">显示顶部时间电量栏</label>
             <div class="field-grid" id="statusBarFields"><label class="field">时间<input id="statusTime" value="9:41" maxlength="5" placeholder="9:41"></label><label class="field">电量 %<input id="statusBattery" type="number" min="0" max="100" value="100"></label></div>
             <label class="field">底部导航栏<select id="navigationStyle"><option value="none">隐藏</option><option value="gesture">手势横条</option><option value="buttons">三键导航</option></select></label>
-            <p class="field-help">系统栏覆盖画布顶部 28 px、底部 28 / 40 px，设计时请留出空间。</p>
+            <p class="field-help">系统栏覆盖画布顶部 28～44 px（随摄像头变化）、底部 28 / 40 px，设计时请留出空间。</p>
           </div>
         </section>
         <section class="prop-section"><div class="section-label">图层 <span id="layerCount">0</span></div><div class="layer-list" id="layerList"></div><p class="field-help" id="layerEmpty">添加组件后在这里快速选中。</p><div class="layer-actions" id="layerActions" hidden><button class="btn btn-sm" id="layerUpBtn" title="上移一层">上移一层</button><button class="btn btn-sm" id="layerDownBtn" title="下移一层">下移一层</button></div></section>

@@ -1,4 +1,4 @@
-import { normalizeFrame, frameLayout } from './frames.js';
+import { normalizeFrame, frameLayout, cameraLayout } from './frames.js';
 /** 组件只承载静态标记，移除脚本、事件、页面级样式及外部资源。 */
 const HTML_TAGS = new Set('div span p strong b em i u s small h1 h2 h3 h4 h5 h6 section article header footer main nav aside ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col label button input textarea select option img a br hr pre code blockquote figure figcaption'.split(' '));
 const SVG_TAGS = new Set('svg g path rect circle ellipse line polyline polygon text tspan defs lineargradient radialgradient stop clippath mask title desc'.split(' '));
@@ -62,6 +62,11 @@ export const PROTOTYPE_CSS = `
 .phone-classic .device-screen,.tablet-classic .device-screen{border-radius:3px;overflow:hidden}
 .device-hardware{position:absolute;inset:0;pointer-events:none}
 .device-camera{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#607590}
+.device-cutout{position:absolute;z-index:4;background:#11151e;pointer-events:auto;cursor:default;border-radius:999px;box-shadow:inset 0 0 0 1px #273244}
+.device-cutout.notch{border-radius:0 0 15px 15px}.device-cutout.notch.landscape{border-radius:0 15px 15px 0}
+.device-cutout i{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:7px;height:7px;border-radius:50%;background:#1b3555;box-shadow:inset 0 0 0 2px #243d59}
+.device-cutout.landscape i{right:50%;top:auto;bottom:8px;transform:translateX(50%)}
+.device-cutout.punch-center i,.device-cutout.punch-left i{right:50%;top:50%;bottom:auto;transform:translate(50%,-50%);width:6px;height:6px}
 .phone-classic .device-camera,.tablet-classic .device-camera{top:23px;width:42px;height:5px;border-radius:4px}
 .device-home{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);width:30px;height:30px;border:2px solid #64748b;border-radius:50%}
 .pc-monitor .device-decoration{background:linear-gradient(#273244 0 calc(100% - 85px),transparent calc(100% - 85px));border-radius:14px}
@@ -84,11 +89,13 @@ export function deviceMarkup(canvas, rawFrame, screenHTML = '') {
   const frame = normalizeFrame(rawFrame, rawFrame?.device || canvas.preset);
   const layout = frameLayout(canvas, frame);
   const key = `${frame.device}-${frame.style}`;
+  const camera = cameraLayout(canvas, frame);
+  const cutout = camera ? `<div class="device-cutout ${camera.kind}${camera.landscape ? ' landscape' : ''}" style="left:${camera.left}px;top:${camera.top}px;width:${camera.width}px;height:${camera.height}px" aria-hidden="true"><i></i></div>` : '';
   let decoration = '';
   if (frame.style === 'custom') decoration = frame.html;
   else if (frame.style !== 'none') {
     decoration = '<div class="device-hardware">';
-    if (frame.device !== 'pc' || frame.style === 'laptop') decoration += '<span class="device-camera"></span>';
+    if (frame.device === 'tablet' || frame.style === 'classic' || frame.style === 'laptop') decoration += '<span class="device-camera"></span>';
     if (frame.style === 'classic') decoration += '<span class="device-home"></span>';
     if (frame.style === 'monitor') decoration += '<span class="device-stand"></span>';
     if (frame.style === 'laptop') decoration += '<span class="device-trackpad"></span>';
@@ -96,9 +103,9 @@ export function deviceMarkup(canvas, rawFrame, screenHTML = '') {
     decoration += '</div>';
   }
   const mobile = frame.device !== 'pc';
-  const status = mobile && frame.statusBar ? `<div class="device-status" aria-label="顶部时间电量栏"><span>${frame.time}</span><span class="device-indicators"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 14h2v-3H1zm4 0h2V8H5zm4 0h2V5H9zm4 0h2V2h-2z"/></svg><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1 6a11 11 0 0 1 14 0M4 9a6 6 0 0 1 8 0M6 12a3 3 0 0 1 4 0"/></svg><span>${frame.battery}%</span><span class="device-battery"><i style="width:${frame.battery}%"></i></span></span></div>` : '';
+  const status = mobile && frame.statusBar ? `<div class="device-status" style="height:${camera?.statusHeight || 28}px;padding-left:${camera?.statusPaddingLeft || 16}px" aria-label="顶部时间电量栏"><span>${frame.time}</span><span class="device-indicators"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 14h2v-3H1zm4 0h2V8H5zm4 0h2V5H9zm4 0h2V2h-2z"/></svg><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1 6a11 11 0 0 1 14 0M4 9a6 6 0 0 1 8 0M6 12a3 3 0 0 1 4 0"/></svg><span>${frame.battery}%</span><span class="device-battery"><i style="width:${frame.battery}%"></i></span></span></div>` : '';
   const navigation = mobile && frame.navigation !== 'none' ? `<div class="device-navigation ${frame.navigation}" aria-label="底部导航栏">${frame.navigation === 'gesture' ? '<span class="device-gesture"></span>' : '<span class="device-nav-back"></span><span class="device-nav-home"></span><span class="device-nav-recent"></span>'}</div>` : '';
-  return { layout, className: `device-shell ${key}`, style: `width:${layout.width}px;height:${layout.height}px`, inner: `<div class="device-decoration" aria-hidden="true">${decoration}</div><div class="device-screen" style="left:${layout.left}px;top:${layout.top}px;width:${canvas.width}px;height:${canvas.height}px">${screenHTML}${status}${navigation}</div>` };
+  return { layout, className: `device-shell ${key}`, style: `width:${layout.width}px;height:${layout.height}px`, inner: `<div class="device-decoration" aria-hidden="true">${decoration}</div><div class="device-screen" style="left:${layout.left}px;top:${layout.top}px;width:${canvas.width}px;height:${canvas.height}px">${screenHTML}${status}${navigation}${cutout}</div>` };
 }
 export function exportHTML(project) {
   const screen = `<main class="prototype" aria-label="原型画布">${project.items.map(itemHTML).join('\n')}</main>`;

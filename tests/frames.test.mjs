@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeFrame, frameLayout, FRAME_STYLES } from '../src/frames.js';
+import { normalizeFrame, frameLayout, FRAME_STYLES, CAMERA_STYLES, cameraLayout } from '../src/frames.js';
 import { validateProject, resizeProject, createHistory } from '../src/model.js';
 import { deviceMarkup, exportHTML, itemHTML } from '../src/content.js';
 
@@ -60,4 +60,32 @@ test('外框与系统栏纳入历史，导出保持画布坐标和完整外框',
 });
 test('矢量图形使用透明底且零圆角，避免点线被白色卡片遮挡', () => {
   assert.match(itemHTML({ type: 'svg', name: '线', content: '<svg></svg>', x: 0, y: 0, width: 100, height: 12, radius: 0, padding: '0', margin: '0' }), /prototype-item vector-item/);
+});
+test('屏内摄像头覆盖画布，横屏旋转到左侧并随草稿恢复', () => {
+  for (const camera of Object.keys(CAMERA_STYLES).filter(value => value !== 'none')) {
+    const frame = normalizeFrame({ camera, statusBar: true });
+    const restored = validateProject({ version: 1, canvas, frame, items: [] }, value => value);
+    assert.equal(restored.frame.camera, camera);
+    const portrait = cameraLayout(canvas, frame);
+    const landscape = cameraLayout({ ...canvas, width: canvas.height, height: canvas.width }, frame);
+    assert.equal(portrait.width, landscape.height);
+    assert.equal(portrait.height, landscape.width);
+    assert.equal(portrait.left, landscape.top);
+    assert.equal(portrait.top, landscape.left);
+    const markup = deviceMarkup(canvas, frame, '<main class="prototype"></main>');
+    assert.match(markup.inner, new RegExp(`device-cutout ${camera}`));
+    assert.ok(markup.inner.indexOf('device-cutout') > markup.inner.indexOf('device-screen'));
+  }
+});
+test('旧草稿及关闭摄像头无屏内遮挡，经典手机和平板电脑隐藏屏内摄像头', () => {
+  assert.equal(normalizeFrame().camera, 'none');
+  assert.equal(normalizeFrame({ camera: 'invalid' }).camera, 'none');
+  assert.equal(cameraLayout(canvas, normalizeFrame()), null);
+  for (const frame of [normalizeFrame({ camera: 'notch', style: 'classic' }), normalizeFrame({ camera: 'island' }, 'tablet'), normalizeFrame({ camera: 'punch-left' }, 'pc')]) {
+    assert.equal(cameraLayout(canvas, frame), null);
+    assert.doesNotMatch(deviceMarkup(canvas, frame).inner, /device-cutout/);
+  }
+  const frame = normalizeFrame({ camera: 'punch-left', statusBar: true, style: 'custom', html: '<div>外框</div>' });
+  assert.equal(cameraLayout(canvas, frame).statusPaddingLeft, 50);
+  assert.match(exportHTML({ canvas, frame, items: [] }), /device-cutout punch-left/);
 });

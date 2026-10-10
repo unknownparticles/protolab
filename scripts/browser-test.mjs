@@ -239,6 +239,47 @@ try {
   const controls = await controlsContext.newPage();
   controls.on('pageerror', error => errors.push(error.message));
   await controls.goto(base);
+  assert.equal(await controls.locator('.device-cutout.island').count(), 1);
+  await controls.locator('#showStatusBar').check();
+  for (const camera of ['notch', 'island', 'punch-center', 'punch-left']) {
+    await controls.locator('#cameraStyle').selectOption(camera);
+    const mask = await controls.locator('.device-cutout').boundingBox();
+    const screen = await controls.locator('#canvas').boundingBox();
+    assert.ok(mask.x >= screen.x && mask.y >= screen.y && mask.x + mask.width <= screen.x + screen.width && mask.y + mask.height <= screen.y + screen.height);
+    const coversScreen = await controls.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.device-cutout'), { x: mask.x + mask.width / 2, y: mask.y + mask.height / 2 });
+    assert.equal(coversScreen, true);
+    for (const selector of ['.device-status > span:first-child', '.device-indicators']) {
+      const text = await controls.locator(selector).boundingBox();
+      assert.ok(text.x + text.width <= mask.x || text.x >= mask.x + mask.width || text.y + text.height <= mask.y || text.y >= mask.y + mask.height, `${camera} 不应遮挡时间电量`);
+    }
+  }
+  await controls.locator('#cameraStyle').selectOption('none');
+  assert.equal(await controls.locator('.device-cutout').count(), 0);
+  await controls.locator('#undoBtn').click(); assert.equal(await controls.locator('#cameraStyle').inputValue(), 'punch-left');
+  await controls.locator('#redoBtn').click(); assert.equal(await controls.locator('.device-cutout').count(), 0);
+  await controls.locator('#cameraStyle').selectOption('notch');
+  await controls.locator('#rotateBtn').click();
+  assert.equal(await controls.locator('.device-cutout.notch.landscape').count(), 1);
+  assert.equal(await controls.locator('.device-cutout').evaluate(element => element.offsetLeft), 0);
+  await controls.locator('#rotateBtn').click();
+  await controls.locator('#frameStyle').selectOption('classic');
+  assert.equal(await controls.locator('.device-cutout').count(), 0);
+  await controls.locator('#frameStyle').selectOption('modern');
+  await controls.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
+  await controls.reload();
+  assert.equal(await controls.locator('.device-cutout.notch').count(), 1);
+  await controls.locator('#previewBtn').click();
+  assert.equal(await controls.frameLocator('#previewFrame').locator('.device-cutout.notch').count(), 1);
+  await controls.locator('[data-close="previewDialog"]').click();
+  const cameraDownload = controls.waitForEvent('download'); await controls.locator('#exportHtmlBtn').click();
+  const cameraFile = await cameraDownload;
+  const cameraExport = await controlsContext.newPage(); await cameraExport.setContent(await readFile(await cameraFile.path(), 'utf8'));
+  assert.equal(await cameraExport.locator('.device-cutout.notch').count(), 1);
+  const cameraProperties = ['left', 'top', 'width', 'height', 'zIndex', 'borderRadius'];
+  const readCameraStyle = (element, properties) => properties.map(property => getComputedStyle(element)[property]);
+  assert.deepEqual(await cameraExport.locator('.device-cutout').evaluate(readCameraStyle, cameraProperties), await controls.locator('.device-cutout').evaluate(readCameraStyle, cameraProperties));
+  await cameraExport.close();
+  console.log('通过：刘海、灵动岛、打孔实际遮挡屏幕，状态栏避让、横屏旋转、历史、恢复和导出一致');
   for (const [id, x, y] of [['lib-slider', 30, 60], ['lib-textarea', 30, 120], ['lib-svg-line', 30, 260], ['lib-svg-circle', 30, 320], ['lib-svg-rect', 170, 320]]) {
     await controls.locator(`[data-comp-id="${id}"]`).click();
     await controls.locator('#propX').fill(String(x)); await controls.locator('#propY').fill(String(y));

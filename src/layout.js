@@ -1,4 +1,5 @@
 /** 布局操作始终以画布像素计算，与缩放和设备外框无关。 */
+import { placementBounds } from './safe-area.js';
 export function selectionBounds(items) {
   if (!items.length) return null;
   const x = Math.min(...items.map(item => item.x));
@@ -10,7 +11,7 @@ export function alignItems(project, ids, direction, reference = 'canvas') {
   if (!['left', 'centerX', 'right', 'top', 'centerY', 'bottom', 'center'].includes(direction)) throw new Error('不支持的对齐方式');
   const selected = project.items.filter(item => ids.has(item.id));
   if (!selected.length || reference === 'selection' && selected.length < 2) return project;
-  const bounds = reference === 'selection' ? selectionBounds(selected) : { x: 0, y: 0, ...project.canvas };
+  const bounds = reference === 'selection' ? selectionBounds(selected) : placementBounds(project);
   return { ...project, items: project.items.map(item => {
     if (!ids.has(item.id)) return item;
     let { x, y } = item;
@@ -28,7 +29,8 @@ export function moveItems(project, starts, dx, dy) {
   const selected = project.items.filter(item => starts.has(item.id)).map(item => ({ ...item, ...starts.get(item.id) }));
   const bounds = selectionBounds(selected);
   if (!bounds) return project;
-  dx = Math.round(Math.max(-bounds.x, Math.min(project.canvas.width - bounds.x - bounds.width, dx)));
-  dy = Math.round(Math.max(-bounds.y, Math.min(project.canvas.height - bounds.y - bounds.height, dy)));
+  const available = placementBounds(project);
+  dx = Math.round(Math.max(available.x - bounds.x, Math.min(available.x + available.width - bounds.x - bounds.width, dx)));
+  dy = Math.round(Math.max(available.y - bounds.y, Math.min(available.y + available.height - bounds.y - bounds.height, dy)));
   return { ...project, items: project.items.map(item => starts.has(item.id) ? { ...item, x: starts.get(item.id).x + dx, y: starts.get(item.id).y + dy } : item) };
 }
