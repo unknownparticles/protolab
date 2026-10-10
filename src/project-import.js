@@ -1,4 +1,4 @@
-import { MAX_ITEMS, MAX_CODE, uid, validateProject, validateLibrary } from './model.js';
+import { MAX_ITEMS, contentSizeValid, uid, validateProject, validateLibrary } from './model.js';
 import { sanitizeContent, STYLES } from './content.js';
 import { projectDetails } from './projects.js';
 
@@ -115,7 +115,7 @@ export async function importHTML(source, { width = 1280, height = 800 } = {}) {
     const add = (element, box, content, name) => {
       if (!content.trim()) return;
       if (items.length >= MAX_ITEMS) throw new Error('识别出的组件超过 200 个，请拆分工程后导入');
-      if (content.length > MAX_CODE) throw new Error('识别出的单个组件内容过大，请拆分后导入');
+      if (!contentSizeValid(content, element.localName === 'svg' ? 'svg' : 'html')) throw new Error('识别出的单个组件内容过大，请拆分后导入');
       if (box.left < origin.left - 1 || box.top < origin.top - 1) warnings.add('画布外的负坐标内容已约束到画布边界');
       items.push({ id: uid(), name, type: element.localName === 'svg' ? 'svg' : 'html', imported: true, content, x: box.left - origin.left, y: box.top - origin.top, width: box.width, height: box.height, radius: 0, padding: '0', margin: '0' });
     };

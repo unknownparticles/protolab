@@ -1,4 +1,5 @@
 import { normalizeFrame } from './frames.js';
+import { normalizeAppearance } from './appearance.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { normalizeOrientationResponse } from './orientation.js';
 import { MAX_PAGES, normalizeInteraction, syncPages, pageBoard, validatePageLinks } from './pages.js';
@@ -13,6 +14,13 @@ export const MAX_LIBRARY = 200;
 export const MAX_LIBRARY_BYTES = 12 * 1024 * 1024;
 export const MAX_CODE = 100_000;
 export const MAX_IMAGE = 3 * 1024 * 1024;
+/** 内嵌图片另计体积，避免正常上传的图片触发标记代码长度限制。 */
+export function contentSizeValid(content, type) {
+  if (typeof content !== 'string') return false;
+  if (type === 'image') return content.length <= MAX_IMAGE * 1.4;
+  if (content.length > MAX_LIBRARY_BYTES) return false;
+  return content.replace(/data:image\/(?:png|jpeg|gif|webp|avif);base64,[A-Za-z0-9+/=\s]+/g, '').length <= MAX_CODE;
+}
 export const uid = () => globalThis.crypto.randomUUID();
 export const clone = value => structuredClone(value);
 export function number(value, fallback, min, max) {
@@ -39,6 +47,7 @@ export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) 
   };
   if (interaction) result.interaction = interaction;
   else delete result.interaction;
+  if (item.appearance != null) result.appearance = normalizeAppearance(item.appearance);
   return result;
 }
 export function resizeProject(project, width, height, preset = 'custom') {
@@ -69,6 +78,8 @@ export function createItem(component, canvas, x = 40, y = 40, bounds) {
     content: component.content, x, y, width: component.defaultWidth,
     height: component.defaultHeight, radius: component.type === 'svg' ? 0 : 8, padding: '0', margin: '0',
     orientationResponse: component.orientationResponse,
+    ...(component.imageSlot ? { imageSlot: true } : {}),
+    ...(component.appearance ? { appearance: component.appearance } : {}),
   }, canvas, bounds);
 }
 export function validateLibrary(raw, sanitize) {
@@ -80,7 +91,7 @@ export function validateLibrary(raw, sanitize) {
     if (!entry || typeof entry !== 'object' || typeof entry.name !== 'string' || !entry.name.trim()) throw new Error(`第 ${index + 1} 个组件缺少名称`);
     const type = entry.type === 'image' ? 'image' : entry.svg || entry.type === 'svg' ? 'svg' : 'html';
     const content = entry.svg ?? entry.html ?? entry.content;
-    if (typeof content !== 'string' || !content.trim() || content.length > (type === 'image' ? MAX_IMAGE * 1.4 : MAX_CODE)) throw new Error(`组件「${entry.name}」的内容为空或过大`);
+    if (!contentSizeValid(content, type) || !content.trim()) throw new Error(`组件「${entry.name}」的内容为空或过大`);
     const safe = sanitize(content, type);
     if (!safe.trim()) throw new Error(`组件「${entry.name}」没有可用内容`);
     const id = typeof entry.id === 'string' && entry.id.length <= 100 ? entry.id : uid();
@@ -89,6 +100,8 @@ export function validateLibrary(raw, sanitize) {
     return { id, name: entry.name.trim().slice(0, 80), type, content: safe,
       builtin: entry.builtin === true || entry.type === 'preset', category: type === 'svg' ? 'vector' : 'basic',
       orientationResponse: normalizeOrientationResponse(entry.orientationResponse),
+      ...(entry.imageSlot === true ? { imageSlot: true } : {}),
+      ...(entry.appearance != null ? { appearance: normalizeAppearance(entry.appearance) } : {}),
       defaultWidth: number(entry.defaultWidth, 120, 1, 2000), defaultHeight: number(entry.defaultHeight, 60, 1, 2000) };
   });
 }
@@ -105,7 +118,7 @@ function validateBoard(raw, sanitize) {
   project.safeArea = normalizeSafeArea(raw.safeArea, project.canvas, project.frame);
   const ids = new Set();
   project.items = raw.items.map(item => {
-    if (!item || !['html', 'svg', 'image'].includes(item.type) || typeof item.content !== 'string' || item.content.length > (item.type === 'image' ? MAX_IMAGE * 1.4 : MAX_CODE)) throw new Error('草稿组件格式不正确');
+    if (!item || !['html', 'svg', 'image'].includes(item.type) || !contentSizeValid(item.content, item.type)) throw new Error('草稿组件格式不正确');
     const id = typeof item.id === 'string' ? item.id : uid();
     if (ids.has(id)) throw new Error('草稿中存在重复标识');
     ids.add(id);

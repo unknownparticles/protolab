@@ -44,15 +44,16 @@
       <div class="panel-heading"><h1>组件库</h1><span class="badge" id="libCount">23</span></div>
       <p class="panel-description">拖拽到画布，或点击快速添加</p>
       <label class="search-box"><span data-icon="search"></span><input id="componentSearch" type="search" placeholder="搜索组件…" aria-label="搜索组件"></label>
+      <div class="library-tabs" role="tablist" aria-label="组件分类">
+        <button id="basicTab" role="tab" type="button" data-library-tab="basic" aria-controls="basicPanel" aria-selected="true">基础<span id="basicCount">14</span></button>
+        <button id="vectorTab" role="tab" type="button" data-library-tab="vector" aria-controls="vectorPanel" aria-selected="false" tabindex="-1">矢量<span id="vectorCount">9</span></button>
+        <button id="customTab" role="tab" type="button" data-library-tab="custom" aria-controls="customPanel" aria-selected="false" tabindex="-1">自定义<span id="customCount">0</span></button>
+      </div>
       <div class="library-scroll">
-        <div class="section-label">普通组件 <span id="basicCount">14</span></div>
-        <div class="component-list" id="presetList"></div>
-        <div class="section-label">矢量图形 <span id="vectorCount">9</span></div>
-        <div class="component-list vector-list" id="vectorList"></div>
-        <p class="custom-empty" id="libraryEmpty" hidden>没有找到匹配的组件</p>
-        <div class="section-label">我的组件 <span id="customCount">0</span></div>
-        <div class="component-list" id="customList"></div>
-        <p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p>
+        <section id="basicPanel" role="tabpanel" aria-labelledby="basicTab"><div class="section-label">基础组件</div><div class="component-list" id="presetList"></div></section>
+        <section id="vectorPanel" role="tabpanel" aria-labelledby="vectorTab" hidden><div class="section-label">矢量组件</div><div class="component-list vector-list" id="vectorList"></div></section>
+        <section id="customPanel" role="tabpanel" aria-labelledby="customTab" hidden><div class="section-label">自定义组件</div><div class="component-list" id="customList"></div><p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p></section>
+        <p class="custom-empty" id="libraryEmpty" hidden>当前分类没有匹配的组件</p>
         <div class="creation-actions">
           <button class="btn" id="generateComponentBtn">AI 生成组件</button>
           <button class="btn" id="addHtmlCompBtn"><span data-icon="plus"></span>新建 HTML 组件</button>
@@ -102,8 +103,31 @@
             <div class="field-grid"><label class="field">X<input id="propX" type="number" min="0" required></label><label class="field">Y<input id="propY" type="number" min="0" required></label></div>
             <div class="field-grid"><label class="field">宽度<input id="propW" type="number" min="1" max="2000" required></label><label class="field">高度<input id="propH" type="number" min="1" max="2000" required></label></div>
             <label class="field">圆角 <span class="unit">px</span><input id="propRadius" type="number" min="0" max="50" required></label>
-            <div class="field-grid"><label class="field">内边距<input id="propPadding" placeholder="8px 12px" required></label><label class="field">外边距<input id="propMargin" placeholder="0" required></label></div>
-            <p class="field-help">边距使用 px；外边距作用于组件内部内容。</p>
+            <fieldset class="property-group"><legend>内边距 padding · px</legend><div class="spacing-grid"><label class="field">上<input id="propPaddingTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propPaddingRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propPaddingBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propPaddingLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>
+            <fieldset class="property-group"><legend>外边距 margin · px</legend><div class="spacing-grid"><label class="field">上<input id="propMarginTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propMarginRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propMarginBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propMarginLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>
+            <p class="field-help">外边距作用于内部内容，保留组件定位与尺寸。</p>
+            <fieldset class="property-group"><legend>外观</legend>
+              <label class="field">背景颜色<div class="color-field"><input id="propBackgroundPicker" type="color" aria-label="背景颜色选择器"><input id="propBackground" placeholder="原始颜色 / #ffffff" maxlength="20"></div></label>
+              <label class="field">矢量填充 / 描边颜色<div class="color-field"><input id="propColorPicker" type="color" aria-label="矢量颜色选择器"><input id="propColor" placeholder="原始颜色 / #2563eb" maxlength="20"></div></label>
+              <label class="field">不透明度 · %<input id="propOpacity" type="number" min="0" max="100" step="0.1" required></label>
+              <label class="field">混合模式<select id="propBlendMode"></select></label>
+            </fieldset>
+            <fieldset class="property-group" id="textProperties" hidden><legend>文本与字体</legend>
+              <div id="textContentFields"></div>
+              <label class="field">字体<input id="propFontFamily" list="fontChoices" placeholder="原始字体 / system-ui" maxlength="200"></label>
+              <datalist id="fontChoices"><option value="system-ui"><option value="Arial"><option value="Inter"><option value="PingFang SC"><option value="Microsoft YaHei"><option value="serif"><option value="monospace"></datalist>
+              <div class="field-grid"><label class="field">字号 · px<input id="propFontSize" type="number" min="1" max="300" step="0.1" placeholder="原始字号"></label><label class="field">字重<select id="propFontWeight"><option value="">原始字重</option><option value="100">100 · 极细</option><option value="200">200 · 纤细</option><option value="300">300 · 细体</option><option value="400">400 · 常规</option><option value="500">500 · 中等</option><option value="600">600 · 半粗</option><option value="700">700 · 粗体</option><option value="800">800 · 特粗</option><option value="900">900 · 极粗</option></select></label></div>
+              <label class="field">字体颜色<div class="color-field"><input id="propTextColorPicker" type="color" aria-label="字体颜色选择器"><input id="propTextColor" placeholder="原始颜色 / #334155" maxlength="20"></div></label>
+              <p class="field-help">留空保留原始样式；字体需已安装在当前设备。</p>
+            </fieldset>
+            <fieldset class="property-group" id="imageProperties" hidden><legend>图片</legend>
+              <label class="field">编辑图片<select id="propImageTarget"></select></label>
+              <img id="propImagePreview" class="property-image-preview" alt="当前图片" hidden>
+              <label class="field">设置图片<input id="propImageFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif"></label>
+              <label class="field">内嵌图片数据<textarea id="propImageSource" rows="2" placeholder="data:image/png;base64,…" spellcheck="false"></textarea></label>
+              <label class="field">填充方式<select id="propImageFit"><option value="">原始设置</option></select></label>
+              <p class="field-help">完整显示保留比例并留白；原始大小居中裁切。支持上传或粘贴内嵌图片，填充方式作用于组件内全部图片。</p>
+            </fieldset>
             <label class="checkbox-field"><input id="propOrientationEnabled" type="checkbox">跟随屏幕方向</label>
             <div id="propOrientationFields" hidden><label class="field">竖屏时<select id="propPortraitAction"></select></label><label class="field">横屏时<select id="propLandscapeAction"></select></label></div>
             <p class="field-help">切换横竖屏保留坐标、尺寸和组件间距；旋转以组件中心为轴。隐藏的组件仍可从图层选中。</p>
@@ -160,7 +184,7 @@
       <p class="panel-description">描述需求，修改设计或独立生成组件和页面。</p>
       <div id="aiMessages" class="ai-messages" role="log" aria-live="polite"></div>
       <div id="aiPending" class="ai-pending" hidden><strong>AI 版本等待合并</strong><p id="aiPendingSummary"></p><button class="btn btn-primary btn-sm" id="mergeOpenBtn">查看并合并</button><button class="btn btn-sm" id="discardAIBtn">放弃应用</button></div>
-      <div id="aiGenerated" class="ai-pending" hidden><strong>生成结果等待保存</strong><p id="aiGeneratedSummary"></p><button class="btn btn-primary btn-sm" id="aiGeneratedOpenBtn">预览并保存</button></div>
+      <div id="aiGenerated" class="ai-pending" hidden><strong>生成结果等待保存</strong><p id="aiGeneratedSummary"></p><p class="field-help">请保存后再刷新或切换工程。</p><button class="btn btn-primary btn-sm" id="aiGeneratedOpenBtn">预览并保存</button></div>
       <form id="aiForm" class="ai-composer"><label class="field">设计任务<select id="aiMode"><option value="modify">修改当前页面</option><option value="component">独立生成组件</option><option value="page">独立生成页面</option></select></label><p class="field-help" id="aiModeHelp"></p><label class="field">用户提示词<textarea id="aiRequirement" rows="4" maxlength="10000" placeholder="例如：生成一个蓝色登录页，包含手机号输入框、验证码和登录按钮" required></textarea></label><p class="field-help" id="aiRulesSummary"></p><details class="ai-rules"><summary>查看内置设计规范</summary><p class="field-help" id="aiBuiltinRules"></p></details><p id="aiStatus" class="field-help" role="status"></p><div class="ai-composer-actions"><button class="btn" type="button" id="aiCancelBtn" hidden>取消请求</button><button class="btn btn-primary" type="submit" id="aiSendBtn">发送需求</button></div></form>
     </aside>
   </main>

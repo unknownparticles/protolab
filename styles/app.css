@@ -70,9 +70,26 @@
 /* 页面管理在画布上方，窄屏仍可直接切换与添加。 */
 .pages-toolbar{flex-shrink:0;padding:8px 16px 10px;border-block:1px solid #e2e8f0;background:#ffffffb8;min-width:0}
 .project-controls{display:flex;align-items:center;gap:6px;min-width:0}.project-controls select{max-width:180px;min-width:90px;border:1px solid var(--border);border-radius:8px;padding:7px;background:white;color:var(--secondary);font-size:12px}.ai-composer{overflow:auto;max-height:65%;flex-shrink:0}.ai-rules{font-size:11px;color:var(--muted);margin-bottom:10px}.ai-rules summary{cursor:pointer;margin-bottom:8px}.ai-pending p{overflow-wrap:anywhere}
+#generationDialog{overflow:auto}#generationPreview{height:min(50dvh,620px)}#generationDialog .dialog-actions{flex-wrap:wrap}
 @media(max-width:899px){.project-controls{order:2;width:100%}.project-controls select{flex:1;max-width:none}}
 .page-list{display:flex;gap:6px;overflow:auto;max-height:64px;padding-bottom:4px}
 .page-tab{flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--border);border-radius:8px;background:white;color:var(--muted);padding:8px 12px;font-size:11px;cursor:pointer}
 .page-tab.active{background:#eff6ff;border-color:#93c5fd;color:var(--brand)}
 .page-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}.page-tools>span{font-size:10px;color:var(--muted);margin-right:auto}.page-tools .btn{font-size:11px;padding:5px 8px}
 @media(max-width:599px){.pages-toolbar{padding:8px}.page-tools>span{width:100%}.canvas-topbar{gap:6px}.canvas-breadcrumb{overflow:hidden;text-overflow:ellipsis;min-width:0}}
+
+/* 组件分类标签与属性编辑 */
+.library-tabs{display:flex;gap:3px;padding:0 12px 12px;flex-shrink:0}
+.library-tabs [role=tab]{flex:1;min-width:0;border:1px solid transparent;border-radius:8px;padding:8px 3px;background:#f8fafc;color:var(--muted);font-size:11px;white-space:nowrap}
+.library-tabs [aria-selected=true]{background:#eff6ff;border-color:#bfdbfe;color:var(--brand);font-weight:600}
+.library-tabs span{margin-left:4px;font-size:9px;opacity:.7}
+.property-group{margin:0 0 14px;padding:12px 10px 0;border:1px solid var(--border);border-radius:8px;min-width:0}
+.property-group legend{font-size:11px;font-weight:600;color:var(--secondary);padding:0 5px}
+.spacing-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.spacing-grid .field input{padding:8px 4px;text-align:center}
+.color-field{display:flex;align-items:center;gap:6px;margin-top:6px}
+.color-field input{margin-top:0!important;min-width:0}
+.color-field input[type=color]{flex:0 0 32px;width:32px;height:34px;padding:3px;cursor:pointer}
+.property-image-preview{display:block;width:100%;height:96px;object-fit:contain;border-radius:6px;background:#f1f5f9;margin-bottom:12px}
+.property-group textarea{font-family:inherit;resize:vertical}
+.property-group input[type=file]{font-size:10px;padding:6px;max-width:100%}

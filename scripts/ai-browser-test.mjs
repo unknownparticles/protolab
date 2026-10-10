@@ -138,6 +138,7 @@ try {
   assert.equal(await partial.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')).items.length), 2);
   await partial.reload(); assert.equal(await partial.locator('.editor-item').count(), 2);
   await partial.locator('#versionsBtn').click();
-  assert.match(await partial.locator('.version-row').first().textContent(), /较新的本地草稿/);
-  console.log('通过：版本写入失败时保留较新草稿，刷新不会恢复旧画布');
+  assert.match(await partial.locator('.version-row').first().textContent(), /手动修改/);
+  assert.equal(await partial.locator('.version-row').count(), 3);
+  console.log('通过：兼容版本缓存写入失败时，完整工程集合保留最新草稿和全部版本');
 } finally { await browser?.close(); server?.kill(); }

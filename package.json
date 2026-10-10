@@ -13,7 +13,8 @@
     "test:project": "node scripts/project-browser-test.mjs",
     "test:ai": "node scripts/ai-browser-test.mjs",
     "test:orientation": "node scripts/orientation-browser-test.mjs",
-    "test:pages": "node scripts/pages-browser-test.mjs"
+    "test:pages": "node scripts/pages-browser-test.mjs",
+    "test:projects": "node scripts/projects-browser-test.mjs"
   },
   "engines": {
     "node": ">=20.11"

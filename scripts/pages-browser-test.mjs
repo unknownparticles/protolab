@@ -130,6 +130,7 @@ try {
   await page.screenshot({ path: resolve(output, 'pages-editor.png') });
   console.log('通过：复制与删除弹窗、关联动作清理、撤销重做恢复');
 
+  await page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   const baseline = await savedProject();
   const damaged = structuredClone(bundle); damaged.project.pages[1].items[0].interaction = { type: 'openPopup', targetId: 'missing' };
   // 校验未编辑页的数据，失败后保留整个工程。

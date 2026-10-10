@@ -13,9 +13,11 @@ for (const directory of ['src', 'scripts', 'tests']) {
 const html = await readFile(resolve(root, 'index.html'), 'utf8');
 const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 if (new Set(ids).size !== ids.length) { console.error('页面存在重复标识'); failed = true; }
-const app = await readFile(resolve(root, 'src/app.js'), 'utf8');
-for (const match of app.matchAll(/\$\('([^']+)'\)/g)) {
-  if (!ids.includes(match[1])) { console.error(`缺少页面元素：${match[1]}`); failed = true; }
+for (const source of ['src/app.js', 'src/assistant.js']) {
+  const app = await readFile(resolve(root, source), 'utf8');
+  for (const match of app.matchAll(/\$\('([^']+)'\)/g)) {
+    if (!ids.includes(match[1])) { console.error(`缺少页面元素：${match[1]}`); failed = true; }
+  }
 }
 process.exitCode = failed ? 1 : 0;
 if (!failed) console.log('模块语法、页面标识及静态绑定检查通过');

@@ -1,6 +1,8 @@
-import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, normalizeItem, constrainProject, resizeProject, rotateProject, itemBounds, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
+import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, contentSizeValid, uid, clone, normalizeItem, constrainProject, resizeProject, rotateProject, itemBounds, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
 import { ORIENTATION_ACTIONS, normalizeOrientationResponse, orientationPresentation } from './orientation.js';
 import { COMPONENTS } from './presets.js';
+import { IMAGE_FITS, BLEND_MODES, normalizeAppearance, spacingSides } from './appearance.js';
+import { editableContent, updateTextContent, updateImageContent } from './content-editor.js';
 import { icon, componentIcon } from './icons.js';
 import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
 import { renderComponentPreview, clearComponentPreview } from './component-preview.js';
@@ -44,10 +46,15 @@ let saveTimer;
 let toastTimer;
 let customType = 'html';
 let imageData = null;
+let libraryTab = 'basic';
+let propertyContent = { texts: [], images: [] };
+let pendingImages = new Map();
+const appearanceFields = { propBackground: 'background', propColor: 'color', propTextColor: 'textColor', propFontFamily: 'fontFamily', propFontSize: 'fontSize', propFontWeight: 'fontWeight', propOpacity: 'opacity', propBlendMode: 'blendMode', propImageFit: 'imageFit' };
 let startupWarnings = [];
 let initialSavedAt = null;
 let catalog = null;
 let catalogReadable = true;
+let projectSession = 0;
 const currentRecord = () => catalog?.entries.find(entry => entry.id === catalog.activeId);
 function completeLibrary(values) {
   const ids = new Set(COMPONENTS.map(component => component.id));
@@ -75,8 +82,10 @@ function persistProject() {
     const next = saveActiveProject(catalog, { project, library, workspace: { ...assistant.snapshot(), savedAt } });
     writeStorage(PROJECTS_KEY, next); catalog = next;
   } catch { saved = false; }
-  try { assistant.persist(savedAt); } catch { saved = false; }
-  try { writeStorage(PROJECT_KEY, { ...project, savedAt }); } catch { saved = false; }
+  if (saved) {
+    try { assistant.persist(savedAt); } catch { saved = false; }
+    try { writeStorage(PROJECT_KEY, { ...project, savedAt }); } catch { saved = false; }
+  }
   $('saveState').textContent = saved ? '已自动保存' : '草稿未保存';
   if (!saved) notify('草稿或版本未保存成功，浏览器存储不可用或已满，请导出版本备份保留设计与历史。', true);
   return saved;
@@ -87,7 +96,7 @@ function scheduleSave() {
   saveTimer = setTimeout(persistProject, 300);
 }
 function persistLibrary() {
-  try { writeStorage(LIBRARY_KEY, { version: 1, components: library }); return persistProject(); }
+  try { if (!persistProject()) return false; writeStorage(LIBRARY_KEY, { version: 1, components: library }); return true; }
   catch { notify('组件库保存在内存中，浏览器存储不可用或已满。请导出 JSON 备份。', true); return false; }
 }
 // 恢复失败不覆盖损坏的数据，以便用户仍可手动备份。
@@ -116,7 +125,7 @@ const assistant = createAssistant({
     finishGesture();
     if (result.mode === 'component') {
       const nextLibrary = validateLibrary([...library, { ...result.component, id: uid(), name: result.name }], sanitizeContent);
-      library = nextLibrary; renderLibrary(); persistLibrary();
+      library = nextLibrary; setLibraryTab('custom'); persistLibrary();
     } else {
       let next = addPage(project);
       const pageId = next.activePageId;
@@ -152,12 +161,13 @@ function installProject(next) {
   // 先原子写入完整工程集合，再切换内存；写入失败保留当前工程。
   writeStorage(PROJECTS_KEY, next);
   catalog = next;
+  projectSession++;
   const entry = currentRecord();
   project = withPages(entry.project); library = completeLibrary(entry.library);
   assistant.activate(project, entry.workspace);
   selectedId = null; selectedIds.clear(); history = createHistory(project);
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
-  $('componentSearch').value = ''; renderProjects(); renderLibrary(); renderCanvas(); fitCanvas(); persistProject();
+  $('componentSearch').value = ''; renderProjects(); setLibraryTab('basic'); renderCanvas(); fitCanvas(); persistProject();
   notify(`已切换到「${entry.name}」${entry.workspace.pending ? '，有 AI 版本等待合并' : ''}`);
 }
 $('newProjectBtn').addEventListener('click', () => openProjectDetails(true));
@@ -214,12 +224,23 @@ function renderLibrary() {
   }
   const customCount = library.filter(component => !component.builtin).length;
   $('libCount').textContent = library.length;
-  $('customCount').textContent = customCount;
+  $('customCount').textContent = query ? visible.filter(component => !component.builtin).length : customCount;
   $('basicCount').textContent = visible.filter(component => component.builtin && component.type !== 'svg').length;
   $('vectorCount').textContent = visible.filter(component => component.builtin && component.type === 'svg').length;
-  $('libraryEmpty').hidden = visible.length > 0;
+  const count = visible.filter(component => libraryCategory(component) === libraryTab).length;
+  $('libraryEmpty').hidden = count > 0 || libraryTab === 'custom';
   $('customEmpty').hidden = visible.some(component => !component.builtin);
   $('customEmpty').textContent = query ? '没有找到匹配的自定义组件' : '把常用的设计，变成自己的组件。';
+  for (const category of ['basic', 'vector', 'custom']) {
+    const tab = $(`${category}Tab`), active = libraryTab === category;
+    tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1;
+    $(`${category}Panel`).hidden = !active;
+  }
+}
+function libraryCategory(component) { return !component.builtin ? 'custom' : component.type === 'svg' ? 'vector' : 'basic'; }
+function setLibraryTab(category, focus = false) {
+  libraryTab = category; renderLibrary();
+  if (focus) $(`${category}Tab`).focus();
 }
 function renderProperties() {
   const item = selectedItem();
@@ -230,7 +251,21 @@ function renderProperties() {
   $('alignmentActions').querySelectorAll('button').forEach(button => { button.disabled = disabled; });
   if (!item) return;
   $('selectionDetail').textContent = selectedIds.size > 1 ? `已选 ${selectedIds.size} 个组件，以下属性仅编辑「${item.name}」；拖动、复制、删除作用于全部所选组件。` : '按住 Shift 点击组件可多选并对齐。';
-  for (const [field, key] of Object.entries({ propName: 'name', propX: 'x', propY: 'y', propW: 'width', propH: 'height', propRadius: 'radius', propPadding: 'padding', propMargin: 'margin' })) $(field).value = item[key];
+  for (const [field, key] of Object.entries({ propName: 'name', propX: 'x', propY: 'y', propW: 'width', propH: 'height', propRadius: 'radius' })) $(field).value = item[key];
+  for (const key of ['padding', 'margin']) for (const [side, value] of Object.entries(spacingSides(item[key]))) $(`prop${key[0].toUpperCase()}${key.slice(1)}${side[0].toUpperCase()}${side.slice(1)}`).value = value;
+  const appearance = normalizeAppearance(item.appearance);
+  for (const [field, key] of Object.entries(appearanceFields)) $(field).value = appearance[key] ?? (key === 'opacity' ? 100 : key === 'blendMode' ? 'normal' : '');
+  for (const field of ['propBackground', 'propColor', 'propTextColor']) syncColorPicker(field);
+  propertyContent = editableContent(item); pendingImages = new Map();
+  $('textProperties').hidden = !propertyContent.texts.length;
+  $('textContentFields').replaceChildren(...propertyContent.texts.map(({ label, value }, index) => {
+    const field = document.createElement('label'); field.className = 'field'; field.textContent = label;
+    const input = document.createElement('textarea'); input.rows = 2; input.value = value; input.dataset.textIndex = index;
+    field.append(input); return field;
+  }));
+  $('imageProperties').hidden = !propertyContent.images.length;
+  $('propImageTarget').replaceChildren(...propertyContent.images.map(({ label }, index) => new Option(label, String(index))));
+  $('propImageFile').value = ''; renderPropertyImage();
   const response = normalizeOrientationResponse(item.orientationResponse);
   $('propOrientationEnabled').checked = response.enabled;
   $('propPortraitAction').value = response.portrait; $('propLandscapeAction').value = response.landscape;
@@ -238,6 +273,48 @@ function renderProperties() {
   $('propClickAction').value = item.interaction?.type || 'none';
   renderInteractionTargets(item.interaction?.targetId);
 }
+function syncColorPicker(field) {
+  const value = $(field).value;
+  $(`${field}Picker`).value = /^#[\da-f]{6}$/i.test(value) ? value : /^#[\da-f]{3}$/i.test(value) ? '#' + [...value.slice(1)].map(char => char + char).join('') : '#000000';
+}
+function renderPropertyImage() {
+  const index = Number($('propImageTarget').value);
+  const source = pendingImages.get(index) ?? propertyContent.images[index]?.source ?? '';
+  $('propImageSource').value = source;
+  $('propImagePreview').hidden = !/^data:image\//.test(source);
+  if (!$('propImagePreview').hidden) $('propImagePreview').src = source;
+  else $('propImagePreview').removeAttribute('src');
+}
+function readPropertySpacing(key) {
+  return ['Top', 'Right', 'Bottom', 'Left'].map(side => `${Number($(`prop${key}${side}`).value)}px`).join(' ');
+}
+function readPropertyAppearance() {
+  const values = Object.fromEntries(Object.entries(appearanceFields).map(([field, key]) => [key, $(field).value]));
+  // 隐藏的内容编辑器不增加新的字体或图片样式。
+  if ($('textProperties').hidden) for (const key of ['textColor', 'fontFamily', 'fontSize', 'fontWeight']) values[key] = selectedItem().appearance?.[key];
+  if ($('imageProperties').hidden) values.imageFit = selectedItem().appearance?.imageFit;
+  return normalizeAppearance(values);
+}
+$('propBlendMode').replaceChildren(...Object.entries(BLEND_MODES).map(([value, label]) => new Option(label, value)));
+$('propImageFit').append(...Object.entries(IMAGE_FITS).map(([value, label]) => new Option(label, value)));
+for (const field of ['propBackground', 'propColor', 'propTextColor']) {
+  $(field).addEventListener('input', () => syncColorPicker(field));
+  $(`${field}Picker`).addEventListener('input', event => { $(field).value = event.target.value; });
+}
+$('propImageTarget').addEventListener('change', renderPropertyImage);
+$('propImageSource').addEventListener('input', () => {
+  const index = Number($('propImageTarget').value), value = $('propImageSource').value.trim();
+  if (value === propertyContent.images[index]?.source || !value) pendingImages.delete(index);
+  else pendingImages.set(index, value);
+});
+$('propImageFile').addEventListener('change', safeAction(async event => {
+  const file = event.target.files[0]; event.target.value = ''; if (!file) return;
+  const item = selectedItem(), session = projectSession, index = Number($('propImageTarget').value);
+  const source = await readImageFile(file);
+  if (session !== projectSession || selectedItem() !== item) throw new Error('所选组件已变化，请重新设置图片');
+  pendingImages.set(index, source); renderPropertyImage();
+  notify('图片已准备好，点击应用属性保存');
+}));
 function renderInteractionTargets(targetId = $('propClickTarget').value) {
   const type = $('propClickAction').value;
   const needsTarget = ['navigate', 'openPopup'].includes(type);
@@ -552,6 +629,16 @@ $('canvas').addEventListener('drop', safeAction(event => {
   add(component, point.x, point.y, guides.snap && !event.altKey);
 }));
 $('componentSearch').addEventListener('input', renderLibrary);
+document.querySelector('.library-tabs').addEventListener('click', event => {
+  const tab = event.target.closest('[data-library-tab]'); if (tab) setLibraryTab(tab.dataset.libraryTab);
+});
+document.querySelector('.library-tabs').addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  const categories = ['basic', 'vector', 'custom'];
+  const index = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (categories.indexOf(libraryTab) + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
+  setLibraryTab(categories[index], true);
+});
 $('layerList').addEventListener('click', event => { const button = event.target.closest('[data-item-id]'); if (button) select(button.dataset.itemId, event.shiftKey); });
 $('alignReference').addEventListener('change', renderProperties);
 $('alignmentActions').addEventListener('click', event => {
@@ -615,10 +702,19 @@ $('statusTime').addEventListener('change', safeAction(() => {
   updateFrame({ time });
 }));
 $('statusBattery').addEventListener('change', () => updateFrame({ battery: $('statusBattery').value }));
-$('selectionProps').addEventListener('submit', safeAction(event => {
+$('selectionProps').addEventListener('submit', safeAction(async event => {
   event.preventDefault(); const item = selectedItem(); if (!item) return;
+  const session = projectSession, images = [...pendingImages.values()];
+  let content = updateTextContent(item, [...$('textContentFields').querySelectorAll('[data-text-index]')].map(input => input.value));
+  for (const [index, source] of pendingImages) content = updateImageContent({ ...item, content }, index, source);
+  if (!contentSizeValid(content, item.type)) throw new Error('组件内容过大，请使用较小图片或独立图片组件');
   const geometryChanged = Object.entries({ propX: 'x', propY: 'y', propW: 'width', propH: 'height' }).some(([field, key]) => Number($(field).value) !== item[key]);
-  const next = normalizeItem({ ...item, name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: $('propPadding').value, margin: $('propMargin').value, orientationResponse: readOrientationFields('prop'), interaction: normalizeInteraction({ type: $('propClickAction').value, targetId: $('propClickTarget').value }) }, project.canvas, geometryChanged ? placementBounds(project) : itemBounds(project));
+  const next = normalizeItem({ ...item, content, appearance: readPropertyAppearance(), name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: readPropertySpacing('Padding'), margin: readPropertySpacing('Margin'), orientationResponse: readOrientationFields('prop'), interaction: normalizeInteraction({ type: $('propClickAction').value, targetId: $('propClickTarget').value }) }, project.canvas, geometryChanged ? placementBounds(project) : itemBounds(project));
+  for (const source of images) {
+    const image = new Image(); image.src = source;
+    try { await image.decode(); } catch { throw new Error('图片内容无效，无法读取'); }
+  }
+  if (session !== projectSession || selectedItem() !== item) throw new Error('所选组件已变化，请重新应用属性');
   project.items[project.items.indexOf(item)] = next;
   commit(); notify('组件属性已更新');
 }));
@@ -648,10 +744,10 @@ $('projectForm').addEventListener('submit', async event => {
   event.preventDefault();
   const file = $('projectFileInput').files[0]; if (!file || $('applyProjectImportBtn').disabled) return;
   const button = $('applyProjectImportBtn'); button.disabled = true; button.textContent = '正在识别组件…'; $('projectError').textContent = '';
-  const sourceId = catalog.activeId;
+  const sourceSession = projectSession;
   try {
     const imported = await importProjectFile(file, { width: Number($('importWidth').value), height: Number($('importHeight').value) }, readFile);
-    if (sourceId !== catalog.activeId) throw new Error('工程已切换，请在目标工程重新导入');
+    if (sourceSession !== projectSession) throw new Error('工程已切换，请在目标工程重新导入');
     const nextLibrary = imported.components ? completeLibrary(imported.components) : library;
     finishGesture(); project = imported.project; library = nextLibrary;
     selectedId = null; selectedIds.clear(); commit(); renderLibrary();
@@ -666,9 +762,9 @@ $('importLibBtn').addEventListener('click', () => $('libFileInput').click());
 $('libFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
   if (file.size > MAX_LIBRARY_BYTES) throw new Error('组件库文件不能超过 12 MB');
-  const sourceId = catalog.activeId;
+  const sourceSession = projectSession;
   const imported = completeLibrary(validateLibrary(JSON.parse(await readFile(file)), sanitizeContent));
-  if (sourceId !== catalog.activeId) throw new Error('工程已切换，请重新导入组件库');
+  if (sourceSession !== projectSession) throw new Error('工程已切换，请重新导入组件库');
   if (!confirm(`导入后组件库共 ${imported.length} 个组件，替换当前自定义组件，保留内置组件。画布中的组件会保留。建议先导出当前库。`)) return;
   library = imported; renderLibrary(); if (persistLibrary()) notify(`已导入 ${library.length} 个组件`);
 }));
@@ -694,7 +790,7 @@ function readCustomComponent(preview = false) {
     if (!$(id).checkValidity()) throw new Error('默认宽度和高度请输入 1～2000 的整数');
   }
   const raw = customType === 'image' ? imageData : $('customCode').value;
-  if (customType !== 'image' && raw.length > MAX_CODE) throw new Error('组件代码不能超过 100000 字符');
+  if (!contentSizeValid(raw, customType)) throw new Error('组件标记不能超过 100000 字符，内嵌图片另计体积');
   return validateLibrary([{ id: uid(), name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value, orientationResponse: readOrientationFields('custom') }], sanitizeContent)[0];
 }
 function previewCustomComponent() {
@@ -718,15 +814,21 @@ $('componentDialog').addEventListener('close', () => {
   $('componentPreviewSection').hidden = true;
 });
 $('importImgCompBtn').addEventListener('click', () => $('imgFileInput').click());
-$('imgFileInput').addEventListener('change', safeAction(async event => {
-  const file = event.target.files[0]; event.target.value = ''; if (!file) return;
+async function readImageFile(file) {
   if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'].includes(file.type)) throw new Error('请选择 PNG、JPEG、GIF、WebP 或 AVIF 图片');
   if (file.size > MAX_IMAGE) throw new Error('图片不能超过 3 MB');
-  const sourceId = catalog.activeId;
   const data = await readFile(file, 'dataURL');
   const image = new Image(); image.src = data;
   try { await image.decode(); } catch { throw new Error('图片内容无效，无法读取'); }
-  if (sourceId !== catalog.activeId) throw new Error('工程已切换，请重新导入图片');
+  return data;
+}
+$('imgFileInput').addEventListener('change', safeAction(async event => {
+  const file = event.target.files[0]; event.target.value = ''; if (!file) return;
+  const sourceSession = projectSession;
+  const data = await readImageFile(file);
+  const image = new Image(); image.src = data;
+  try { await image.decode(); } catch { throw new Error('图片内容无效，无法读取'); }
+  if (sourceSession !== projectSession) throw new Error('工程已切换，请重新导入图片');
   openComponentDialog('image', data, file.name.replace(/\.[^.]+$/, ''));
   $('customWidth').value = Math.min(image.naturalWidth, 320); $('customHeight').value = Math.max(1, Math.round(Math.min(image.naturalWidth, 320) * image.naturalHeight / image.naturalWidth));
 }));
@@ -735,7 +837,7 @@ $('componentForm').addEventListener('submit', event => {
   try {
     if (library.length >= MAX_LIBRARY) throw new Error('组件库最多支持 200 个组件');
     const component = readCustomComponent();
-    library = validateLibrary([...library, component], sanitizeContent); renderLibrary(); $('componentDialog').close();
+    library = validateLibrary([...library, component], sanitizeContent); setLibraryTab('custom'); $('componentDialog').close();
     if (persistLibrary()) notify(`「${component.name}」已添加并保存到组件库`);
   } catch (error) { $('componentError').textContent = error.message; }
 });
