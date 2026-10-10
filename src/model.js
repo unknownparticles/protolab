@@ -145,20 +145,26 @@ export function validateProject(raw, sanitize) {
   validatePageLinks(result);
   return result;
 }
-export function createHistory(initial, limit = 60) {
-  let values = [clone(initial)];
+export function createHistory(initial, limit = Infinity) {
+  const entry = (value, label) => ({ value: clone(value), label, createdAt: new Date().toISOString() });
+  let entries = [entry(initial, '初始状态')];
   let cursor = 0;
   return {
-    push(value) {
-      if (JSON.stringify(values[cursor]) === JSON.stringify(value)) return;
-      values = values.slice(0, cursor + 1);
-      values.push(clone(value));
-      if (values.length > limit) values.shift();
-      cursor = values.length - 1;
+    push(value, label = '修改设计') {
+      if (JSON.stringify(entries[cursor].value) === JSON.stringify(value)) return;
+      entries = entries.slice(0, cursor + 1);
+      entries.push(entry(value, label));
+      if (entries.length > limit) entries.shift();
+      cursor = entries.length - 1;
     },
-    undo() { if (cursor > 0) cursor--; return clone(values[cursor]); },
-    redo() { if (cursor < values.length - 1) cursor++; return clone(values[cursor]); },
-    get canUndo() { return cursor > 0; }, get canRedo() { return cursor < values.length - 1; },
+    checkout(index) {
+      if (!Number.isInteger(index) || index < 0 || index >= entries.length) throw new Error('历史记录不存在');
+      cursor = index; return clone(entries[cursor].value);
+    },
+    undo() { if (cursor > 0) cursor--; return clone(entries[cursor].value); },
+    redo() { if (cursor < entries.length - 1) cursor++; return clone(entries[cursor].value); },
+    get entries() { return clone(entries); }, get cursor() { return cursor; },
+    get canUndo() { return cursor > 0; }, get canRedo() { return cursor < entries.length - 1; },
   };
 }
 export function clientToCanvas(clientX, clientY, rect, zoom) {

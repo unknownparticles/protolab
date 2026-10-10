@@ -127,7 +127,7 @@ const assistant = createAssistant({
     finishGesture();
     if (result.mode === 'component') {
       const nextLibrary = validateLibrary([...library, { ...result.component, id: uid(), name: result.name }], sanitizeContent);
-      library = nextLibrary; setLibraryTab('custom'); persistLibrary();
+      library = nextLibrary; commit(`AI 生成组件：${result.name}`); setLibraryTab('custom'); persistLibrary();
     } else {
       let next = addPage(project);
       const pageId = next.activePageId;
@@ -143,7 +143,8 @@ if (!catalog) {
   const entry = projectRecord({ name: '未命名工程' }, project, library, assistant.snapshot());
   catalog = { version: 1, activeId: entry.id, entries: [entry] };
 }
-let history = createHistory(project);
+let history = createHistory({ project, library });
+const projectHistories = new Map([[catalog.activeId, history]]);
 function renderProjects() {
   $('projectSelect').replaceChildren(...catalog.entries.map(entry => new Option(entry.name, entry.id)));
   $('projectSelect').value = catalog.activeId;
@@ -167,7 +168,9 @@ function installProject(next) {
   const entry = currentRecord();
   project = withPages(entry.project); library = completeLibrary(entry.library);
   assistant.activate(project, entry.workspace);
-  selectedId = null; selectedIds.clear(); history = createHistory(project);
+  selectedId = null; selectedIds.clear();
+  history = projectHistories.get(entry.id) || createHistory({ project, library });
+  projectHistories.set(entry.id, history);
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('componentSearch').value = ''; renderProjects(); setLibraryTab('basic'); renderCanvas(); fitCanvas(); persistProject();
   notify(`已切换到「${entry.name}」${entry.workspace.pending ? '，有 AI 版本等待合并' : ''}`);
@@ -547,18 +550,35 @@ function select(id, toggle = false) {
   for (const [key, node] of itemNodes) node.classList.toggle('selected', selectedIds.has(key));
   renderProperties(); renderLayers();
 }
-function commit(label) { project = constrainProject(withPages(project)); history.push(project); assistant.record(project, label); renderCanvas(); scheduleSave(); }
+function commit(label = '修改设计') {
+  project = constrainProject(withPages(project)); history.push({ project, library }, label);
+  renderCanvas(); assistant.refreshVersions(); if ($('historyDialog').open) renderHistory(); scheduleSave();
+}
+function saveProject(label = '手动保存') {
+  finishGesture(); assistant.saveVersion(label);
+  if (persistProject()) { $('saveState').textContent = '已保存版本'; notify('已保存，并生成版本记录'); }
+}
+function renderHistory() {
+  $('historyList').replaceChildren(...history.entries.map((entry, index) => {
+    const row = document.createElement('div'); row.className = `version-row${index === history.cursor ? ' current' : ''}`;
+    const info = document.createElement('div'); const title = document.createElement('strong');
+    title.textContent = `${index + 1} · ${entry.label}${index === history.cursor ? ' · 当前' : ''}`;
+    const meta = document.createElement('small'); meta.textContent = new Date(entry.createdAt).toLocaleString('zh-CN');
+    const button = document.createElement('button'); button.className = 'btn btn-sm'; button.textContent = index > history.cursor ? '重做到此步骤' : '撤回到此步骤'; button.disabled = index === history.cursor;
+    button.addEventListener('click', () => restore(index)); info.append(title, meta); row.append(info, button); return row;
+  }).toReversed());
+}
 function add(component, x = 40, y = 40, snap = false) {
   if (project.items.length >= MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
   const item = createItem(component, project.canvas, x, y, placementBounds(project));
   project.items.push(item); selectedId = item.id; selectedIds = new Set([item.id]);
   if (snap) project = snapItems(project, new Map([[item.id, { x: item.x, y: item.y }]]), 0, 0, zoom).project;
-  commit(); notify(`已添加「${item.name}」`);
+  commit(`添加组件：${item.name}`); notify(`已添加「${item.name}」`);
 }
 function removeSelected() {
   if (!selectedItem()) return;
   project.items = project.items.filter(item => !selectedIds.has(item.id));
-  selectedId = null; selectedIds.clear(); commit(); notify('已删除所选组件，可撤销恢复');
+  selectedId = null; selectedIds.clear(); commit('删除组件'); notify('已删除所选组件，可撤销恢复');
 }
 function duplicateSelected() {
   const item = selectedItem();
@@ -566,12 +586,13 @@ function duplicateSelected() {
   if (project.items.length + selectedIds.size > MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
   const moved = moveItems(project, selectionStarts(), 16, 16);
   const copies = moved.items.filter(value => selectedIds.has(value.id)).map(value => normalizeItem({ ...clone(value), id: uid(), name: `${value.name} 副本` }, project.canvas, itemBounds(project)));
-  project.items.push(...copies); selectedIds = new Set(copies.map(value => value.id)); selectedId = copies.at(-1).id; commit(); notify('已复制所选组件');
+  project.items.push(...copies); selectedIds = new Set(copies.map(value => value.id)); selectedId = copies.at(-1).id; commit('复制组件'); notify('已复制所选组件');
 }
 function restore(direction) {
   finishGesture();
-  project = direction === 'undo' ? history.undo() : history.redo();
-  assistant.record(project, direction === 'undo' ? '撤销修改' : '重做修改');
+  const state = typeof direction === 'number' ? history.checkout(direction) : direction === 'undo' ? history.undo() : history.redo();
+  project = state.project; library = state.library;
+  assistant.refreshVersions(); if ($('historyDialog').open) renderHistory(); renderLibrary();
   if (!selectedItem()) selectedId = null;
   renderCanvas(); scheduleSave();
 }
@@ -581,7 +602,7 @@ function finishGesture(cancel = false) {
   const old = gesture; gesture = null;
   const changed = project.items.some(item => old.starts.has(item.id) && (item.x !== old.starts.get(item.id).x || item.y !== old.starts.get(item.id).y));
   if (cancel) { project = moveItems(project, old.starts, 0, 0); renderCanvas(); }
-  else if (changed) commit();
+  else if (changed) commit('移动组件');
   if (old.node.hasPointerCapture(old.pointerId)) old.node.releasePointerCapture(old.pointerId);
 }
 // 使用事件委托及指针捕获；选中时保留节点，避免原稿中拖拽引用失效。
@@ -648,27 +669,27 @@ $('alignmentActions').addEventListener('click', event => {
   const button = event.target.closest('[data-align]');
   if (!button || button.disabled) return;
   finishGesture(); project = alignItems(project, selectedIds, button.dataset.align, $('alignReference').value);
-  commit(); notify(`已${button.textContent}（参照${$('alignReference').value === 'canvas' ? '画布' : '所选组件'}）`);
+  commit(button.textContent); notify(`已${button.textContent}（参照${$('alignReference').value === 'canvas' ? '画布' : '所选组件'}）`);
 });
 function changeLayer(delta) {
   const index = project.items.findIndex(item => item.id === selectedId);
   const target = index + delta;
   if (index < 0 || target < 0 || target >= project.items.length) return;
   [project.items[index], project.items[target]] = [project.items[target], project.items[index]];
-  commit();
+  commit('调整图层顺序');
 }
 $('layerUpBtn').addEventListener('click', () => changeLayer(1)); $('layerDownBtn').addEventListener('click', () => changeLayer(-1));
 document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
   finishGesture();
   const key = button.dataset.preset;
-  project = resizeProject(project, PRESETS[key].width, PRESETS[key].height, key); commit();
+  project = resizeProject(project, PRESETS[key].width, PRESETS[key].height, key); commit('切换画布预设');
 }));
-$('rotateBtn').addEventListener('click', () => { finishGesture(); project = rotateProject(project); commit(); });
-$('canvasSizeForm').addEventListener('submit', event => { event.preventDefault(); finishGesture(); project = resizeProject(project, $('canvasWidthInput').value, $('canvasHeightInput').value); commit(); notify('画布尺寸已更新'); });
+$('rotateBtn').addEventListener('click', () => { finishGesture(); project = rotateProject(project); commit('旋转画布'); });
+$('canvasSizeForm').addEventListener('submit', event => { event.preventDefault(); finishGesture(); project = resizeProject(project, $('canvasWidthInput').value, $('canvasHeightInput').value); commit('调整画布尺寸'); notify('画布尺寸已更新'); });
 function updateFrame(changes) {
   finishGesture();
   project.frame = normalizeFrame({ ...project.frame, ...changes }, 'custom', sanitizeContent);
-  commit();
+  commit('修改设备外框');
 }
 function openFrameDialog() {
   $('frameError').textContent = '';
@@ -719,7 +740,7 @@ $('selectionProps').addEventListener('submit', safeAction(async event => {
   }
   if (session !== projectSession || selectedItem() !== item) throw new Error('所选组件已变化，请重新应用属性');
   project.items[project.items.indexOf(item)] = next;
-  commit(); notify('组件属性已更新');
+  commit('修改组件属性'); notify('组件属性已更新');
 }));
 $('deleteItemBtn').addEventListener('click', removeSelected);
 $('duplicateItemBtn').addEventListener('click', safeAction(duplicateSelected));
@@ -735,7 +756,9 @@ function fitCanvas() {
   updateZoom();
 }
 $('fitBtn').addEventListener('click', fitCanvas);
-$('saveLibBtn').addEventListener('click', () => { if (persistLibrary()) notify('组件库已保存到当前浏览器'); });
+$('saveBtn').addEventListener('click', () => saveProject());
+$('historyBtn').addEventListener('click', () => { finishGesture(); renderHistory(); $('historyDialog').showModal(); });
+$('saveLibBtn').addEventListener('click', () => { finishGesture(); assistant.saveVersion('保存组件库'); if (persistLibrary()) notify('组件库已保存到当前浏览器'); });
 $('exportLibBtn').addEventListener('click', () => { download(JSON.stringify({ version: 1, components: library }, null, 2), 'protolab-library.json', 'application/json'); notify('组件库 JSON 已导出'); });
 $('exportProjectBtn').addEventListener('click', safeAction(() => {
   finishGesture(); download(projectFile(project, library, projectDetails(currentRecord())), 'protolab-project.json', 'application/json'); notify('工程已导出，包含画布、设备设置、自定义组件及工程规范');
@@ -753,7 +776,7 @@ $('projectForm').addEventListener('submit', async event => {
     if (sourceSession !== projectSession) throw new Error('工程已切换，请在目标工程重新导入');
     const nextLibrary = imported.components ? completeLibrary(imported.components) : library;
     finishGesture(); project = imported.project; library = nextLibrary;
-    selectedId = null; selectedIds.clear(); commit(); renderLibrary();
+    selectedId = null; selectedIds.clear(); commit('导入工程'); renderLibrary();
     if (imported.details) { catalog = saveActiveProject(catalog, imported.details); renderProjects(); }
     if (imported.components) persistLibrary();
     persistProject(); fitCanvas(); $('projectDialog').close();
@@ -769,7 +792,7 @@ $('libFileInput').addEventListener('change', safeAction(async event => {
   const imported = completeLibrary(validateLibrary(JSON.parse(await readFile(file)), sanitizeContent));
   if (sourceSession !== projectSession) throw new Error('工程已切换，请重新导入组件库');
   if (!confirm(`导入后组件库共 ${imported.length} 个组件，替换当前自定义组件，保留内置组件。画布中的组件会保留。建议先导出当前库。`)) return;
-  library = imported; renderLibrary(); if (persistLibrary()) notify(`已导入 ${library.length} 个组件`);
+  library = imported; commit('导入组件库'); renderLibrary(); if (persistLibrary()) notify(`已导入 ${library.length} 个组件`);
 }));
 function openComponentDialog(type, data = null, name = '') {
   customType = type; imageData = data;
@@ -840,7 +863,8 @@ $('componentForm').addEventListener('submit', event => {
   try {
     if (library.length >= MAX_LIBRARY) throw new Error('组件库最多支持 200 个组件');
     const component = readCustomComponent();
-    library = validateLibrary([...library, component], sanitizeContent); setLibraryTab('custom'); $('componentDialog').close();
+    library = validateLibrary([...library, component], sanitizeContent); commit(`添加自定义组件：${component.name}`); setLibraryTab('custom'); $('componentDialog').close();
+    assistant.saveVersion('保存自定义组件');
     if (persistLibrary()) notify(`「${component.name}」已添加并保存到组件库`);
   } catch (error) { $('componentError').textContent = error.message; }
 });
@@ -856,8 +880,9 @@ document.querySelectorAll('[data-panel]').forEach(button => button.addEventListe
   if (shouldOpen) { panel.classList.add('open'); button.setAttribute('aria-expanded', 'true'); }
 }));
 document.addEventListener('keydown', safeAction(event => {
-  if (document.querySelector('dialog[open]') || event.target.closest('input,textarea,select,[contenteditable="true"]')) return;
   const command = event.ctrlKey || event.metaKey;
+  if (command && event.key.toLowerCase() === 's') { event.preventDefault(); saveProject(); return; }
+  if (document.querySelector('dialog[open]') || event.target.closest('input,textarea,select,[contenteditable="true"]')) return;
   if (command && event.key.toLowerCase() === 'z') { event.preventDefault(); restore(event.shiftKey ? 'redo' : 'undo'); return; }
   if (command && event.key.toLowerCase() === 'y') { event.preventDefault(); restore('redo'); return; }
   if (command && event.key.toLowerCase() === 'd') { event.preventDefault(); duplicateSelected(); return; }
@@ -866,7 +891,7 @@ document.addEventListener('keydown', safeAction(event => {
   const item = selectedItem();
   if (item && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
     event.preventDefault(); const distance = event.shiftKey ? 10 : 1;
-    project = moveItems(project, selectionStarts(), event.key === 'ArrowRight' ? distance : event.key === 'ArrowLeft' ? -distance : 0, event.key === 'ArrowDown' ? distance : event.key === 'ArrowUp' ? -distance : 0); commit();
+    project = moveItems(project, selectionStarts(), event.key === 'ArrowRight' ? distance : event.key === 'ArrowLeft' ? -distance : 0, event.key === 'ArrowDown' ? distance : event.key === 'ArrowUp' ? -distance : 0); commit('键盘移动组件');
   }
 }));
 window.addEventListener('pagehide', () => { finishGesture(); if (saveTimer) persistProject(); });

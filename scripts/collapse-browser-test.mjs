@@ -24,12 +24,13 @@ try {
   await page.goto(base);
   const toggle = key => page.locator(`[data-collapsible="${key}"] > :is(.section-label,legend,strong) > .section-toggle`);
   const roundTrip = async key => {
+    const expanded = await toggle(key).getAttribute('aria-expanded') === 'true';
     await toggle(key).click();
-    assert.equal(await toggle(key).getAttribute('aria-expanded'), 'false');
-    assert.ok(await page.locator(`#collapse-${key}`).isHidden());
+    assert.equal(await toggle(key).getAttribute('aria-expanded'), String(!expanded));
+    assert.equal(await page.locator(`#collapse-${key}`).isVisible(), !expanded);
     await toggle(key).press('Enter');
-    assert.equal(await toggle(key).getAttribute('aria-expanded'), 'true');
-    assert.ok(await page.locator(`#collapse-${key}`).isVisible());
+    assert.equal(await toggle(key).getAttribute('aria-expanded'), String(expanded));
+    assert.equal(await page.locator(`#collapse-${key}`).isVisible(), expanded);
   };
   await page.locator('[data-comp-id="lib-btn"]').click();
   await page.locator('#propName').fill('收起后保留草稿');
@@ -84,6 +85,7 @@ try {
   assert.equal(await page.locator('#libraryPanel .panel-toggle').getAttribute('aria-expanded'), 'false');
   await page.locator('#layerList button').first().click();
   assert.equal(await toggle('text').getAttribute('aria-expanded'), 'false');
+  for (const key of ['component-properties', 'alignment', 'safe-area', 'device-frame', 'layers']) await toggle(key).click();
   await page.screenshot({ path: resolve(output, 'collapse-desktop.png') });
   const ids = await page.locator('[id]').evaluateAll(nodes => nodes.map(node => node.id));
   assert.equal(new Set(ids).size, ids.length);

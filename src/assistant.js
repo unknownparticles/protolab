@@ -11,8 +11,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   try { if (initialWorkspace === undefined) saved = readStorage(WORKSPACE_KEY, value => validateWorkspace(value, validate)); }
   catch { startupWarning('版本或对话记录读取失败，已使用本地草稿'); }
   let versions = createVersions(initial, saved?.versions);
-  if (saved && Date.parse(initialSavedAt) > Date.parse(saved.savedAt || '1970-01-01')) versions.add(initial, '恢复较新的本地草稿');
-  if (saved) restoreInitial(versions.current);
+  if (saved) restoreInitial(initialWorkspace !== undefined || Date.parse(initialSavedAt) > Date.parse(saved.savedAt || '1970-01-01') ? initial : saved.project || versions.current);
   let messages = saved?.messages || [];
   let pending = saved?.pending || null;
   let settings = normalizeAISettings();
@@ -24,7 +23,8 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   let generated = null;
   let choices = {};
   let mergeHead = null;
-  const serialize = () => ({ version: 1, versions: versions.serialize(), messages: clone(messages), pending: clone(pending) });
+  let mergeProject = null;
+  const serialize = () => ({ version: 1, project: clone(getProject()), versions: versions.serialize(), messages: clone(messages), pending: clone(pending) });
   function setPanel(open) {
     $('aiPanel').hidden = !open;
     $('aiToggleBtn').setAttribute('aria-expanded', String(open));
@@ -58,7 +58,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       const title = document.createElement('strong'); title.textContent = `版本 ${numbers.get(entry.id)} · ${entry.label}${entry.id === versions.head ? ' · 当前' : ''}`;
       const meta = document.createElement('small'); meta.textContent = `${new Date(entry.createdAt).toLocaleString('zh-CN')} · ${entry.project.items.length} 个组件${entry.parent ? ` · 源于版本 ${numbers.get(entry.parent)}` : ''}${entry.mergeParent ? ` · 合并版本 ${numbers.get(entry.mergeParent)}` : ''}`;
       info.append(title, meta);
-      const button = document.createElement('button'); button.className = 'btn btn-sm'; button.textContent = '回退到此版本'; button.disabled = entry.id === versions.head;
+      const button = document.createElement('button'); button.className = 'btn btn-sm'; button.textContent = '回退到此版本'; button.disabled = entry.id === versions.head && JSON.stringify(getProject()) === JSON.stringify(entry.project);
       button.addEventListener('click', () => {
         finishGesture();
         const value = versions.checkout(entry.id);
@@ -81,6 +81,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     if (!pending) return;
     const result = pendingMerge();
     mergeHead = versions.head;
+    mergeProject = clone(getProject());
     $('mergeSummary').textContent = `${pending.summary} · ${result.conflicts.length ? `${result.conflicts.length} 项冲突需要选择` : '没有字段冲突，确认后应用合并结果'}`;
     $('mergeConflicts').replaceChildren();
     const entries = versions.entries;
@@ -146,7 +147,9 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     finishGesture();
     const mode = $('aiMode').value;
     const currentSession = session;
-    const base = mode === 'modify' ? clone(getProject()) : generationBase(getProject(), mode); const baseId = versions.head;
+    const requestProject = clone(getProject());
+    const baseId = versions.add(requestProject, 'AI 生成前', { force: true });
+    const base = mode === 'modify' ? requestProject : generationBase(requestProject, mode);
     const context = clone(messages);
     controller = new AbortController(); const active = controller;
     let timedOut = false;
@@ -159,6 +162,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       if (active.signal.aborted) throw new Error('请求已取消');
       if (mode !== 'modify') {
         generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent), mode };
+        versions.add(getProject(), `AI 生成后（待确认）：${generated.summary}`, { force: true });
         addMessage('assistant', generated.summary);
         $('aiGeneratedSummary').textContent = `${generated.name} · ${generated.summary}`;
         $('aiStatus').textContent = '生成完成，请预览并确认保存。';
@@ -169,7 +173,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       finishGesture();
       const aiId = versions.add(response.project, `AI：${response.summary}`, { parent: baseId, branch: true });
       addMessage('assistant', response.summary);
-      if (versions.head === baseId) {
+      if (versions.head === baseId && JSON.stringify(getProject()) === JSON.stringify(requestProject)) {
         versions.checkout(aiId); applyProject(response.project, `AI：${response.summary}`);
         addMessage('system', 'AI 修改已应用，并保留请求前的版本。'); notify('AI 修改已应用，可在版本中回退');
       } else {
@@ -201,7 +205,10 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     try {
       const name = $('generationName').value.trim();
       if (!name || name.length > 40) throw new Error('名称请输入 1～40 个字符');
+      finishGesture();
       applyGeneration({ ...generated, name });
+      versions.add(getProject(), `保存 AI 生成${generated.mode === 'component' ? '组件' : '页面'}：${name}`, { force: true });
+      renderVersions();
       const label = generated.mode === 'component' ? '组件已保存到当前工程组件库，可点击或拖拽使用。' : '新页面已添加到当前工程，可继续编辑。';
       generated = null; $('generationDialog').close(); addMessage('system', label); notify(label);
       $('aiStatus').textContent = '已保存，可以继续提出需求。'; renderMessages();
@@ -223,10 +230,11 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   $('mergeApplyBtn').addEventListener('click', () => {
     try {
       finishGesture();
-      if (versions.head !== mergeHead) { choices = {}; renderMerge(); throw new Error('本地版本已改变，已重新计算合并，请重新确认'); }
+      if (versions.head !== mergeHead || JSON.stringify(getProject()) !== JSON.stringify(mergeProject)) { choices = {}; renderMerge(); throw new Error('本地设计已改变，已重新计算合并，请重新确认'); }
       const result = pendingMerge();
       if (result.conflicts.some(conflict => !['local', 'ai'].includes(choices[conflict.key]))) throw new Error('请为每项冲突选择保留本地或采用 AI');
       const next = validate(result.project);
+      versions.add(getProject(), 'AI 合并前', { force: true });
       versions.add(next, `合并 AI：${pending.summary}`, { mergeParent: pending.aiId });
       pending = null; applyProject(next, '合并 AI 修改'); $('mergeDialog').close();
       addMessage('system', 'AI 和本地修改已合并，两个来源版本均已保留。'); $('aiStatus').textContent = '合并完成，可以继续提出需求。'; notify('合并完成，可随时回退');
@@ -253,7 +261,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       versions = createVersions(initial, { head, entries: [...existing.entries, ...entries] });
       if (imported.pending) pending = { ...imported.pending, baseId: mapping.get(imported.pending.baseId), aiId: mapping.get(imported.pending.aiId) };
       messages.push(...imported.messages);
-      applyProject(versions.current, '导入版本备份'); renderVersions(); addMessage('system', '已导入备份并打开其当前版本，原有版本完整保留。'); notify('版本备份已导入');
+      applyProject(imported.project || versions.current, '导入版本备份'); renderVersions(); addMessage('system', '已导入备份并打开其当前版本，原有版本完整保留。'); notify('版本备份已导入');
     } catch (error) { notify(error.message || '版本备份导入失败', true); }
   });
   renderMessages();
@@ -269,6 +277,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       $('aiRequirement').value = ''; $('aiStatus').textContent = ''; $('aiMode').value = 'modify'; renderMode(); renderMessages();
     },
     persist(savedAt) { writeStorage(WORKSPACE_KEY, { ...serialize(), savedAt }); },
-    record(project, label) { versions.add(project, label || '手动修改'); if ($('versionsDialog').open) renderVersions(); },
+    saveVersion(label = '手动保存') { versions.add(getProject(), label, { force: true }); renderVersions(); },
+    refreshVersions() { if ($('versionsDialog').open) renderVersions(); },
   };
 }

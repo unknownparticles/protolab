@@ -11,7 +11,7 @@ export function createVersions(initial, raw) {
     get head() { return head; },
     get current() { return clone(entries.find(entry => entry.id === head).project); },
     add(project, label = '手动修改', options = {}) {
-      if (!options.branch && !options.mergeParent && equal(project, this.current)) return head;
+      if (!options.force && !options.branch && !options.mergeParent && equal(project, this.current)) return head;
       const entry = { id: uid(), parent: options.parent || head, label, createdAt: new Date().toISOString(), project: clone(project), ...(options.mergeParent ? { mergeParent: options.mergeParent } : {}) };
       entries.push(entry);
       if (!options.branch) head = entry.id;
@@ -44,7 +44,8 @@ export function validateWorkspace(raw, validate) {
     if (!ids.has(raw.pending.baseId) || !ids.has(raw.pending.aiId) || typeof raw.pending.summary !== 'string') throw new Error('待合并版本损坏');
     pending = { baseId: raw.pending.baseId, aiId: raw.pending.aiId, summary: raw.pending.summary };
   }
-  return { version: 1, savedAt: raw.savedAt, versions: { head: raw.versions.head, entries }, messages, pending };
+  const project = raw.project ? validate(raw.project) : null;
+  return { version: 1, savedAt: raw.savedAt, ...(project ? { project } : {}), versions: { head: raw.versions.head, entries }, messages, pending };
 }
 
 /** 三方合并：组件以稳定标识匹配；同一组件的不同字段可自动合并。 */
