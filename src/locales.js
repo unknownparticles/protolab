@@ -21,6 +21,7 @@ export const EN = Object.freeze({
   "图片生成须保留参考图片的画布尺寸": "Image generation must preserve the reference canvas size",
   "图片生成须还原独立组件": "Image generation must create independent components",
   "图片生成组件超出参考画布，请重新生成": "Generated components exceed the reference canvas. Generate again.",
+  "图片生成组件的位置和尺寸须为有效数字，宽高须大于零": "Generated component positions and sizes must be valid numbers, with positive width and height.",
   "图片生成请求失败（{0}），请检查 Key、接口地址，并使用支持图片输入的视觉模型": "Image generation failed ({0}). Check your key and endpoint, and use a model that supports image input.",
   "展开{0}": "Expand {0}",
   "收起{0}": "Collapse {0}",

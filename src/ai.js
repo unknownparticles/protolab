@@ -47,7 +47,8 @@ export function parseGenerationResponse(text, base, mode, sanitize, options = {}
       if (change.op === 'add') {
         const item = change.item;
         if (!object(item) || 'libraryId' in item) throw new Error('图片生成须还原独立组件');
-        if (![item.x, item.y, item.width, item.height].every(Number.isFinite) || item.x < 0 || item.y < 0 || item.width < 1 || item.height < 1 || item.x + item.width > base.canvas.width || item.y + item.height > base.canvas.height) throw new Error('图片生成组件超出参考画布，请重新生成');
+        // 位置和尺寸交给项目模型约束到参考画布，避免轻微越界使整次生成失败。
+        if (![item.x, item.y, item.width, item.height].every(Number.isFinite) || item.width <= 0 || item.height <= 0) throw new Error('图片生成组件的位置和尺寸须为有效数字，宽高须大于零');
         item.name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : '界面组件';
         item.radius ??= 0;
       }

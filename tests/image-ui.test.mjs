@@ -56,9 +56,31 @@ test('模型重复返回参考尺寸、默认预设或其他尺寸时保留本�
     assert.throws(() => parseGenerationResponse(reply([...valid, { op: 'canvas', fields: canvasFields }]), base(), 'image', clean));
   }
 });
-test('拒绝单层整图、越界、设备外框或安全区、引用组件库和跨页动作', () => {
+test('图片组件轻微越界、负坐标及过大尺寸自动约束到参考画布，保留其他组件和内容', () => {
+  for (const [geometry, expected] of [
+    [{ x: 200, y: 150, width: 200, height: 40 }, { x: 175, y: 150, width: 200, height: 40 }],
+    [{ x: -0.25, y: -12, width: 200, height: 40 }, { x: 0, y: 0, width: 200, height: 40 }],
+    [{ x: 900, y: 1000, width: 200, height: 40 }, { x: 175, y: 627, width: 200, height: 40 }],
+    [{ x: 10, y: 20, width: 1280, height: 800 }, { x: 0, y: 0, width: 375, height: 667 }],
+    [{ x: 0, y: 0, width: 0.2, height: 0.4 }, { x: 0, y: 0, width: 1, height: 1 }],
+    [{ x: 175.2, y: 627.2, width: 200, height: 40 }, { x: 175, y: 627, width: 200, height: 40 }],
+  ]) {
+    const result = parseGenerationResponse(reply([{ op: 'add', item: heading }, { op: 'add', item: { ...button, ...geometry } }]), base(), 'image', clean);
+    const fitted = result.project.items[1];
+    assert.deepEqual({ x: fitted.x, y: fitted.y, width: fitted.width, height: fitted.height }, expected);
+    assert.equal(fitted.content, button.content); assert.equal(fitted.name, button.name);
+    assert.equal(result.project.items[0].x, heading.x); assert.equal(result.project.items[0].y, heading.y);
+    assert.equal(result.project.canvas.width, 375); assert.equal(result.project.canvas.height, 667);
+  }
+});
+test('图片生成拒绝无效坐标、缺少尺寸、零或负宽高', () => {
+  for (const geometry of [{ x: null }, { y: '150' }, { x: undefined }, { width: 0 }, { height: -1 }, { width: undefined }, { height: null }, { x: 1e400 }]) {
+    assert.throws(() => parseGenerationResponse(reply([{ op: 'add', item: heading }, { op: 'add', item: { ...button, ...geometry } }]), base(), 'image', clean), /有效数字/);
+  }
+});
+test('拒绝单层整图、设备外框或安全区、引用组件库和跨页动作', () => {
   const valid = [{ op: 'add', item: heading }, { op: 'add', item: button }];
-  for (const changes of [valid.slice(0, 1), [...valid, { op: 'frame', fields: { style: 'browser' } }], [...valid, { op: 'safeArea', fields: { enabled: true } }], [valid[0], { op: 'add', item: { ...button, x: 300 } }], [valid[0], { op: 'add', item: { ...button, libraryId: 'existing' } }], [valid[0], { op: 'add', item: { ...button, interaction: { type: 'navigate', targetId: 'home' } } }]]) {
+  for (const changes of [valid.slice(0, 1), [...valid, { op: 'frame', fields: { style: 'browser' } }], [...valid, { op: 'safeArea', fields: { enabled: true } }], [valid[0], { op: 'add', item: { ...button, libraryId: 'existing' } }], [valid[0], { op: 'add', item: { ...button, interaction: { type: 'navigate', targetId: 'home' } } }]]) {
     assert.throws(() => parseGenerationResponse(reply(changes), base(), 'image', clean));
   }
 });

@@ -32,7 +32,8 @@ try {
     sent = route.request().postDataJSON();
     if (responseMode === 'wait') await new Promise(resolve => { release = resolve; });
     if (responseMode === 'unsupported') { await route.fulfill({ status: 400, body: '{}' }); return; }
-    const changes = [{ op: 'canvas', fields: { width: 1280, height: 800, preset: 'pc', background: '#f8fafc' } }, ...items.map(item => ({ op: 'add', item }))];
+    const returnedItems = responseMode === 'overflow' ? items.map(item => item.id === 'button' ? { ...item, x: -8, width: 400 } : item.id === 'terms' ? { ...item, y: 660 } : item) : items;
+    const changes = [{ op: 'canvas', fields: { width: 1280, height: 800, preset: 'pc', background: '#f8fafc' } }, ...returnedItems.map(item => ({ op: 'add', item }))];
     const content = responseMode === 'invalid' ? '无法识别' : JSON.stringify({ version: 1, name: '图片登录页', summary: '已识别并命名四个可编辑组件', changes });
     await route.fulfill({ json: { choices: [{ message: { content } }] } });
   });
@@ -85,7 +86,21 @@ try {
   assert.equal(await page.locator('.editor-item').count(), 4); await clickAction(page, '#imageUIBtn');
   assert.equal(await page.locator('#aiImagePreview').isVisible(), false);
   const beforeFailure = (await current()).project;
-  await upload(); await page.locator('#aiImagePreview').waitFor({ state: 'visible' }); responseMode = 'invalid';
+  await upload(); await page.locator('#aiImagePreview').waitFor({ state: 'visible' }); responseMode = 'overflow';
+  await page.locator('#aiSendBtn').click(); await page.locator('#generationDialog').waitFor({ state: 'visible' });
+  const overflowPreview = page.frameLocator('#generationPreview');
+  assert.equal(await overflowPreview.locator('.prototype-item').count(), 4);
+  assert.deepEqual(await overflowPreview.locator('.prototype-item').nth(2).evaluate(node => [node.style.left, node.style.width, node.style.top]), ['0px', '375px', '208px']);
+  assert.deepEqual(await overflowPreview.locator('.prototype-item').nth(3).evaluate(node => [node.style.top, node.style.height]), ['647px', '20px']);
+  await page.screenshot({ path: resolve(output, 'image-ui-overflow.png') });
+  await page.locator('#generationApplyBtn').click(); await saved();
+  const overflowPage = (await current()).project;
+  assert.equal(overflowPage.canvas.width, 375); assert.equal(overflowPage.canvas.height, 667);
+  assert.equal(overflowPage.items[2].width, 375); assert.equal(overflowPage.items[3].y, 647);
+  assert.equal(overflowPage.pages.length, beforeFailure.pages.length + 1);
+  await page.locator('#aiCloseBtn').click(); await clickAction(page, '#undoBtn'); await saved();
+  assert.deepEqual((await current()).project, beforeFailure);
+  await clickAction(page, '#imageUIBtn'); responseMode = 'invalid';
   await page.locator('#aiSendBtn').click(); await page.waitForFunction(() => document.getElementById('aiStatus').textContent.includes('JSON')); await saved();
   assert.deepEqual((await current()).project, beforeFailure);
   responseMode = 'unsupported'; await page.locator('#aiSendBtn').click();
