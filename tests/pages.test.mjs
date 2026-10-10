@@ -1,13 +1,71 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateProject, createHistory, rotateProject } from '../src/model.js';
-import { withPages, switchPage, syncPages, addPage, deletePage, normalizeInteraction } from '../src/pages.js';
+import { withPages, switchPage, syncPages, addPage, deletePage, normalizeInteraction, copyItems, cleanVisibilityTargets } from '../src/pages.js';
 import { mergeProjects, createVersions, validateWorkspace } from '../src/versions.js';
 import { parseAIResponse } from '../src/ai.js';
 import { exportHTML } from '../src/content.js';
 const clean = value => value;
 const initial = () => withPages(validateProject({ version: 1, canvas: { width: 375, height: 667, preset: 'phone' }, items: [{ id: 'button', name: '下一页', type: 'html', content: '<button>下一页</button>', x: 20, y: 500, width: 100, height: 40 }] }, clean));
 const reply = changes => JSON.stringify({ version: 1, summary: '修改当前页', changes });
+
+test('提示独立编辑与导出，动作验证提示类型、时长，删除后清除引用', () => {
+  let project = addPage(initial(), 'toast');
+  const toastId = project.activePageId;
+  assert.equal(project.canvas.height, 100);
+  assert.equal(project.items.length, 1);
+  assert.match(exportHTML(project, { preview: true }), new RegExp(`data-initial-toast="${toastId}"`));
+  project = switchPage(project, 'page-home');
+  project.items[0].interaction = { type: 'showToast', targetId: toastId, duration: 800 };
+  project = validateProject(project, clean);
+  assert.match(exportHTML(project), /data-prototype-toast=/);
+  assert.equal(project.items[0].interaction.duration, 800);
+  const wrong = structuredClone(project); wrong.items[0].interaction.targetId = 'page-home';
+  assert.throws(() => validateProject(wrong, clean), /类型/);
+  for (const duration of [0, 199, 10001, 'bad', 250.5]) assert.throws(() => normalizeInteraction({ type: 'showToast', targetId: toastId, duration }));
+  assert.equal(deletePage(project, toastId).items[0].interaction, undefined);
+});
+
+test('初始隐藏与整组显隐保留在工程中，拒绝跨页目标及非法状态', () => {
+  const project = initial();
+  project.items.push({ ...project.items[0], id: 'content', visible: false });
+  project.items[0].interaction = { type: 'visibility', mode: 'toggle', targetIds: ['content', 'content'] };
+  const validated = validateProject(project, clean);
+  assert.deepEqual(validated.items[0].interaction.targetIds, ['content']);
+  assert.equal(validated.items[1].visible, false);
+  assert.match(exportHTML(validated), /data-element-id="content"[^>]* hidden/);
+  const wrong = structuredClone(validated); wrong.items[0].interaction.targetIds = ['missing'];
+  assert.throws(() => validateProject(wrong, clean), /当前页面/);
+  for (const action of [{ type: 'visibility', targetIds: [], mode: 'toggle' }, { type: 'visibility', targetIds: ['content'], mode: 'invalid' }]) assert.throws(() => normalizeInteraction(action));
+  wrong.items[0].interaction = undefined; wrong.items[1].visible = 'false';
+  assert.throws(() => validateProject(wrong, clean), /布尔/);
+});
+
+test('复制板块重连显隐目标，删除部分目标保留其他目标，全部删除清除动作', () => {
+  const items = [initial().items[0], { ...initial().items[0], id: 'a' }, { ...initial().items[0], id: 'b' }];
+  items[0].interaction = { type: 'visibility', mode: 'show', targetIds: ['a', 'b'] };
+  const copies = copyItems(items);
+  assert.deepEqual(copies[0].interaction.targetIds, copies.slice(1).map(item => item.id));
+  assert.deepEqual(copyItems([items[0]])[0].interaction.targetIds, ['a', 'b']);
+  assert.deepEqual(cleanVisibilityTargets(items.slice(0, 2))[0].interaction.targetIds, ['a']);
+  assert.equal(cleanVisibilityTargets(items.slice(0, 1))[0].interaction, undefined);
+  assert.deepEqual(items[0].interaction.targetIds, ['a', 'b']);
+  const project = initial(); project.items = items;
+  const page = addPage(project, 'page', true);
+  assert.deepEqual(page.items[0].interaction.targetIds, page.items.slice(1).map(item => item.id));
+});
+
+test('智能修改支持提示、显隐与初始隐藏，删除目标清理动作', () => {
+  let project = addPage(initial(), 'toast'); const toast = project.activePageId;
+  project = switchPage(project, 'page-home');
+  project.items.push({ ...project.items[0], id: 'content' });
+  const result = parseAIResponse(reply([
+    { op: 'update', id: 'button', fields: { interaction: { type: 'showToast', targetId: toast, duration: 1000 } } },
+    { op: 'update', id: 'content', fields: { visible: false, interaction: { type: 'visibility', targetIds: ['button'], mode: 'hide' } } },
+  ]), project, clean).project;
+  assert.equal(result.items[1].visible, false);
+  assert.equal(parseAIResponse(reply([{ op: 'remove', id: 'button' }]), result, clean).project.items[0].interaction, undefined);
+});
 
 test('旧草稿迁移，切换保存各页布局与方向，不改变原始项目', () => {
   const source = initial();

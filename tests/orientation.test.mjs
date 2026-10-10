@@ -83,7 +83,7 @@ test('预览及导出应用当前方向的响应，并保留原工程数据', ()
   project.items[1].orientationResponse = normalizeOrientationResponse({ enabled: true, landscape: 'hide' });
   const html = exportHTML(project);
   assert.match(html, /top:600px;.*?transform:rotate\(90deg\)/);
-  assert.match(html, /top:80px;.*?display:none/);
+  assert.match(html, /data-element-id="upper"[^>]*data-orientation-hidden="true" hidden[^>]*top:80px/);
   const recovered = validateProject(JSON.parse(html.match(/id="protolab-project">(.*?)<\/script>/s)[1]), clean);
   assert.deepEqual(recovered, project);
 });
