@@ -60,6 +60,7 @@
         <div class="menu-dropdown" id="toolsMenu" role="menu" aria-labelledby="toolsMenuBtn" hidden>
           <button id="aiToggleBtn" type="button" role="menuitem" tabindex="-1" aria-expanded="false" aria-controls="aiPanel">AI 对话</button>
           <button id="settingsBtn" type="button" role="menuitem" tabindex="-1">AI 设置</button>
+          <button id="mcpSettingsBtn" type="button" role="menuitem" tabindex="-1">MCP 接入</button>
         </div>
       </div>
     </nav>
@@ -259,6 +260,18 @@
   <input type="file" id="libFileInput" hidden accept=".json,application/json">
   <input type="file" id="imgFileInput" hidden accept="image/png,image/jpeg,image/gif,image/webp,image/avif">
   <input type="file" id="versionsFileInput" hidden accept=".json,application/json">
+  <dialog id="mcpDialog" aria-labelledby="mcpTitle">
+    <div class="dialog-heading"><h2 id="mcpTitle">MCP 接入</h2><button class="btn btn-icon" type="button" data-close="mcpDialog" aria-label="关闭">×</button></div>
+    <p class="dialog-description">让 Codex、Cursor、Claude Code、OpenCode 和 Antigravity 读取工程、修改组件、创建页面与导出原型。修改支持撤销和版本回退。</p>
+    <p class="field-help">先在本地运行 npm run dev，打开本地易设并连接当前标签页，再把下方配置合并到客户端配置文件，重新加载客户端。调用期间保持标签页打开。</p>
+    <p id="mcpStatus" class="field-help" role="status">尚未连接</p>
+    <button id="mcpConnectBtn" class="btn btn-primary" type="button">连接当前标签页</button>
+    <p id="mcpSessionId" class="field-help" data-i18n-ignore></p>
+    <label class="field">AI 编程工具<select id="mcpClient"><option value="codex">Codex</option><option value="cursor">Cursor</option><option value="claude">Claude Code</option><option value="opencode">OpenCode</option><option value="antigravity">Antigravity</option></select></label>
+    <p id="mcpConfigFile" class="field-help" data-i18n-ignore></p>
+    <label class="field">客户端配置<textarea id="mcpConfig" rows="10" readonly spellcheck="false" data-i18n-ignore></textarea></label>
+    <div class="dialog-actions"><button id="mcpCopyBtn" class="btn" type="button">复制配置</button><button class="btn" type="button" data-close="mcpDialog">关闭</button></div>
+  </dialog>
   <dialog id="engineeringDialog"><form id="engineeringForm">
     <div class="dialog-heading"><h2 id="engineeringTitle">新建工程</h2><button class="btn btn-icon" type="button" data-close="engineeringDialog" aria-label="关闭工程设置">×</button></div>
     <p class="dialog-description">各工程独立保存页面、组件库、修改版本和 AI 对话。关联配色、组件库和安全区后，AI 修改页面、生成页面与组件都会自动使用这些信息。</p>

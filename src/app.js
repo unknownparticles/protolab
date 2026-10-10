@@ -25,6 +25,8 @@ import { attachViewportPan } from './viewport-pan.js';
 import { validateGroups, mergeLibrary } from './library-groups.js';
 import { initializeTabs } from './panel-tabs.js';
 import { initializeMenus } from './menus.js';
+import { createMCPEditor } from './mcp-editor.js';
+import { initializeMCPConnection } from './mcp-connection.js';
 
 const $ = id => document.getElementById(id);
 const refreshStaticTranslations = bindStaticTranslations(document);
@@ -1217,6 +1219,24 @@ document.addEventListener('keydown', safeAction(event => {
 }));
 window.addEventListener('pagehide', () => { finishGesture(); if (saveTimer) persistProject(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && saveTimer) persistProject(); });
+const mcpEditor = createMCPEditor({
+  getState: () => ({ projectId: catalog.activeId, ...projectDetails(currentRecord()), project, library, libraryGroups }),
+  getAssets: value => designAssets(currentRecord()?.design, value, library, libraryGroups),
+  sanitize: sanitizeContent,
+  isBusy: () => !!gesture || assistant.isBusy(),
+  apply(value, label) {
+    assistant.saveVersion(t('MCP 修改前'));
+    project = withPages(value); selectedId = null; selectedIds.clear(); commit(label);
+    assistant.saveVersion(label); persistProject(); notify(t('MCP 修改已应用，可撤销或回退版本'));
+  },
+  exportFile(format) {
+    if (format === 'html') return { filename: 'prototype.html', mimeType: 'text/html', content: exportHTML(project) };
+    return { filename: 'protolab-project.json', mimeType: 'application/json', content: projectFile(project, library, projectDetails(currentRecord()), libraryGroups) };
+  },
+});
+const mcpConnection = initializeMCPConnection({ editor: mcpEditor, notify,
+  getMetadata: () => ({ projectId: catalog.activeId, name: currentRecord().name, activePageId: project.activePageId }),
+});
 renderProjects(); renderLibrary(); renderCanvas(); renderHistory(); assistant.refreshVersions();
 if (window.innerWidth < 900) requestAnimationFrame(fitCanvas);
 if (startupWarnings.length) notify(startupWarnings.join('；'), true);
@@ -1225,7 +1245,7 @@ else if (project.items.length) { $('saveState').textContent = t('已恢复本地
 initializeLanguage({
   refreshStatic: refreshStaticTranslations,
   onChange() {
-    renderLibrary(); renderPages(); renderLayers(); renderHistory(); assistant.refreshLocale();
+    renderLibrary(); renderPages(); renderLayers(); renderHistory(); assistant.refreshLocale(); mcpConnection.refreshLocale();
     const canvas = project.canvas;
     $('presetLabel').textContent = `${t(PRESETS[canvas.preset]?.label || '自定义')} · ${canvas.width > canvas.height ? t('横屏') : t('竖屏')}`;
     // 只更新界面，不重填属性、对话或设置表单，保留尚未应用的输入。

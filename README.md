@@ -2,6 +2,8 @@
 
 浏览器里的轻量原型设计器：从组件库拖拽搭建界面，编辑尺寸与布局，导出可独立打开的 HTML。纯静态 HTML、CSS、原生 JavaScript，无框架、无后端、无运行时依赖。
 
+可通过可选的本地 MCP 桥，让 Codex、Cursor、Claude Code、OpenCode 和 Antigravity 读取工程、修改组件、新建页面及导出原型。运行 `npm run dev` 后，从「工具 → MCP 接入」连接标签页并复制对应客户端配置。修改支持撤销与版本回退；当前 MCP 功能需要本地服务。详见 [MCP 接入说明](docs/mcp.md)。
+
 顶部语言选择支持「跟随系统」「中文」与「English」。首次打开跟随系统首选语言（中文地区使用中文，英文地区使用英文，其他语言回退英文）；选择会保存在当前浏览器。系统语言变化时自动跟随，显式选择优先。切换即时更新菜单、属性、提示和预览控件，保留未应用的表单输入及工程、页面、自定义组件和画布文案。中文品牌为「易设」，英文品牌为「Protolab」。
 
 ## 本地运行
@@ -32,6 +34,7 @@ npm run dev
 - 多页面、弹窗与 Toast 管理：新增、切换、复制、重命名、删除与首页设置，每页独立保存画布和组件。
 - 组件点击可跳转页面、返回上一页、打开或关闭弹窗、显示 Toast，以及控制多个元素显示隐藏；预览和独立 HTML 导出均可交互。
 - AI 对话修改：配置兼容接口的 URL、Key 和模型，按固定 JSON 变更协议更新画布。
+- MCP 外部工具调用：五种 AI 编程客户端共用标准 stdio 服务，支持工程读取、组件修改、新建页面及导出；按标签页隔离并校验写入版本。
 - AI 独立生成组件或页面：结合用户提示词、内置设计规范与工程规范，预览后保存到组件库或添加为新页面。
 - 持久修改版本、回退与分支保留；等待 AI 时继续编辑，返回后通过三方合并处理冲突并预览结果。
 - 工程 JSON 导入导出，包含画布、设备外框、安全区和自定义组件库；导出的 HTML 可重新导入恢复编辑。
@@ -135,9 +138,17 @@ src/storage.js            浏览器存储、文件读取与下载
 src/projects.js           多工程列表、独立快照、迁移与校验
 src/ai.js                 AI 固定协议、接口请求和返回校验
 src/assistant.js          对话、设置、版本与合并交互
+src/mcp-editor.js         MCP 模型操作与写入版本检查
+src/mcp-connection.js     浏览器标签页连接与客户端配置界面
+src/mcp-protocol.js       MCP 工具清单、参数与协议说明
+src/mcp-config.js         五种客户端配置生成
 src/versions.js           持久版本图和字段级三方合并
 src/project-import.js     工程文件校验及隔离 HTML 布局识别
 scripts/serve.mjs         无依赖本地静态服务器
+scripts/mcp-bridge.mjs    本地标签页请求桥
+scripts/mcp-server.mjs    标准 MCP 输入输出服务
+scripts/mcp-config.mjs    客户端配置生成命令
+scripts/mcp-browser-test.mjs MCP 调用与浏览器同步验收
 scripts/check.mjs         语法与页面绑定检查
 scripts/browser-test.mjs  浏览器验收脚本
 scripts/properties-browser-test.mjs 分类、属性及图片编辑验收
@@ -145,6 +156,7 @@ scripts/guides-browser-test.mjs 辅助线、多选和对齐验收
 tests/                    模型回归测试
 docs/design-requirements.md 原始需求
 docs/implementation-plan.md 模块拆解、验收与后续计划
+docs/mcp.md              MCP 接入和五种客户端配置说明
 docs/reference/original.html 原始单文件页面
 .github/workflows/pages.yml GitHub Pages 发布工作流
 ```
@@ -170,6 +182,7 @@ npm run test:orientation
 npm run test:pages
 npm run test:projects
 npm run test:i18n
+npm run test:mcp
 ```
 
 验收脚本自动启动临时服务，覆盖拖拽、缩放、属性、历史、文件导入导出、草稿恢复、窄屏面板和存储异常；截图写入不参与提交的 `test-results/`。已有 Playwright 可通过 `PROTOLAB_PLAYWRIGHT_MODULE` 指定其 `index.mjs`，通过 `PROTOLAB_BROWSER_EXECUTABLE` 指定浏览器执行文件，或用 `PROTOLAB_TEST_URL` 测试已启动服务。

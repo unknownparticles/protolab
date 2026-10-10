@@ -13,7 +13,7 @@ for (const directory of ['src', 'scripts', 'tests']) {
 const html = await readFile(resolve(root, 'index.html'), 'utf8');
 const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 if (new Set(ids).size !== ids.length) { console.error('页面存在重复标识'); failed = true; }
-for (const source of ['src/app.js', 'src/assistant.js']) {
+for (const source of ['src/app.js', 'src/assistant.js', 'src/mcp-connection.js']) {
   const app = await readFile(resolve(root, source), 'utf8');
   for (const match of app.matchAll(/\$\('([^']+)'\)/g)) {
     if (!ids.includes(match[1])) { console.error(`缺少页面元素：${match[1]}`); failed = true; }

@@ -280,6 +280,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   renderMode();
   return {
     snapshot: serialize,
+    isBusy: () => !!controller || !!pending || !!generated,
     refreshRules: renderMode,
     refreshLocale() { renderMessages(); renderVersions(); renderMode(); if ($('mergeDialog').open) renderMerge(); },
     activate(project, workspace) {
