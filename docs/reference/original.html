@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原型稿设计器 · 拖拽原型</title>
+    <!-- Font Awesome (图标) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #f1f5f9;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 顶部工具栏 */
+        .toolbar {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            z-index: 20;
+        }
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8fafc;
+            padding: 4px 8px;
+            border-radius: 30px;
+        }
+        .toolbar-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #334155;
+            margin-right: 4px;
+        }
+        .btn {
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 6px 12px;
+            border-radius: 24px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        .btn-primary {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        .btn-icon {
+            padding: 6px 8px;
+        }
+
+        /* 主工作区 */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 左侧组件库 */
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 16px 16px 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .component-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .component-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: grab;
+            transition: all 0.1s;
+            font-size: 14px;
+            font-weight: 500;
+            color: #0f172a;
+        }
+        .component-item:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.04);
+        }
+        .component-item i {
+            width: 20px;
+            color: #3b82f6;
+            font-size: 16px;
+            text-align: center;
+        }
+        .component-item svg {
+            width: 20px;
+            height: 20px;
+            color: #3b82f6;
+        }
+        .badge {
+            background: #e2e8f0;
+            color: #475569;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-left: auto;
+        }
+        .lib-actions {
+            padding: 12px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* 中间画布区 */
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #eef2f6;
+            overflow: auto;
+            padding: 30px;
+            position: relative;
+        }
+        .canvas-container {
+            background: white;
+            box-shadow: 0 20px 35px -8px rgba(0,0,0,0.15), 0 5px 15px rgba(0,0,0,0.05);
+            border-radius: 16px;
+            transition: width 0.2s, height 0.2s;
+            position: relative;
+            overflow: hidden;
+            /* 尺寸动态控制 */
+        }
+        .canvas-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 12px;
+            color: #64748b;
+            border-radius: 16px 16px 0 0;
+        }
+        .canvas {
+            position: relative;
+            width: 100%;
+            height: calc(100% - 36px); /* 减去header高度 */
+            background: white;
+            overflow: auto;
+            min-height: 300px;
+        }
+        /* 拖拽放置高亮 */
+        .canvas.drag-over {
+            outline: 3px solid #3b82f6;
+            outline-offset: -2px;
+        }
+
+        /* 画布上的组件 */
+        .canvas-item {
+            position: absolute;
+            background: white;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            padding: 8px 12px;
+            cursor: move;
+            font-size: 14px;
+            transition: box-shadow 0.1s, border-color 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            min-height: 40px;
+            user-select: none;
+            overflow: hidden;
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+        .canvas-item.selected {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.3), 0 8px 20px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .canvas-item img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+        .canvas-item svg {
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .canvas-item .item-label {
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+            font-size: 9px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 20px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.1s;
+            white-space: nowrap;
+        }
+        .canvas-item:hover .item-label {
+            opacity: 1;
+        }
+
+        /* 右侧属性面板 */
+        .properties {
+            width: 260px;
+            background: white;
+            border-left: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 16px;
+            gap: 20px;
+            flex-shrink: 0;
+        }
+        .prop-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .prop-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+        .prop-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .prop-row label {
+            width: 60px;
+            color: #334155;
+        }
+        .prop-row input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+        }
+        .prop-row input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        }
+        .prop-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        /* 底部状态栏 */
+        .status-bar {
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            padding: 6px 20px;
+            font-size: 12px;
+            color: #475569;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .empty-canvas-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #94a3b8;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            pointer-events: none;
+            text-align: center;
+        }
+        .empty-canvas-hint i {
+            font-size: 40px;
+            opacity: 0.5;
+        }
+
+        /* 隐藏文件输入 */
+        .hidden-input {
+            display: none;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 900px) {
+            .sidebar { width: 220px; }
+            .properties { width: 200px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <span class="toolbar-label"><i class="fas fa-mobile-alt"></i> 预设</span>
+            <button class="btn btn-sm" data-preset="phone">📱 手机</button>
+            <button class="btn btn-sm" data-preset="tablet">平板</button>
+            <button class="btn btn-sm" data-preset="pc">PC</button>
+        </div>
+        <div class="toolbar-group">
+            <span class="toolbar-label"><i class="fas fa-arrows-alt"></i> 方向</span>
+            <button class="btn btn-sm" id="rotateBtn"><i class="fas fa-sync-alt"></i> 横竖切换</button>
+        </div>
+        <div class="toolbar-group">
+            <span class="toolbar-label"><i class="fas fa-save"></i> 组件库</span>
+            <button class="btn btn-sm" id="saveLibBtn"><i class="fas fa-download"></i> 保存当前库</button>
+            <button class="btn btn-sm" id="importLibBtn"><i class="fas fa-upload"></i> 导入库</button>
+            <input type="file" id="libFileInput" class="hidden-input" accept=".json">
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" id="exportHtmlBtn"><i class="fas fa-code"></i> 导出 HTML 原型</button>
+    </div>
+
+    <!-- 主体三栏 -->
+    <div class="main">
+        <!-- 左侧组件库 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>预设组件</span>
+                <span class="badge" id="libCount">7 个</span>
+            </div>
+            <div class="component-list" id="componentList">
+                <!-- 通过JS动态渲染，或者静态写但为保持灵活，用JS渲染 -->
+            </div>
+            <div class="lib-actions">
+                <button class="btn btn-sm" id="addHtmlCompBtn"><i class="fas fa-code"></i> 新建HTML组件</button>
+                <button class="btn btn-sm" id="addSvgCompBtn"><i class="fas fa-image"></i> 新建SVG组件</button>
+                <button class="btn btn-sm" id="importImgCompBtn"><i class="fas fa-file-image"></i> 导入图片组件</button>
+                <input type="file" id="imgFileInput" class="hidden-input" accept="image/*">
+            </div>
+        </div>
+
+        <!-- 中间画布 -->
+        <div class="canvas-wrapper">
+            <div class="canvas-container" id="canvasContainer" style="width: 375px; height: 667px;">
+                <div class="canvas-header">
+                    <span><i class="fas fa-phone"></i> <span id="presetLabel">手机</span></span>
+                    <span><i class="fas fa-expand"></i> <span id="canvasSizeLabel">375 x 667</span></span>
+                </div>
+                <div class="canvas" id="canvas">
+                    <!-- 空状态提示 -->
+                    <div class="empty-canvas-hint" id="emptyHint">
+                        <i class="fas fa-arrow-pointer"></i>
+                        <span>从左侧拖拽组件到画布</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧属性面板 -->
+        <div class="properties" id="propertiesPanel">
+            <div class="prop-section">
+                <div class="prop-title">组件属性</div>
+                <div id="noSelectionMsg" style="color:#94a3b8; font-size:13px; padding:8px 0;">未选中组件</div>
+                <div id="selectionProps" style="display: none; flex-direction: column; gap: 12px;">
+                    <div class="prop-row">
+                        <label>名称</label>
+                        <input type="text" id="propName" placeholder="组件名称">
+                    </div>
+                    <div class="prop-row">
+                        <label>X</label>
+                        <input type="number" id="propX" value="0">
+                    </div>
+                    <div class="prop-row">
+                        <label>Y</label>
+                        <input type="number" id="propY" value="0">
+                    </div>
+                    <div class="prop-row">
+                        <label>宽</label>
+                        <input type="number" id="propW" value="100">
+                    </div>
+                    <div class="prop-row">
+                        <label>高</label>
+                        <input type="number" id="propH" value="40">
+                    </div>
+                    <div class="prop-row">
+                        <label>圆角</label>
+                        <input type="number" id="propRadius" value="8" min="0">
+                    </div>
+                    <div class="prop-row">
+                        <label>内边距</label>
+                        <input type="text" id="propPadding" value="8px 12px" placeholder="如 8px 12px">
+                    </div>
+                    <div class="prop-row">
+                        <label>外边距</label>
+                        <input type="text" id="propMargin" value="0" placeholder="如 0 或 10px">
+                    </div>
+                    <div class="prop-actions">
+                        <button class="btn btn-sm" id="applyPropsBtn"><i class="fas fa-check"></i> 应用</button>
+                        <button class="btn btn-sm" id="deleteItemBtn" style="color:#dc2626;"><i class="fas fa-trash"></i> 删除</button>
+                    </div>
+                </div>
+            </div>
+            <div class="prop-section">
+                <div class="prop-title">画布尺寸</div>
+                <div class="prop-row">
+                    <label>宽</label>
+                    <input type="number" id="canvasWidthInput" value="375" min="100" max="2000">
+                </div>
+                <div class="prop-row">
+                    <label>高</label>
+                    <input type="number" id="canvasHeightInput" value="667" min="100" max="2000">
+                </div>
+                <button class="btn btn-sm" id="applyCanvasSizeBtn">更新画布</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部状态 -->
+    <div class="status-bar">
+        <span><i class="fas fa-info-circle"></i> 拖拽组件到画布 · 点击组件编辑属性 · 支持导出 HTML</span>
+        <span id="componentCount">0 个组件</span>
+    </div>
+
+    <script>
+        (function() {
+            // ---------- 状态管理 ----------
+            // 画布尺寸预设 (横屏/竖屏会动态翻转)
+            const presets = {
+                phone: { width: 375, height: 667, label: '手机' },
+                tablet: { width: 768, height: 1024, label: '平板' },
+                pc: { width: 1280, height: 800, label: 'PC' }
+            };
+            let currentPreset = 'phone';
+            let isLandscape = false; // 横屏标记
+
+            // 组件库数据 (预设+用户导入)
+            let componentLibrary = [
+                { id: 'lib-btn', type: 'preset', name: '按钮', icon: 'fa-square', html: '<button style="padding:8px 16px; background:#3b82f6; color:white; border:none; border-radius:8px; font-size:14px;">按钮</button>', defaultWidth: 100, defaultHeight: 40 },
+                { id: 'lib-text', type: 'preset', name: '文本', icon: 'fa-font', html: '<span style="font-size:14px;">文本内容</span>', defaultWidth: 80, defaultHeight: 30 },
+                { id: 'lib-input', type: 'preset', name: '输入框', icon: 'fa-keyboard', html: '<input type="text" placeholder="输入..." style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%;">', defaultWidth: 180, defaultHeight: 40 },
+                { id: 'lib-card', type: 'preset', name: '卡片', icon: 'fa-square-check', html: '<div style="padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0; width:100%;">卡片内容</div>', defaultWidth: 200, defaultHeight: 100 },
+                { id: 'lib-image', type: 'preset', name: '图片占位', icon: 'fa-image', html: '<div style="width:100%; height:100%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#64748b;"><i class="fas fa-image"></i></div>', defaultWidth: 150, defaultHeight: 120 },
+                { id: 'lib-svg-star', type: 'preset', name: 'SVG 星星', icon: 'fa-star', svg: '<svg viewBox="0 0 24 24" fill="#f59e0b" width="100%" height="100%"><path d="M12 2L15 9H22L16 14L19 21L12 16.5L5 21L8 14L2 9H9L12 2Z"/></svg>', defaultWidth: 60, defaultHeight: 60 },
+                { id: 'lib-avatar', type: 'preset', name: '头像', icon: 'fa-user-circle', html: '<div style="width:48px; height:48px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold;">A</div>', defaultWidth: 60, defaultHeight: 60 },
+            ];
+
+            // 画布上的组件列表 (每个元素包含: id, name, type, x, y, width, height, radius, padding, margin, content(html/svg/img), extra)
+            let canvasItems = [];
+            let selectedItemId = null;
+            let nextItemId = 1;
+
+            // DOM 元素
+            const canvas = document.getElementById('canvas');
+            const canvasContainer = document.getElementById('canvasContainer');
+            const componentListEl = document.getElementById('componentList');
+            const emptyHint = document.getElementById('emptyHint');
+            const componentCountSpan = document.getElementById('componentCount');
+            const presetLabel = document.getElementById('presetLabel');
+            const canvasSizeLabel = document.getElementById('canvasSizeLabel');
+            const canvasWidthInput = document.getElementById('canvasWidthInput');
+            const canvasHeightInput = document.getElementById('canvasHeightInput');
+            const noSelectionMsg = document.getElementById('noSelectionMsg');
+            const selectionProps = document.getElementById('selectionProps');
+            const propName = document.getElementById('propName');
+            const propX = document.getElementById('propX');
+            const propY = document.getElementById('propY');
+            const propW = document.getElementById('propW');
+            const propH = document.getElementById('propH');
+            const propRadius = document.getElementById('propRadius');
+            const propPadding = document.getElementById('propPadding');
+            const propMargin = document.getElementById('propMargin');
+
+            // ---------- 辅助函数 ----------
+            function updateEmptyHint() {
+                if (canvasItems.length === 0) {
+                    emptyHint.style.display = 'flex';
+                } else {
+                    emptyHint.style.display = 'none';
+                }
+                componentCountSpan.innerText = canvasItems.length + ' 个组件';
+                document.getElementById('libCount').innerText = componentLibrary.length + ' 个';
+            }
+
+            // 保存到 localStorage (组件库)
+            function saveLibraryToStorage() {
+                try {
+                    localStorage.setItem('proto_component_library', JSON.stringify(componentLibrary));
+                } catch (e) {
+                    console.warn('保存组件库失败', e);
+                }
+            }
+
+            // 从 localStorage 加载
+            function loadLibraryFromStorage() {
+                const saved = localStorage.getItem('proto_component_library');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed) && parsed.length) {
+                            componentLibrary = parsed;
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            // 渲染左侧组件库
+            function renderComponentLibrary() {
+                componentListEl.innerHTML = '';
+                componentLibrary.forEach(comp => {
+                    const el = document.createElement('div');
+                    el.className = 'component-item';
+                    el.draggable = true;
+                    el.dataset.compId = comp.id;
+                    // 根据类型显示图标或预览
+                    let iconHtml = '';
+                    if (comp.svg) {
+                        iconHtml = `<span style="width:20px;height:20px;display:inline-flex;">${comp.svg}</span>`;
+                    } else if (comp.html) {
+                        // 如果是预设html，简化显示图标
+                        iconHtml = `<i class="fas ${comp.icon || 'fa-cube'}"></i>`;
+                    } else {
+                        iconHtml = `<i class="fas ${comp.icon || 'fa-cube'}"></i>`;
+                    }
+                    el.innerHTML = `${iconHtml} <span>${comp.name}</span> <span class="badge">${comp.type === 'preset' ? '预设' : '自定义'}</span>`;
+                    
+                    // 拖拽开始
+                    el.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', comp.id);
+                        e.dataTransfer.effectAllowed = 'copy';
+                    });
+                    componentListEl.appendChild(el);
+                });
+                updateEmptyHint();
+            }
+
+            // 画布渲染
+            function renderCanvas() {
+                // 清除除了emptyHint之外的所有子元素
+                Array.from(canvas.children).forEach(child => {
+                    if (child.id !== 'emptyHint') child.remove();
+                });
+
+                canvasItems.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = 'canvas-item' + (item.id === selectedItemId ? ' selected' : '');
+                    el.dataset.itemId = item.id;
+                    el.style.left = item.x + 'px';
+                    el.style.top = item.y + 'px';
+                    el.style.width = item.width + 'px';
+                    el.style.height = item.height + 'px';
+                    el.style.borderRadius = (item.radius || 8) + 'px';
+                    if (item.padding) el.style.padding = item.padding;
+                    if (item.margin) el.style.margin = item.margin;
+                    el.style.boxSizing = 'border-box';
+                    
+                    // 内容
+                    if (item.type === 'html') {
+                        el.innerHTML = item.content;
+                    } else if (item.type === 'svg') {
+                        el.innerHTML = item.content; // svg字符串
+                    } else if (item.type === 'image') {
+                        el.innerHTML = `<img src="${item.content}" alt="${item.name}" style="width:100%;height:100%;object-fit:contain;">`;
+                    } else {
+                        el.innerHTML = item.content || '组件';
+                    }
+
+                    // 添加名称标签
+                    const label = document.createElement('div');
+                    label.className = 'item-label';
+                    label.innerText = item.name || '未命名';
+                    el.appendChild(label);
+
+                    // 选中事件
+                    el.addEventListener('mousedown', (e) => {
+                        e.stopPropagation();
+                        selectItem(item.id);
+                    });
+
+                    // 拖拽移动 (利用mousedown + mousemove 实现画布内移动)
+                    el.addEventListener('mousedown', (e) => {
+                        if (e.button !== 0) return; // 只左键
+                        e.stopPropagation();
+                        const startX = e.clientX;
+                        const startY = e.clientY;
+                        const startLeft = item.x;
+                        const startTop = item.y;
+                        const moveHandler = (moveEvent) => {
+                            const dx = moveEvent.clientX - startX;
+                            const dy = moveEvent.clientY - startY;
+                            let newX = startLeft + dx;
+                            let newY = startTop + dy;
+                            // 边界约束(可粗略)
+                            newX = Math.max(0, Math.min(newX, canvas.clientWidth - item.width));
+                            newY = Math.max(0, Math.min(newY, canvas.clientHeight - item.height));
+                            item.x = Math.round(newX);
+                            item.y = Math.round(newY);
+                            el.style.left = item.x + 'px';
+                            el.style.top = item.y + 'px';
+                            // 更新属性面板
+                            if (selectedItemId === item.id) {
+                                propX.value = item.x;
+                                propY.value = item.y;
+                            }
+                        };
+                        const upHandler = () => {
+                            document.removeEventListener('mousemove', moveHandler);
+                            document.removeEventListener('mouseup', upHandler);
+                        };
+                        document.addEventListener('mousemove', moveHandler);
+                        document.addEventListener('mouseup', upHandler);
+                    });
+
+                    canvas.appendChild(el);
+                });
+                updateEmptyHint();
+            }
+
+            // 选中组件
+            function selectItem(id) {
+                selectedItemId = id;
+                renderCanvas(); // 重新渲染以更新选中样式
+                const item = canvasItems.find(it => it.id === id);
+                if (item) {
+                    noSelectionMsg.style.display = 'none';
+                    selectionProps.style.display = 'flex';
+                    propName.value = item.name || '';
+                    propX.value = item.x;
+                    propY.value = item.y;
+                    propW.value = item.width;
+                    propH.value = item.height;
+                    propRadius.value = item.radius || 8;
+                    propPadding.value = item.padding || '8px 12px';
+                    propMargin.value = item.margin || '0';
+                } else {
+                    noSelectionMsg.style.display = 'block';
+                    selectionProps.style.display = 'none';
+                }
+            }
+
+            // 取消选中
+            function deselect() {
+                selectedItemId = null;
+                renderCanvas();
+                noSelectionMsg.style.display = 'block';
+                selectionProps.style.display = 'none';
+            }
+
+            // 添加组件到画布
+            function addComponentToCanvas(comp, dropX, dropY) {
+                const newItem = {
+                    id: 'item-' + (nextItemId++),
+                    name: comp.name || '组件',
+                    type: comp.svg ? 'svg' : (comp.html ? 'html' : 'html'),
+                    x: dropX || 50,
+                    y: dropY || 50,
+                    width: comp.defaultWidth || 100,
+                    height: comp.defaultHeight || 40,
+                    radius: 8,
+                    padding: '8px 12px',
+                    margin: '0',
+                    content: comp.svg || comp.html || comp.content || '组件',
+                };
+                if (comp.type === 'image') {
+                    newItem.type = 'image';
+                    newItem.content = comp.content; // base64
+                }
+                canvasItems.push(newItem);
+                renderCanvas();
+                // 自动选中新组件
+                setTimeout(() => selectItem(newItem.id), 10);
+            }
+
+            // ---------- 初始化画布尺寸和预设 ----------
+            function applyPreset(presetKey) {
+                currentPreset = presetKey;
+                const preset = presets[presetKey];
+                let w = preset.width;
+                let h = preset.height;
+                if (isLandscape) {
+                    [w, h] = [h, w];
+                }
+                canvasContainer.style.width = w + 'px';
+                canvasContainer.style.height = h + 'px';
+                canvasWidthInput.value = w;
+                canvasHeightInput.value = h;
+                presetLabel.innerText = preset.label + (isLandscape ? ' 横屏' : ' 竖屏');
+                canvasSizeLabel.innerText = `${w} x ${h}`;
+                canvas.style.width = '100%';
+                canvas.style.height = 'calc(100% - 36px)';
+            }
+
+            // 切换横竖
+            function toggleOrientation() {
+                isLandscape = !isLandscape;
+                applyPreset(currentPreset);
+            }
+
+            // 更新画布尺寸(手动)
+            function updateCanvasSizeFromInput() {
+                let w = parseInt(canvasWidthInput.value, 10);
+                let h = parseInt(canvasHeightInput.value, 10);
+                if (isNaN(w) || w < 100) w = 100;
+                if (isNaN(h) || h < 100) h = 100;
+                canvasContainer.style.width = w + 'px';
+                canvasContainer.style.height = h + 'px';
+                canvasWidthInput.value = w;
+                canvasHeightInput.value = h;
+                canvasSizeLabel.innerText = `${w} x ${h}`;
+                presetLabel.innerText = '自定义';
+                canvas.style.height = 'calc(100% - 36px)';
+            }
+
+            // ---------- 事件绑定 ----------
+            // 拖拽放置
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                canvas.classList.add('drag-over');
+            });
+            canvas.addEventListener('dragleave', () => {
+                canvas.classList.remove('drag-over');
+            });
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                canvas.classList.remove('drag-over');
+                const compId = e.dataTransfer.getData('text/plain');
+                const comp = componentLibrary.find(c => c.id === compId);
+                if (!comp) return;
+                const rect = canvas.getBoundingClientRect();
+                const dropX = e.clientX - rect.left;
+                const dropY = e.clientY - rect.top;
+                // 边界限制
+                const maxX = canvas.clientWidth - (comp.defaultWidth || 100);
+                const maxY = canvas.clientHeight - (comp.defaultHeight || 40);
+                const x = Math.max(0, Math.min(dropX, maxX > 0 ? maxX : 0));
+                const y = Math.max(0, Math.min(dropY, maxY > 0 ? maxY : 0));
+                addComponentToCanvas(comp, x, y);
+            });
+
+            // 点击画布空白取消选中
+            canvas.addEventListener('click', (e) => {
+                if (e.target === canvas) {
+                    deselect();
+                }
+            });
+
+            // 预设按钮
+            document.querySelectorAll('[data-preset]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const preset = btn.dataset.preset;
+                    applyPreset(preset);
+                });
+            });
+
+            // 横竖切换
+            document.getElementById('rotateBtn').addEventListener('click', toggleOrientation);
+
+            // 应用画布尺寸
+            document.getElementById('applyCanvasSizeBtn').addEventListener('click', updateCanvasSizeFromInput);
+
+            // 应用组件属性
+            document.getElementById('applyPropsBtn').addEventListener('click', () => {
+                if (!selectedItemId) return;
+                const item = canvasItems.find(it => it.id === selectedItemId);
+                if (!item) return;
+                item.name = propName.value || '未命名';
+                item.x = parseInt(propX.value, 10) || 0;
+                item.y = parseInt(propY.value, 10) || 0;
+                item.width = parseInt(propW.value, 10) || 100;
+                item.height = parseInt(propH.value, 10) || 40;
+                item.radius = parseInt(propRadius.value, 10) || 0;
+                item.padding = propPadding.value || '0';
+                item.margin = propMargin.value || '0';
+                // 边界约束
+                item.x = Math.max(0, Math.min(item.x, canvas.clientWidth - item.width));
+                item.y = Math.max(0, Math.min(item.y, canvas.clientHeight - item.height));
+                renderCanvas();
+                selectItem(item.id); // 重新选中并刷新属性
+            });
+
+            // 删除组件
+            document.getElementById('deleteItemBtn').addEventListener('click', () => {
+                if (!selectedItemId) return;
+                canvasItems = canvasItems.filter(it => it.id !== selectedItemId);
+                selectedItemId = null;
+                renderCanvas();
+                noSelectionMsg.style.display = 'block';
+                selectionProps.style.display = 'none';
+            });
+
+            // 保存组件库
+            document.getElementById('saveLibBtn').addEventListener('click', () => {
+                saveLibraryToStorage();
+                alert('组件库已保存到本地 (localStorage)');
+            });
+
+            // 导入组件库 (JSON)
+            document.getElementById('importLibBtn').addEventListener('click', () => {
+                document.getElementById('libFileInput').click();
+            });
+            document.getElementById('libFileInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const imported = JSON.parse(ev.target.result);
+                        if (Array.isArray(imported)) {
+                            // 合并，简单去重根据id？ 这里直接覆盖吧
+                            componentLibrary = imported;
+                            renderComponentLibrary();
+                            saveLibraryToStorage();
+                            alert('组件库导入成功');
+                        } else {
+                            alert('格式错误：需要JSON数组');
+                        }
+                    } catch (err) {
+                        alert('解析失败');
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = ''; // 清空
+            });
+
+            // 新建HTML组件
+            document.getElementById('addHtmlCompBtn').addEventListener('click', () => {
+                const name = prompt('输入组件名称', '自定义HTML');
+                if (!name) return;
+                const html = prompt('输入HTML代码', '<div style="padding:10px;">新组件</div>');
+                if (!html) return;
+                const newComp = {
+                    id: 'custom-html-' + Date.now(),
+                    type: 'custom',
+                    name: name,
+                    icon: 'fa-code',
+                    html: html,
+                    defaultWidth: 120,
+                    defaultHeight: 60,
+                };
+                componentLibrary.push(newComp);
+                renderComponentLibrary();
+                saveLibraryToStorage();
+            });
+
+            // 新建SVG组件
+            document.getElementById('addSvgCompBtn').addEventListener('click', () => {
+                const name = prompt('输入SVG组件名称', '自定义SVG');
+                if (!name) return;
+                const svg = prompt('输入SVG代码', '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>');
+                if (!svg) return;
+                const newComp = {
+                    id: 'custom-svg-' + Date.now(),
+                    type: 'custom',
+                    name: name,
+                    icon: 'fa-image',
+                    svg: svg,
+                    defaultWidth: 60,
+                    defaultHeight: 60,
+                };
+                componentLibrary.push(newComp);
+                renderComponentLibrary();
+                saveLibraryToStorage();
+            });
+
+            // 导入图片组件
+            document.getElementById('importImgCompBtn').addEventListener('click', () => {
+                document.getElementById('imgFileInput').click();
+            });
+            document.getElementById('imgFileInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const dataUrl = ev.target.result;
+                    const name = prompt('输入图片组件名称', file.name.replace(/\.[^/.]+$/, ''));
+                    if (!name) return;
+                    const newComp = {
+                        id: 'custom-img-' + Date.now(),
+                        type: 'image',
+                        name: name,
+                        icon: 'fa-file-image',
+                        content: dataUrl,
+                        defaultWidth: 120,
+                        defaultHeight: 120,
+                    };
+                    componentLibrary.push(newComp);
+                    renderComponentLibrary();
+                    saveLibraryToStorage();
+                };
+                reader.readAsDataURL(file);
+                e.target.value = '';
+            });
+
+            // 导出HTML原型
+            document.getElementById('exportHtmlBtn').addEventListener('click', () => {
+                // 构建HTML
+                const w = canvasContainer.clientWidth;
+                const h = canvasContainer.clientHeight - 36; // 减去header高度(36px左右)
+                const title = '原型导出';
+                
+                let itemsHtml = '';
+                canvasItems.forEach(item => {
+                    let inner = '';
+                    if (item.type === 'html') inner = item.content;
+                    else if (item.type === 'svg') inner = item.content;
+                    else if (item.type === 'image') inner = `<img src="${item.content}" style="width:100%;height:100%;object-fit:contain;">`;
+                    else inner = item.content || '';
+                    
+                    // 构建样式
+                    const style = `position:absolute; left:${item.x}px; top:${item.y}px; width:${item.width}px; height:${item.height}px; border-radius:${item.radius || 8}px; padding:${item.padding || '0'}; margin:${item.margin || '0'}; box-sizing:border-box; background:white; box-shadow:0 4px 12px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; overflow:hidden;`;
+                    
+                    itemsHtml += `<div style="${style}" data-name="${item.name || ''}">${inner}</div>`;
+                });
+
+                const fullHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${title}</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f1f5f9;font-family:system-ui,sans-serif;} .prototype{position:relative;width:${w}px;height:${h}px;background:white;box-shadow:0 20px 35px -8px rgba(0,0,0,0.15);border-radius:16px;overflow:hidden;}</style>
+</head>
+<body>
+<div class="prototype">
+${itemsHtml}
+</div>
+</body>
+</html>`;
+
+                // 下载
+                const blob = new Blob([fullHtml], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'prototype.html';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            // 初始化
+            function init() {
+                // 加载保存的组件库
+                loadLibraryFromStorage();
+                renderComponentLibrary();
+                // 默认预设
+                applyPreset('phone');
+                // 画布尺寸标签
+                canvasSizeLabel.innerText = '375 x 667';
+                canvasWidthInput.value = 375;
+                canvasHeightInput.value = 667;
+                // 渲染空画布
+                renderCanvas();
+                deselect();
+
+                // 调整canvas高度
+                canvas.style.height = 'calc(100% - 36px)';
+            }
+
+            init();
+        })();
+    </script>
+</body>
+</html>
