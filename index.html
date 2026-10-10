@@ -40,7 +40,7 @@
     <button class="btn btn-sm" data-panel="properties" aria-expanded="false">属性面板</button>
   </nav>
   <main class="workspace">
-    <aside class="sidebar" id="libraryPanel" aria-label="组件库">
+    <aside class="sidebar" id="libraryPanel" data-collapsible-panel="libraryPanel" aria-label="组件库">
       <div class="panel-heading"><h1>组件库</h1><span class="badge" id="libCount">23</span></div>
       <p class="panel-description">拖拽到画布，或点击快速添加</p>
       <label class="search-box"><span data-icon="search"></span><input id="componentSearch" type="search" placeholder="搜索组件…" aria-label="搜索组件"></label>
@@ -50,18 +50,18 @@
         <button id="customTab" role="tab" type="button" data-library-tab="custom" aria-controls="customPanel" aria-selected="false" tabindex="-1">自定义<span id="customCount">0</span></button>
       </div>
       <div class="library-scroll">
-        <section id="basicPanel" role="tabpanel" aria-labelledby="basicTab"><div class="section-label">基础组件</div><div class="component-list" id="presetList"></div></section>
-        <section id="vectorPanel" role="tabpanel" aria-labelledby="vectorTab" hidden><div class="section-label">矢量组件</div><div class="component-list vector-list" id="vectorList"></div></section>
-        <section id="customPanel" role="tabpanel" aria-labelledby="customTab" hidden><div class="section-label">自定义组件</div><div class="component-list" id="customList"></div><p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p></section>
+        <section id="basicPanel" data-collapsible="basicPanel" role="tabpanel" aria-labelledby="basicTab"><div class="section-label">基础组件</div><div class="component-list" id="presetList"></div></section>
+        <section id="vectorPanel" data-collapsible="vectorPanel" role="tabpanel" aria-labelledby="vectorTab" hidden><div class="section-label">矢量组件</div><div class="component-list vector-list" id="vectorList"></div></section>
+        <section id="customPanel" data-collapsible="customPanel" role="tabpanel" aria-labelledby="customTab" hidden><div class="section-label">自定义组件</div><div class="component-list" id="customList"></div><p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p></section>
         <p class="custom-empty" id="libraryEmpty" hidden>当前分类没有匹配的组件</p>
-        <div class="creation-actions">
+        <section class="creation-section" data-collapsible="creation" data-collapse-title="创建组件"><div class="creation-actions">
           <button class="btn" id="generateComponentBtn">AI 生成组件</button>
           <button class="btn" id="addHtmlCompBtn"><span data-icon="plus"></span>新建 HTML 组件</button>
           <button class="btn" id="addSvgCompBtn"><span data-icon="code"></span>新建 SVG 组件</button>
           <button class="btn" id="importImgCompBtn"><span data-icon="image"></span>导入图片组件</button>
-        </div>
+        </div></section>
       </div>
-      <div class="library-footer">
+      <div class="library-footer" data-collapsible="library-management">
         <div class="section-label">组件库管理</div>
         <div class="lib-actions">
           <button class="btn btn-sm" id="saveLibBtn"><span data-icon="save"></span>保存</button>
@@ -73,7 +73,7 @@
     </aside>
     <section class="canvas-area" aria-label="画布工作区">
       <div class="canvas-topbar"><span class="canvas-breadcrumb"><span data-icon="layers"></span>未命名原型 <span>/</span> <strong id="presetLabel">手机 · 竖屏</strong></span><div class="canvas-view-controls"><label><input type="checkbox" id="showRulers" checked>标尺</label><label><input type="checkbox" id="showGrid">网格</label><span class="canvas-dimensions" id="canvasSizeLabel">375 × 667</span></div></div>
-      <div class="pages-toolbar" aria-label="页面管理"><div class="page-list" id="pageList" aria-label="页面与弹窗"></div><div class="page-tools"><span id="pageSummary"></span><button class="btn btn-sm" id="addPageBtn">＋ 页面</button><button class="btn btn-sm" id="addPopupBtn">＋ 弹窗</button><button class="btn btn-sm" id="generatePageBtn">AI 生成页面</button><button class="btn btn-sm" id="managePageBtn">管理当前页</button></div></div>
+      <div class="pages-toolbar" data-collapsible="pages" data-collapse-title="页面管理" aria-label="页面管理"><div class="page-list" id="pageList" aria-label="页面与弹窗"></div><div class="page-tools"><span id="pageSummary"></span><button class="btn btn-sm" id="addPageBtn">＋ 页面</button><button class="btn btn-sm" id="addPopupBtn">＋ 弹窗</button><button class="btn btn-sm" id="generatePageBtn">AI 生成页面</button><button class="btn btn-sm" id="managePageBtn">管理当前页</button></div></div>
       <div class="canvas-viewport" id="canvasViewport">
         <div class="canvas-stage" id="canvasStage">
           <div class="canvas-ruler horizontal" id="rulerHorizontal" aria-label="水平标尺，单位像素"></div>
@@ -91,10 +91,10 @@
       </div>
       <div class="canvas-bottom-controls"><span class="keyboard-hint">方向键微调 <kbd>⇧</kbd> × 10 · <kbd>Del</kbd> 删除</span><label class="zoom-control">缩放 <select id="zoomSelect" aria-label="画布缩放"><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label><button class="btn btn-sm" id="fitBtn">适应窗口</button></div>
     </section>
-    <aside class="properties" id="propertiesPanel" aria-label="属性面板">
+    <aside class="properties" id="propertiesPanel" data-collapsible-panel="propertiesPanel" aria-label="属性面板">
       <div class="panel-heading"><h2>设计属性</h2><span class="heading-icon" data-icon="pointer"></span></div>
       <div class="properties-scroll">
-        <section class="prop-section">
+        <section class="prop-section" data-collapsible="component-properties">
           <div class="section-label">组件属性</div>
           <div id="noSelectionMsg" class="selection-empty"><span data-icon="pointer"></span><strong>未选中组件</strong><p>点击画布中的组件<br>在这里调整它的设计</p></div>
           <form id="selectionProps" hidden>
@@ -103,16 +103,16 @@
             <div class="field-grid"><label class="field">X<input id="propX" type="number" min="0" required></label><label class="field">Y<input id="propY" type="number" min="0" required></label></div>
             <div class="field-grid"><label class="field">宽度<input id="propW" type="number" min="1" max="2000" required></label><label class="field">高度<input id="propH" type="number" min="1" max="2000" required></label></div>
             <label class="field">圆角 <span class="unit">px</span><input id="propRadius" type="number" min="0" max="50" required></label>
-            <fieldset class="property-group"><legend>内边距 padding · px</legend><div class="spacing-grid"><label class="field">上<input id="propPaddingTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propPaddingRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propPaddingBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propPaddingLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>
-            <fieldset class="property-group"><legend>外边距 margin · px</legend><div class="spacing-grid"><label class="field">上<input id="propMarginTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propMarginRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propMarginBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propMarginLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>
+            <fieldset class="property-group" data-collapsible="padding"><legend>内边距 padding · px</legend><div class="spacing-grid"><label class="field">上<input id="propPaddingTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propPaddingRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propPaddingBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propPaddingLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>
+            <fieldset class="property-group" data-collapsible="margin"><legend>外边距 margin · px</legend><div class="spacing-grid"><label class="field">上<input id="propMarginTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propMarginRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propMarginBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propMarginLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>
             <p class="field-help">外边距作用于内部内容，保留组件定位与尺寸。</p>
-            <fieldset class="property-group"><legend>外观</legend>
+            <fieldset class="property-group" data-collapsible="appearance"><legend>外观</legend>
               <label class="field">背景颜色<div class="color-field"><input id="propBackgroundPicker" type="color" aria-label="背景颜色选择器"><input id="propBackground" placeholder="原始颜色 / #ffffff" maxlength="20"></div></label>
               <label class="field">矢量填充 / 描边颜色<div class="color-field"><input id="propColorPicker" type="color" aria-label="矢量颜色选择器"><input id="propColor" placeholder="原始颜色 / #2563eb" maxlength="20"></div></label>
               <label class="field">不透明度 · %<input id="propOpacity" type="number" min="0" max="100" step="0.1" required></label>
               <label class="field">混合模式<select id="propBlendMode"></select></label>
             </fieldset>
-            <fieldset class="property-group" id="textProperties" hidden><legend>文本与字体</legend>
+            <fieldset class="property-group" data-collapsible="text" id="textProperties" hidden><legend>文本与字体</legend>
               <div id="textContentFields"></div>
               <label class="field">字体<input id="propFontFamily" list="fontChoices" placeholder="原始字体 / system-ui" maxlength="200"></label>
               <datalist id="fontChoices"><option value="system-ui"><option value="Arial"><option value="Inter"><option value="PingFang SC"><option value="Microsoft YaHei"><option value="serif"><option value="monospace"></datalist>
@@ -120,7 +120,7 @@
               <label class="field">字体颜色<div class="color-field"><input id="propTextColorPicker" type="color" aria-label="字体颜色选择器"><input id="propTextColor" placeholder="原始颜色 / #334155" maxlength="20"></div></label>
               <p class="field-help">留空保留原始样式；字体需已安装在当前设备。</p>
             </fieldset>
-            <fieldset class="property-group" id="imageProperties" hidden><legend>图片</legend>
+            <fieldset class="property-group" data-collapsible="image" id="imageProperties" hidden><legend>图片</legend>
               <label class="field">编辑图片<select id="propImageTarget"></select></label>
               <img id="propImagePreview" class="property-image-preview" alt="当前图片" hidden>
               <label class="field">设置图片<input id="propImageFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif"></label>
@@ -138,9 +138,9 @@
             <div class="prop-actions"><button class="btn btn-sm" type="button" id="duplicateItemBtn"><span data-icon="copy"></span>复制</button><button class="btn btn-sm btn-danger" type="button" id="deleteItemBtn"><span data-icon="trash"></span>删除</button></div>
           </form>
         </section>
-        <section class="prop-section">
-          <label class="checkbox-field"><input type="checkbox" id="snapComponents" checked>拖动吸附</label><p class="field-help">靠近中心或边缘时自动吸附；按住 Alt 临时跳过。</p>
+        <section class="prop-section" data-collapsible="alignment">
           <div class="section-label">对齐与居中 <span id="selectionCount">未选中</span></div>
+          <label class="checkbox-field"><input type="checkbox" id="snapComponents" checked>拖动吸附</label><p class="field-help">靠近中心或边缘时自动吸附；按住 Alt 临时跳过。</p>
           <label class="field">对齐参照<select id="alignReference"><option value="canvas">画布</option><option value="selection">所选组件</option></select></label>
           <div class="alignment-actions" id="alignmentActions" role="group" aria-label="对齐与居中">
             <button class="btn btn-sm" data-align="left" disabled>左对齐</button><button class="btn btn-sm" data-align="centerX" disabled>水平居中</button><button class="btn btn-sm" data-align="right" disabled>右对齐</button>
@@ -148,8 +148,8 @@
             <button class="btn btn-sm align-center" data-align="center" disabled>整体居中</button>
           </div><p class="field-help alignment-help">按住 Shift 点击画布或图层可多选。以画布为参照时，各组件分别对齐；以所选组件为参照时，至少选择两个组件。</p>
         </section>
-        <section class="prop-section"><div class="section-label">画布设置</div><label class="field">网格间距<select id="gridSize"><option value="5">5 px</option><option value="10">10 px</option><option value="20" selected>20 px</option><option value="40">40 px</option><option value="50">50 px</option><option value="100">100 px</option></select></label><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
-        <section class="prop-section">
+        <section class="prop-section" data-collapsible="canvas-settings"><div class="section-label">画布设置</div><label class="field">网格间距<select id="gridSize"><option value="5">5 px</option><option value="10">10 px</option><option value="20" selected>20 px</option><option value="40">40 px</option><option value="50">50 px</option><option value="100">100 px</option></select></label><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
+        <section class="prop-section" data-collapsible="safe-area">
           <div class="section-label">安全区</div>
           <form id="safeAreaForm">
             <label class="checkbox-field"><input type="checkbox" id="safeAreaEnabled">启用安全区限制</label>
@@ -162,7 +162,7 @@
             <button class="btn apply-button" type="submit">应用安全区</button>
           </form>
         </section>
-        <section class="prop-section">
+        <section class="prop-section" data-collapsible="device-frame">
           <div class="section-label">设备外框</div>
           <label class="field">设备类型<select id="frameDevice"><option value="phone">手机</option><option value="tablet">平板</option><option value="pc">电脑</option></select></label>
           <label class="field">外框样式<select id="frameStyle"></select></label>
@@ -175,17 +175,17 @@
             <p class="field-help">系统栏覆盖画布顶部 28～44 px（随摄像头变化）、底部 28 / 40 px，设计时请留出空间。</p>
           </div>
         </section>
-        <section class="prop-section"><div class="section-label">图层 <span id="layerCount">0</span></div><div class="layer-list" id="layerList"></div><p class="field-help" id="layerEmpty">添加组件后在这里快速选中。</p><div class="layer-actions" id="layerActions" hidden><button class="btn btn-sm" id="layerUpBtn" title="上移一层">上移一层</button><button class="btn btn-sm" id="layerDownBtn" title="下移一层">下移一层</button></div></section>
+        <section class="prop-section" data-collapsible="layers"><div class="section-label">图层 <span id="layerCount">0</span></div><div class="layer-list" id="layerList"></div><p class="field-help" id="layerEmpty">添加组件后在这里快速选中。</p><div class="layer-actions" id="layerActions" hidden><button class="btn btn-sm" id="layerUpBtn" title="上移一层">上移一层</button><button class="btn btn-sm" id="layerDownBtn" title="下移一层">下移一层</button></div></section>
       </div>
       <div class="properties-footer"><span class="local-dot"></span>草稿本地保存 · AI 按需发送项目</div>
     </aside>
-    <aside id="aiPanel" class="ai-panel" hidden aria-label="AI 对话">
+    <aside id="aiPanel" data-collapsible-panel="aiPanel" class="ai-panel" hidden aria-label="AI 对话">
       <div class="panel-heading"><h2>AI 设计助手</h2><button class="btn btn-icon" id="aiCloseBtn" aria-label="关闭 AI 对话">×</button></div>
       <p class="panel-description">描述需求，修改设计或独立生成组件和页面。</p>
-      <div id="aiMessages" class="ai-messages" role="log" aria-live="polite"></div>
-      <div id="aiPending" class="ai-pending" hidden><strong>AI 版本等待合并</strong><p id="aiPendingSummary"></p><button class="btn btn-primary btn-sm" id="mergeOpenBtn">查看并合并</button><button class="btn btn-sm" id="discardAIBtn">放弃应用</button></div>
-      <div id="aiGenerated" class="ai-pending" hidden><strong>生成结果等待保存</strong><p id="aiGeneratedSummary"></p><p class="field-help">请保存后再刷新或切换工程。</p><button class="btn btn-primary btn-sm" id="aiGeneratedOpenBtn">预览并保存</button></div>
-      <form id="aiForm" class="ai-composer"><label class="field">设计任务<select id="aiMode"><option value="modify">修改当前页面</option><option value="component">独立生成组件</option><option value="page">独立生成页面</option></select></label><p class="field-help" id="aiModeHelp"></p><label class="field">用户提示词<textarea id="aiRequirement" rows="4" maxlength="10000" placeholder="例如：生成一个蓝色登录页，包含手机号输入框、验证码和登录按钮" required></textarea></label><p class="field-help" id="aiRulesSummary"></p><details class="ai-rules"><summary>查看内置设计规范</summary><p class="field-help" id="aiBuiltinRules"></p></details><p id="aiStatus" class="field-help" role="status"></p><div class="ai-composer-actions"><button class="btn" type="button" id="aiCancelBtn" hidden>取消请求</button><button class="btn btn-primary" type="submit" id="aiSendBtn">发送需求</button></div></form>
+      <section class="ai-history" data-collapsible="ai-history" data-collapse-title="对话记录"><div id="aiMessages" class="ai-messages" role="log" aria-live="polite"></div></section>
+      <div id="aiPending" data-collapsible="ai-pending" class="ai-pending" hidden><strong>AI 版本等待合并</strong><p id="aiPendingSummary"></p><button class="btn btn-primary btn-sm" id="mergeOpenBtn">查看并合并</button><button class="btn btn-sm" id="discardAIBtn">放弃应用</button></div>
+      <div id="aiGenerated" data-collapsible="ai-generated" class="ai-pending" hidden><strong>生成结果等待保存</strong><p id="aiGeneratedSummary"></p><p class="field-help">请保存后再刷新或切换工程。</p><button class="btn btn-primary btn-sm" id="aiGeneratedOpenBtn">预览并保存</button></div>
+      <form id="aiForm" data-collapsible="ai-task" data-collapse-title="设计需求" class="ai-composer"><label class="field">设计任务<select id="aiMode"><option value="modify">修改当前页面</option><option value="component">独立生成组件</option><option value="page">独立生成页面</option></select></label><p class="field-help" id="aiModeHelp"></p><label class="field">用户提示词<textarea id="aiRequirement" rows="4" maxlength="10000" placeholder="例如：生成一个蓝色登录页，包含手机号输入框、验证码和登录按钮" required></textarea></label><p class="field-help" id="aiRulesSummary"></p><details class="ai-rules"><summary>查看内置设计规范</summary><p class="field-help" id="aiBuiltinRules"></p></details><p id="aiStatus" class="field-help" role="status"></p><div class="ai-composer-actions"><button class="btn" type="button" id="aiCancelBtn" hidden>取消请求</button><button class="btn btn-primary" type="submit" id="aiSendBtn">发送需求</button></div></form>
     </aside>
   </main>
   <footer class="status-bar"><span id="statusMessage" role="status"><span class="local-dot"></span>准备就绪 · 点击或拖拽组件开始设计</span><span id="componentCount">0 个组件</span></footer>
@@ -198,7 +198,7 @@
   <dialog id="versionsDialog" class="versions-dialog"><div class="dialog-heading"><h2>修改版本</h2><button class="btn btn-icon" data-close="versionsDialog" aria-label="关闭版本记录">×</button></div><p class="dialog-description">每次画布修改自动形成版本。回退后继续编辑会保留原来的分支，AI 合并版本保留两份来源。记录保存在此浏览器，可导出备份。</p><div class="version-tools"><button class="btn btn-sm" id="versionsExportBtn">导出版本备份</button><button class="btn btn-sm" id="versionsImportBtn">导入版本备份</button></div><div id="versionsList" class="versions-list"></div></dialog>
   <dialog id="mergeDialog" class="merge-dialog"><div class="dialog-heading"><h2>合并 AI 修改</h2><button class="btn btn-icon" data-close="mergeDialog" aria-label="关闭合并">×</button></div><p class="dialog-description" id="mergeSummary"></p><p class="field-help">互不冲突的字段已自动合并。冲突需要逐项选择；未选择时预览保留本地内容。</p><div id="mergeConflicts" class="merge-conflicts"></div><iframe id="mergePreview" title="合并结果预览" sandbox="allow-scripts"></iframe><p class="form-error" id="mergeError" role="alert"></p><div class="dialog-actions"><button class="btn" data-close="mergeDialog">稍后处理</button><button class="btn btn-primary" id="mergeApplyBtn">确认合并</button></div></dialog>
   <dialog id="projectDialog"><form id="projectForm"><div class="dialog-heading"><h2>导入工程</h2><button class="btn btn-icon" type="button" data-close="projectDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">支持工程 JSON 和 HTML。导入将替换当前画布，可撤销；建议先导出当前工程。工程 JSON 同时恢复自定义组件库。</p><label class="field">工程文件<input id="projectFileInput" type="file" accept=".json,.html,.htm,application/json,text/html" required></label><div class="field-grid"><label class="field">HTML 设计宽度 px<input id="importWidth" type="number" min="100" max="2000" value="1280" required></label><label class="field">HTML 设计高度 px<input id="importHeight" type="number" min="100" max="2000" value="800" required></label></div><p class="field-help">普通 HTML 在此尺寸下计算布局并识别可见组件，保留内联和页面 CSS 样式。隐藏内容不导入，脚本不执行，外链样式、字体与图片不载入；请将资源内嵌。工程 JSON 和新版导出的 HTML 使用原工程尺寸。</p><p class="form-error" id="projectError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="projectDialog">取消</button><button class="btn btn-primary" id="applyProjectImportBtn" type="submit">导入并替换画布</button></div></form></dialog>
-  <dialog id="componentDialog"><form id="componentForm"><div class="dialog-heading"><h2 id="dialogTitle">新建 HTML 组件</h2><button class="btn btn-icon" type="button" data-close="componentDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">将常用的界面片段保存到组件库，随时复用。</p><label class="field">组件名称<input id="customName" maxlength="80" placeholder="例如：欢迎卡片" required></label><div class="field-grid"><label class="field">默认宽度<input id="customWidth" type="number" min="1" max="2000" value="200" required></label><label class="field">默认高度<input id="customHeight" type="number" min="1" max="2000" value="100" required></label></div><label class="checkbox-field"><input id="customOrientationEnabled" type="checkbox">跟随屏幕方向</label><div id="customOrientationFields" hidden><label class="field">竖屏时<select id="customPortraitAction"></select></label><label class="field">横屏时<select id="customLandscapeAction"></select></label></div><p class="field-help">添加到画布后继承方向响应，可在组件属性中单独调整。</p><label class="field" id="codeField">组件代码<textarea id="customCode" rows="8" maxlength="12582912" spellcheck="false" required></textarea></label><p class="field-help">支持静态 HTML / SVG 和内联样式；图片可单独上传。</p><section id="componentPreviewSection" hidden aria-label="组件预览"><div class="section-label">组件预览 <span id="componentPreviewSize"></span></div><div id="componentPreview" class="component-preview component-dialog-preview"></div></section><p class="form-error" id="componentError" role="alert"></p><div class="dialog-actions"><button class="btn" id="previewComponentBtn" type="button"><span data-icon="eye"></span>预览</button><button class="btn" type="button" data-close="componentDialog">取消</button><button class="btn btn-primary" type="submit">添加到组件库</button></div></form></dialog>
+  <dialog id="componentDialog"><form id="componentForm"><div class="dialog-heading"><h2 id="dialogTitle">新建 HTML 组件</h2><button class="btn btn-icon" type="button" data-close="componentDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">将常用的界面片段保存到组件库，随时复用。</p><label class="field">组件名称<input id="customName" maxlength="80" placeholder="例如：欢迎卡片" required></label><div class="field-grid"><label class="field">默认宽度<input id="customWidth" type="number" min="1" max="2000" value="200" required></label><label class="field">默认高度<input id="customHeight" type="number" min="1" max="2000" value="100" required></label></div><label class="checkbox-field"><input id="customOrientationEnabled" type="checkbox">跟随屏幕方向</label><div id="customOrientationFields" hidden><label class="field">竖屏时<select id="customPortraitAction"></select></label><label class="field">横屏时<select id="customLandscapeAction"></select></label></div><p class="field-help">添加到画布后继承方向响应，可在组件属性中单独调整。</p><label class="field" id="codeField">组件代码<textarea id="customCode" rows="8" maxlength="12582912" spellcheck="false" required></textarea></label><p class="field-help">支持静态 HTML / SVG 和内联样式；图片可单独上传。</p><section id="componentPreviewSection" data-collapsible="component-preview" hidden aria-label="组件预览"><div class="section-label">组件预览 <span id="componentPreviewSize"></span></div><div id="componentPreview" class="component-preview component-dialog-preview"></div></section><p class="form-error" id="componentError" role="alert"></p><div class="dialog-actions"><button class="btn" id="previewComponentBtn" type="button"><span data-icon="eye"></span>预览</button><button class="btn" type="button" data-close="componentDialog">取消</button><button class="btn btn-primary" type="submit">添加到组件库</button></div></form></dialog>
   <dialog id="pageDialog"><form id="pageForm"><div class="dialog-heading"><h2>管理当前页面 / 弹窗</h2><button class="btn btn-icon" type="button" data-close="pageDialog" aria-label="关闭页面管理">×</button></div><label class="field">名称<input id="pageName" maxlength="40" required></label><label class="checkbox-field"><input id="pageStart" type="checkbox">设为预览首页</label><p class="field-help">每页独立保存组件、尺寸与设备设置。弹窗可以像页面一样编辑，在组件点击动作中打开。删除后清除关联跳转，可撤销恢复；至少保留一个普通页面。</p><p class="form-error" id="pageError" role="alert"></p><div class="dialog-actions page-dialog-actions"><button class="btn" type="button" id="duplicatePageBtn">复制</button><button class="btn btn-danger" type="button" id="deletePageBtn">删除</button><button class="btn btn-primary" type="submit">保存</button></div></form></dialog>
   <dialog id="previewDialog" class="preview-dialog"><div class="dialog-heading"><h2>原型预览 <small>支持点击跳转与弹窗 · 导出后同样可用</small></h2><button class="btn btn-icon" data-close="previewDialog" aria-label="关闭预览"><span data-icon="close"></span></button></div><iframe id="previewFrame" title="原型预览" sandbox="allow-scripts"></iframe></dialog>
   <dialog id="frameDialog"><form id="frameForm"><div class="dialog-heading"><h2>自定义 HTML 外框</h2><button class="btn btn-icon" type="button" data-close="frameDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">HTML 绘制画布周围的外框装饰，画布会按以下留白嵌入。支持静态 HTML / SVG 和内联样式，宽高 100% 对应整个外框。</p><div class="field-grid"><label class="field">顶部留白 px<input id="frameTop" type="number" min="0" max="200" required></label><label class="field">右侧留白 px<input id="frameRight" type="number" min="0" max="200" required></label><label class="field">底部留白 px<input id="frameBottom" type="number" min="0" max="200" required></label><label class="field">左侧留白 px<input id="frameLeft" type="number" min="0" max="200" required></label></div><label class="field">外框 HTML<textarea id="frameCode" rows="8" maxlength="100000" spellcheck="false" required></textarea></label><p class="form-error" id="frameError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="frameDialog">取消</button><button class="btn btn-primary" type="submit">应用外框</button></div></form></dialog>

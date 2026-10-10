@@ -16,6 +16,7 @@ import { snapItems } from './snapping.js';
 import { createAssistant } from './assistant.js';
 import { INTERACTIONS, activePage, withPages, switchPage, addPage, deletePage, normalizeInteraction, pageBoard } from './pages.js';
 import { PROJECTS_KEY, emptyProject, projectRecord, projectDetails, validateProjects, saveActiveProject, activateProject, appendProject } from './projects.js';
+import { initializeCollapsible } from './collapsible.js';
 
 const $ = id => document.getElementById(id);
 for (const prefix of ['prop', 'custom']) {
@@ -32,6 +33,7 @@ function readOrientationFields(prefix) {
     portrait: $(`${prefix}PortraitAction`).value, landscape: $(`${prefix}LandscapeAction`).value });
 }
 document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
+initializeCollapsible();
 const sharedStyles = document.createElement('style');
 sharedStyles.textContent = PROTOTYPE_CSS;
 document.head.append(sharedStyles);

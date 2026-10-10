@@ -93,3 +93,35 @@
 .property-image-preview{display:block;width:100%;height:96px;object-fit:contain;border-radius:6px;background:#f1f5f9;margin-bottom:12px}
 .property-group textarea{font-family:inherit;resize:vertical}
 .property-group input[type=file]{font-size:10px;padding:6px;max-width:100%}
+
+/* 所有编辑板块使用同一套收起入口，独立保留各自状态。 */
+.section-toggle{display:flex;align-items:center;gap:7px;width:100%;min-height:28px;border:0;border-radius:5px;padding:3px 0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.section-toggle::before,.panel-toggle::before{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);flex-shrink:0;margin:0 4px 4px 2px}
+.section-toggle[aria-expanded=false]::before{transform:rotate(-45deg);margin-bottom:0}
+.section-toggle:hover,.panel-toggle:hover{color:var(--brand);background:#eff6ff}
+.section-toggle>span{margin-left:auto}
+.collapsible-section>.section-label{margin-bottom:8px}
+.section-collapsed>.section-label{margin-bottom:0}
+.property-group legend{max-width:100%}
+.property-group .section-toggle{width:auto}
+.property-group.section-collapsed{padding-bottom:6px}
+.creation-section{margin-bottom:16px}
+.panel-toggle{display:flex;align-items:center;justify-content:center;gap:8px;min-width:28px;min-height:28px;border:0;border-radius:6px;background:transparent;color:var(--muted);padding:6px;cursor:pointer}
+.panel-toggle::before{transform:rotate(135deg);margin:0 0 0 4px}
+.properties .panel-toggle::before,.ai-panel .panel-toggle::before{transform:rotate(-45deg);margin:0 4px 0 0}
+.panel-toggle-label{display:none}
+.sidebar.panel-collapsed,.properties.panel-collapsed,.ai-panel.panel-collapsed{width:44px}
+.panel-collapsed>:not(.panel-heading){display:none!important}
+.panel-collapsed>.panel-heading{padding:12px 6px;justify-content:center}
+.panel-collapsed>.panel-heading>:not(.panel-toggle){display:none}
+.panel-collapsed .panel-toggle{flex-direction:column;gap:12px;padding:6px 3px}
+.panel-collapsed .panel-toggle::before{transform:rotate(-45deg);margin:0 4px 0 0}
+.properties.panel-collapsed .panel-toggle::before,.ai-panel.panel-collapsed .panel-toggle::before{transform:rotate(135deg);margin:0 0 0 4px}
+.panel-collapsed .panel-toggle-label{display:block;writing-mode:vertical-rl;letter-spacing:3px;font-size:12px;line-height:18px}
+.pages-toolbar>.section-label{margin-bottom:4px}
+.pages-toolbar.section-collapsed>.section-label{margin-bottom:0}
+.ai-history{display:flex;flex-direction:column;flex:1;min-height:0;padding-top:0}
+.ai-history>.section-label{margin:0 16px 8px}
+.ai-history>.collapse-content{display:flex;flex-direction:column;flex:1;min-height:0}
+.ai-history.section-collapsed{flex:0 0 auto}
+.ai-composer.section-collapsed{overflow:visible}
