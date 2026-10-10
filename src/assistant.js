@@ -135,7 +135,8 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     try {
       const next = normalizeAISettings({ url: $('aiURL').value, key: $('aiKey').value, model: $('aiModel').value });
       writeStorage(AI_SETTINGS_KEY, { ...next, key: $('aiRememberKey').checked ? next.key : '' });
-      settings = next; rememberKey = $('aiRememberKey').checked; $('settingsDialog').close(); notify('AI 接口设置已保存');
+      const upgraded = new URL($('aiURL').value).protocol === 'http:' && new URL(next.url).protocol === 'https:';
+      settings = next; rememberKey = $('aiRememberKey').checked; $('settingsDialog').close(); notify(upgraded ? 'AI 接口设置已保存，HTTPS 页面已将接口地址改为 HTTPS' : 'AI 接口设置已保存');
     } catch (error) { $('aiSettingsError').textContent = error.message; }
   });
   $('aiForm').addEventListener('submit', async event => {

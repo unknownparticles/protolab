@@ -9,6 +9,29 @@ const item = { id: 'button', name: '按钮', type: 'html', content: '<button>登
 const base = () => validateProject({ version: 1, canvas: { width: 375, height: 667, preset: 'phone' }, items: [structuredClone(item)] }, clean);
 const reply = changes => JSON.stringify({ version: 1, summary: '优化登录按钮', changes });
 
+test('HTTPS 页面升级旧 HTTP 设置，保留路径、查询参数及鉴权，本地 HTTP 配置仍可使用', () => {
+  const settings = { url: ' http://api.example.test/v1/chat/completions?api-version=1 ', key: 'test-key', model: 'test-model' };
+  const secure = normalizeAISettings(settings, 'https:');
+  assert.deepEqual(secure, { ...settings, url: 'https://api.example.test/v1/chat/completions?api-version=1' });
+  assert.equal(completionURL(secure.url), secure.url);
+  assert.equal(normalizeAISettings(settings, 'http:').url, settings.url.trim());
+  assert.equal(normalizeAISettings({ url: 'https://api.example.test/v1' }, 'https:').url, 'https://api.example.test/v1');
+  assert.equal(settings.url.startsWith(' http:'), true);
+});
+
+test('连接失败提示跨域要求且不泄露凭据，取消请求保留取消原因', async () => {
+  const settings = { url: 'https://api.example.test/v1', key: 'secret-key', model: 'test' };
+  await assert.rejects(requestAI(settings, '调整', base(), [], undefined, async () => { throw new TypeError('Failed to fetch'); }), error => {
+    assert.match(error.message, /跨域配置（CORS）/);
+    assert.match(error.message, /POST/);
+    assert.equal(error.message.includes(settings.key), false);
+    return true;
+  });
+  const controller = new AbortController(); controller.abort();
+  const reason = new DOMException('请求已取消', 'AbortError');
+  await assert.rejects(requestAI(settings, '调整', base(), [], controller.signal, async () => { throw reason; }), error => error === reason);
+});
+
 test('AI 协议保留未修改字段并安全处理内容', () => {
   const initial = base();
   const result = parseAIResponse(reply([{ op: 'update', id: item.id, fields: { content: '<button>立即登录</button><script>alert(1)</script>', width: 150 } }]), initial, clean);
