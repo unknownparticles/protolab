@@ -54,8 +54,9 @@ try {
   await page.mouse.move(pbox.x + pbox.width / 2, pbox.y + 200); await page.mouse.wheel(0, -100);
   await frame.waitForFunction(() => Number(document.querySelector('.preview-viewport').dataset.zoom) > 1);
   assert.match(await preview.getByLabel('预览缩放').textContent(), /122%/);
-  await viewport.dispatchEvent('wheel', { deltaY: -Math.log(2 / Number(await viewport.getAttribute('data-zoom'))) / .002, clientX: pbox.width / 2, clientY: 200 });
-  assert.equal(await viewport.getAttribute('data-zoom'), '2');
+  const step = -Math.log(2 / Number(await viewport.getAttribute('data-zoom'))) / .004;
+  for (let i = 0; i < 2; i++) await viewport.dispatchEvent('wheel', { deltaY: step, clientX: pbox.width / 2, clientY: 200 });
+  assert.ok(Math.abs(Number(await viewport.getAttribute('data-zoom')) - 2) < .001);
   await preview.getByRole('button', { name: '编辑文字与尺寸', exact: true }).click();
   await preview.locator('[data-preview-item]').first().click({ position: { x: 10, y: 10 } });
   const handle = preview.locator('[data-resize="se"]'), hbox = await handle.boundingBox();

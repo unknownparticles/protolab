@@ -1,5 +1,6 @@
 /** 布局操作始终以画布像素计算，与缩放和设备外框无关。 */
 import { placementBounds } from './safe-area.js';
+import { visibilityLayout, expandedY } from './visibility.js';
 export function selectionBounds(items) {
   if (!items.length) return null;
   const x = Math.min(...items.map(item => item.x));
@@ -9,19 +10,21 @@ export function selectionBounds(items) {
 }
 export function alignItems(project, ids, direction, reference = 'canvas') {
   if (!['left', 'centerX', 'right', 'top', 'centerY', 'bottom', 'center'].includes(direction)) throw new Error('不支持的对齐方式');
-  const selected = project.items.filter(item => ids.has(item.id));
+  const displayed = visibilityLayout(project.items);
+  const selected = displayed.filter(item => ids.has(item.id));
   if (!selected.length || reference === 'selection' && selected.length < 2) return project;
   const bounds = reference === 'selection' ? selectionBounds(selected) : placementBounds(project);
   return { ...project, items: project.items.map(item => {
     if (!ids.has(item.id)) return item;
-    let { x, y } = item;
+    let { x, y } = displayed.find(value => value.id === item.id);
     if (direction === 'left') x = bounds.x;
     if (direction === 'right') x = bounds.x + bounds.width - item.width;
     if (direction === 'centerX' || direction === 'center') x = Math.round(bounds.x + (bounds.width - item.width) / 2);
     if (direction === 'top') y = bounds.y;
     if (direction === 'bottom') y = bounds.y + bounds.height - item.height;
     if (direction === 'centerY' || direction === 'center') y = Math.round(bounds.y + (bounds.height - item.height) / 2);
-    return { ...item, x, y };
+    const moved = project.items.map(value => value.id === item.id ? { ...value, x } : value);
+    return { ...item, x, y: expandedY(moved, item.id, y) };
   }) };
 }
 /** 整组移动统一约束，触碰边界时保留组件相对位置。 */

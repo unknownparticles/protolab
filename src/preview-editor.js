@@ -57,9 +57,9 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     parent.postMessage({ type: 'protolab-preview-edit', token: config.token, pageId: entry.page.id, itemId: entry.item.id, ...change }, '*');
   }
   function position(entry) {
-    for (const key of ['x', 'y', 'width', 'height']) entry.node.style[{ x: 'left', y: 'top' }[key] || key] = `${entry.item[key]}px`;
+    for (const key of ['x', 'y', 'width', 'height']) entry.node.style[{ x: 'left', y: 'top' }[key] || key] = `${entry.item[key] - (key === 'y' ? entry.offsetY || 0 : 0)}px`;
     if (entry.overlay) {
-      entry.overlay.style.cssText = `left:${entry.item.x}px;top:${entry.item.y}px;width:${entry.item.width}px;height:${entry.item.height}px;transform:rotate(${entry.item.angle}deg)`;
+      entry.overlay.style.cssText = `left:${entry.item.x}px;top:${entry.item.y - (entry.offsetY || 0)}px;width:${entry.item.width}px;height:${entry.item.height}px;transform:rotate(${entry.item.angle}deg)`;
     }
   }
   function select(entry) {
@@ -67,6 +67,7 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     selected?.overlay?.remove(); if (selected) selected.overlay = null;
     selected = entry;
     if (!entry) return;
+    entry.offsetY = entry.item.y - parseFloat(entry.node.style.top);
     const overlay = document.createElement('div'); overlay.className = 'preview-selection';
     for (const direction of ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']) {
       const handle = document.createElement('button'); handle.type = 'button'; handle.dataset.resize = direction;
@@ -158,7 +159,10 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     Object.assign(entry.item, event.data.item);
     const template = document.createElement('template'); template.innerHTML = event.data.html;
     const node = template.content.firstElementChild; node.dataset.previewItem = entry.item.id;
-    entry.node.replaceWith(node); entry.node = node; position(entry);
+    node.dataset.visible = entry.node.dataset.visible; node.hidden = entry.node.hidden;
+    entry.node.replaceWith(node); entry.node = node;
+    document.dispatchEvent(new Event('prototype-layout'));
+    entry.offsetY = entry.item.y - parseFloat(node.style.top); position(entry);
     hint.textContent = '修改已同步 · 双击文字编辑 · 拖动控制点调整尺寸';
   });
   // 弹窗关闭或页面跳转后清理选框，防止编辑状态停留在不可见页面。

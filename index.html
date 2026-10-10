@@ -28,8 +28,6 @@
     <div class="toolbar-end">
       <button class="btn" id="aiToggleBtn" aria-expanded="false" aria-controls="aiPanel">AI 对话</button>
       <button class="btn" id="saveBtn" title="保存并生成版本（Ctrl / ⌘ S）"><span data-icon="save"></span>保存</button>
-      <button class="btn" id="historyBtn">历史记录</button>
-      <button class="btn" id="versionsBtn">版本记录</button>
       <button class="btn" id="settingsBtn">设置</button>
       <button class="btn" id="importProjectBtn"><span data-icon="upload"></span>导入工程</button>
       <button class="btn" id="exportProjectBtn"><span data-icon="download"></span>导出工程</button>
@@ -39,7 +37,7 @@
   </header>
   <nav class="mobile-tabs" aria-label="工作区面板">
     <button class="btn btn-sm" data-panel="library" aria-expanded="false">组件库</button>
-    <button class="btn btn-sm" data-panel="properties" aria-expanded="false">属性面板</button>
+    <button class="btn btn-sm" data-panel="properties" aria-expanded="false">属性与图层</button>
   </nav>
   <main class="workspace">
     <aside class="sidebar" id="libraryPanel" data-collapsible-panel="libraryPanel" aria-label="组件库">
@@ -52,16 +50,22 @@
         <button id="customTab" role="tab" type="button" data-library-tab="custom" aria-controls="customPanel" aria-selected="false" tabindex="-1">自定义<span id="customCount">0</span></button>
       </div>
       <div class="library-scroll">
-        <section id="basicPanel" data-collapsible="basicPanel" role="tabpanel" aria-labelledby="basicTab"><div class="section-label">基础组件</div><div class="component-list" id="presetList"></div></section>
+        <section id="basicPanel" data-collapsible="basicPanel" role="tabpanel" aria-labelledby="basicTab"><div class="section-label">基础组件</div><div class="component-list vector-list" id="presetList"></div></section>
         <section id="vectorPanel" data-collapsible="vectorPanel" role="tabpanel" aria-labelledby="vectorTab" hidden><div class="section-label">矢量组件</div><div class="component-list vector-list" id="vectorList"></div></section>
-        <section id="customPanel" data-collapsible="customPanel" role="tabpanel" aria-labelledby="customTab" hidden><div class="section-label">自定义组件</div><div class="component-list" id="customList"></div><p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p></section>
+        <section id="customPanel" role="tabpanel" aria-labelledby="customTab" hidden>
+          <div class="custom-library-tools"><label class="field">组件分组<select id="customGroupFilter" aria-label="筛选组件分组"></select></label><div class="group-tools"><button class="btn btn-sm" id="newGroupBtn">新建分组</button><button class="btn btn-sm" id="manageGroupBtn">管理分组</button></div></div>
+          <div class="component-list" id="customList"></div><p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p>
+          <section class="creation-section" data-collapsible="creation" data-collapse-title="创建与导入"><div class="creation-actions">
+            <button class="btn" id="generateComponentBtn">AI 生成组件</button>
+            <button class="btn" id="addHtmlCompBtn"><span data-icon="plus"></span>新建 HTML 组件</button>
+            <button class="btn" id="addSvgCompBtn"><span data-icon="code"></span>新建 SVG 组件</button>
+            <button class="btn" id="saveSelectionComponentBtn">从选中组件建立</button>
+            <button class="btn" id="importComponentBtn"><span data-icon="upload"></span>导入组件</button>
+            <button class="btn" id="importImgCompBtn"><span data-icon="image"></span>导入图片组件</button>
+          </div></section>
+        </section>
         <p class="custom-empty" id="libraryEmpty" hidden>当前分类没有匹配的组件</p>
-        <section class="creation-section" data-collapsible="creation" data-collapse-title="创建组件"><div class="creation-actions">
-          <button class="btn" id="generateComponentBtn">AI 生成组件</button>
-          <button class="btn" id="addHtmlCompBtn"><span data-icon="plus"></span>新建 HTML 组件</button>
-          <button class="btn" id="addSvgCompBtn"><span data-icon="code"></span>新建 SVG 组件</button>
-          <button class="btn" id="importImgCompBtn"><span data-icon="image"></span>导入图片组件</button>
-        </div></section>
+      </div></section>
       </div>
       <div class="library-footer" data-collapsible="library-management">
         <div class="section-label">组件库管理</div>
@@ -78,10 +82,10 @@
       <div class="pages-toolbar" data-collapsible="pages" data-collapse-title="页面管理" aria-label="页面管理"><div class="page-list" id="pageList" aria-label="页面、弹窗与 Toast"></div><div class="page-tools"><span id="pageSummary"></span><button class="btn btn-sm" id="addPageBtn">＋ 页面</button><button class="btn btn-sm" id="addPopupBtn">＋ 弹窗</button><button class="btn btn-sm" id="addToastBtn">＋ Toast</button><button class="btn btn-sm" id="generatePageBtn">AI 生成页面</button><button class="btn btn-sm" id="managePageBtn">管理当前页</button></div></div>
       <div class="canvas-viewport" id="canvasViewport">
         <div class="canvas-stage" id="canvasStage">
+          <div class="canvas-caption" id="canvasCaption"><span id="artboardName">首页</span><span id="artboardSize">375 × 667</span></div>
           <div class="canvas-ruler horizontal" id="rulerHorizontal" aria-label="水平标尺，单位像素"></div>
           <div class="canvas-ruler vertical" id="rulerVertical" aria-label="垂直标尺，单位像素"></div>
           <div class="canvas-scaler" id="canvasScaler">
-            <div class="canvas-caption"><span id="artboardName">首页</span><span id="artboardSize">375 × 667</span></div>
             <div id="deviceShell" class="device-shell"><div class="canvas-container prototype" id="canvas" tabindex="0" aria-label="原型画布">
               <div class="canvas-grid" id="canvasGrid" hidden aria-hidden="true"></div>
               <div class="canvas-safe-area" id="canvasSafeArea" hidden aria-hidden="true"></div>
@@ -93,16 +97,23 @@
       </div>
       <div class="canvas-bottom-controls"><span class="keyboard-hint">滚轮 / 双指缩放 · 方向键微调 <kbd>⇧</kbd> × 10 · <kbd>Del</kbd> 删除</span><label class="zoom-control">缩放 <select id="zoomSelect" aria-label="画布缩放"><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label><button class="btn btn-sm" id="fitBtn">适应窗口</button></div>
     </section>
+    <div class="inspector-column" id="inspectorColumn">
     <aside class="properties" id="propertiesPanel" data-collapsible-panel="propertiesPanel" aria-label="属性面板">
       <div class="panel-heading"><h2>设计属性</h2><span class="heading-icon" data-icon="pointer"></span></div>
+      <div class="panel-tabs" role="tablist" aria-label="属性分类">
+        <button id="componentPropertiesTab" role="tab" aria-selected="true" aria-controls="componentPropertiesPanel" data-properties-tab="component">组件属性</button>
+        <button id="canvasPropertiesTab" role="tab" aria-selected="false" aria-controls="canvasPropertiesPanel" tabindex="-1" data-properties-tab="canvas">画布属性</button>
+      </div>
       <div class="properties-scroll">
-        <section class="prop-section" data-collapsible="component-properties" data-collapse-group="component-settings">
+        <div id="componentPropertiesPanel" role="tabpanel" aria-labelledby="componentPropertiesTab">
+        <section class="prop-section" data-collapsible="component-properties">
           <div class="section-label">组件属性</div>
           <div id="noSelectionMsg" class="selection-empty"><span data-icon="pointer"></span><strong>未选中组件</strong><p>点击画布中的组件<br>在这里调整它的设计</p></div>
           <form id="selectionProps" hidden>
             <p class="field-help" id="selectionDetail"></p>
             <label class="field">组件名称<input id="propName" maxlength="80" required></label>
             <label class="checkbox-field"><input id="propVisible" type="checkbox">初始显示元素</label>
+            <label class="checkbox-field"><input id="propCollapseSpace" type="checkbox" checked>隐藏时收起布局空间</label>
             <p class="field-help">取消后可从图层选中并编辑；通过点击动作显示隐藏的内容。</p>
             <div class="field-grid"><label class="field">X<input id="propX" type="number" min="0" required></label><label class="field">Y<input id="propY" type="number" min="0" required></label></div>
             <div class="field-grid"><label class="field">宽度<input id="propW" type="number" min="1" max="2000" required></label><label class="field">高度<input id="propH" type="number" min="1" max="2000" required></label></div>
@@ -144,7 +155,7 @@
             <div class="prop-actions"><button class="btn btn-sm" type="button" id="duplicateItemBtn"><span data-icon="copy"></span>复制</button><button class="btn btn-sm btn-danger" type="button" id="deleteItemBtn"><span data-icon="trash"></span>删除</button></div>
           </form>
         </section>
-        <section class="prop-section" data-collapsible="alignment" data-collapse-group="component-settings">
+        <section class="prop-section" data-collapsible="alignment">
           <div class="section-label">对齐与居中 <span id="selectionCount">未选中</span></div>
           <label class="checkbox-field"><input type="checkbox" id="snapComponents" checked>拖动吸附</label><p class="field-help">靠近中心或边缘时自动吸附；按住 Alt 临时跳过。</p>
           <label class="field">对齐参照<select id="alignReference"><option value="canvas">画布</option><option value="selection">所选组件</option></select></label>
@@ -152,8 +163,10 @@
             <button class="btn btn-sm" data-align="left" disabled>左对齐</button><button class="btn btn-sm" data-align="centerX" disabled>水平居中</button><button class="btn btn-sm" data-align="right" disabled>右对齐</button>
             <button class="btn btn-sm" data-align="top" disabled>顶部对齐</button><button class="btn btn-sm" data-align="centerY" disabled>垂直居中</button><button class="btn btn-sm" data-align="bottom" disabled>底部对齐</button>
             <button class="btn btn-sm align-center" data-align="center" disabled>整体居中</button>
-          </div><p class="field-help alignment-help">按住 Shift 点击画布或图层可多选。以画布为参照时，各组件分别对齐；以所选组件为参照时，至少选择两个组件。此板块与组件属性一起收起或展开。</p>
+          </div><p class="field-help alignment-help">按住 Shift 点击画布或图层可多选。以画布为参照时，各组件分别对齐；以所选组件为参照时，至少选择两个组件。元素收起后，坐标属性与对齐以当前显示位置为准。</p>
         </section>
+        </div>
+        <div id="canvasPropertiesPanel" role="tabpanel" aria-labelledby="canvasPropertiesTab" hidden>
         <section class="prop-section" data-collapsible="canvas-settings"><div class="section-label">画布设置</div><label class="field">网格间距<select id="gridSize"><option value="5">5 px</option><option value="10">10 px</option><option value="20" selected>20 px</option><option value="40">40 px</option><option value="50">50 px</option><option value="100">100 px</option></select></label><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
         <section class="prop-section" data-collapsible="safe-area">
           <div class="section-label">安全区</div>
@@ -181,10 +194,23 @@
             <p class="field-help">系统栏覆盖画布顶部 28～44 px（随摄像头变化）、底部 28 / 40 px，设计时请留出空间。</p>
           </div>
         </section>
-        <section class="prop-section" data-collapsible="layers"><div class="section-label">图层 <span id="layerCount">0</span></div><div class="layer-list" id="layerList"></div><p class="field-help" id="layerEmpty">添加组件后在这里快速选中。</p><div class="layer-actions" id="layerActions" hidden><button class="btn btn-sm" id="layerUpBtn" title="上移一层">上移一层</button><button class="btn btn-sm" id="layerDownBtn" title="下移一层">下移一层</button></div></section>
+        </div>
       </div>
       <div class="properties-footer"><span class="local-dot"></span>草稿本地保存 · AI 按需发送项目</div>
     </aside>
+    <section class="activity-panel" aria-label="图层、历史与版本">
+      <div class="panel-tabs" role="tablist" aria-label="设计记录">
+        <button id="layersTab" role="tab" aria-selected="true" aria-controls="layersPanel" data-activity-tab="layers">图层</button>
+        <button id="historyBtn" role="tab" aria-selected="false" aria-controls="historyPanel" tabindex="-1" data-activity-tab="history">历史记录</button>
+        <button id="versionsBtn" role="tab" aria-selected="false" aria-controls="versionsPanel" tabindex="-1" data-activity-tab="versions">版本</button>
+      </div>
+      <div class="activity-scroll">
+        <div id="layersPanel" role="tabpanel" aria-labelledby="layersTab">        <section class="prop-section"><div class="section-label">图层 <span id="layerCount">0</span></div><div class="layer-list" id="layerList"></div><p class="field-help" id="layerEmpty">添加组件后在这里快速选中。</p><div class="layer-actions" id="layerActions" hidden><button class="btn btn-sm" id="layerUpBtn" title="上移一层">上移一层</button><button class="btn btn-sm" id="layerDownBtn" title="下移一层">下移一层</button></div></section></div>
+        <div id="historyPanel" role="tabpanel" aria-labelledby="historyBtn" hidden><p class="field-help">点击步骤撤回或重做。历史在本次打开期间按工程保留。</p><div id="historyList" class="versions-list"></div></div>
+        <div id="versionsPanel" role="tabpanel" aria-labelledby="versionsBtn" hidden><p class="field-help">保存时生成版本，回退后保留原有分支。</p><div class="version-tools"><button class="btn btn-sm" id="versionsExportBtn">导出备份</button><button class="btn btn-sm" id="versionsImportBtn">导入备份</button></div><div id="versionsList" class="versions-list"></div></div>
+      </div>
+    </section>
+    </div>
     <aside id="aiPanel" data-collapsible-panel="aiPanel" class="ai-panel" hidden aria-label="AI 对话">
       <div class="panel-heading"><h2>AI 设计助手</h2><button class="btn btn-icon" id="aiCloseBtn" aria-label="关闭 AI 对话">×</button></div>
       <p class="panel-description">描述需求，修改设计或独立生成组件和页面。</p>
@@ -195,17 +221,18 @@
     </aside>
   </main>
   <footer class="status-bar"><span id="statusMessage" role="status"><span class="local-dot"></span>准备就绪 · 点击或拖拽组件开始设计</span><span id="componentCount">0 个组件</span></footer>
+  <input type="file" id="componentFileInput" hidden accept=".json,.html,.htm,.svg,application/json,text/html,image/svg+xml">
   <input type="file" id="libFileInput" hidden accept=".json,application/json">
   <input type="file" id="imgFileInput" hidden accept="image/png,image/jpeg,image/gif,image/webp,image/avif">
   <input type="file" id="versionsFileInput" hidden accept=".json,application/json">
   <dialog id="engineeringDialog"><form id="engineeringForm"><div class="dialog-heading"><h2 id="engineeringTitle">新建工程</h2><button class="btn btn-icon" type="button" data-close="engineeringDialog" aria-label="关闭工程设置">×</button></div><p class="dialog-description">各工程独立保存页面、组件库、修改版本和 AI 对话。新建或切换前自动保存当前工程；切换会取消正在进行的 AI 请求。</p><label class="field">工程名称<input id="engineeringName" maxlength="40" required placeholder="例如：商城原型"></label><label class="field" id="engineeringPresetField">初始设备<select id="engineeringPreset"><option value="phone">手机 · 375 × 667</option><option value="tablet">平板 · 768 × 1024</option><option value="pc">电脑 · 1280 × 800</option></select></label><label class="field">工程 AI 设计规范<textarea id="engineeringRules" rows="6" maxlength="10000" placeholder="例如：主色 #2563eb，卡片圆角 12px，页面留白 24px，中文文案，简洁商务风格"></textarea></label><p class="field-help">发送 AI 需求时自动注入内置设计规范和这里填写的规范。每个工程可配置自己的配色、布局、文案与组件要求。</p><p class="form-error" id="engineeringError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="engineeringDialog">取消</button><button class="btn btn-primary" id="engineeringSubmitBtn" type="submit">创建并切换</button></div></form></dialog>
   <dialog id="generationDialog" class="preview-dialog"><form id="generationForm"><div class="dialog-heading"><h2>AI 生成预览</h2><button class="btn btn-icon" type="button" data-close="generationDialog" aria-label="关闭生成预览">×</button></div><p class="dialog-description" id="generationSummary"></p><label class="field">名称<input id="generationName" maxlength="40" required></label><iframe id="generationPreview" title="AI 生成预览" sandbox="allow-scripts"></iframe><p class="form-error" id="generationError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" id="discardGenerationBtn">放弃结果</button><button class="btn" type="button" data-close="generationDialog">稍后保存</button><button class="btn btn-primary" type="submit" id="generationApplyBtn">保存</button></div></form></dialog>
   <dialog id="settingsDialog"><form id="aiSettingsForm"><div class="dialog-heading"><h2>AI 接口设置</h2><button class="btn btn-icon" type="button" data-close="settingsDialog" aria-label="关闭设置">×</button></div><p class="dialog-description">支持 OpenAI 兼容的 Chat Completions 接口。可填写基础地址或完整的对话接口地址。</p><div class="version-tools"><button class="btn btn-sm" id="aiDeepSeekBtn" type="button">填写 DeepSeek 官方配置</button></div><p class="field-help">使用 DeepSeek 时请填写自己的 DeepSeek API Key。快捷配置会清空当前表单中的 Key，保存后生效。</p><label class="field">API URL<input id="aiURL" type="url" placeholder="https://api.example.com/v1" required></label><label class="field">API Key<input id="aiKey" type="password" autocomplete="off" placeholder="无需鉴权的接口可以留空"></label><label class="field">模型名称<input id="aiModel" placeholder="填写服务商提供的模型名称" required maxlength="200"></label><label class="checkbox-field"><input id="aiRememberKey" type="checkbox">在此浏览器记住 Key</label><p class="field-help">地址和模型保存在本地；默认 Key 仅用于当前页面。勾选后 Key 以明文保存在浏览器中，不会进入版本备份或 HTML 导出。HTTPS 页面会将 HTTP 接口地址自动改为 HTTPS，接口须支持 HTTPS。浏览器直接请求接口，服务需允许本站跨域访问，以及 POST 方法和 Content-Type / Authorization 请求头。</p><p class="form-error" id="aiSettingsError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="settingsDialog">取消</button><button class="btn btn-primary" type="submit">保存设置</button></div></form></dialog>
-  <dialog id="historyDialog" class="versions-dialog"><div class="dialog-heading"><h2>历史记录</h2><button class="btn btn-icon" data-close="historyDialog" aria-label="关闭历史记录">×</button></div><p class="dialog-description">每一步设计操作都可撤回或重做，也可选择指定步骤恢复。撤回后继续编辑会替换后续历史；保存的版本继续保留。历史在本次打开期间按工程保留。</p><div id="historyList" class="versions-list"></div></dialog>
-  <dialog id="versionsDialog" class="versions-dialog"><div class="dialog-heading"><h2>版本记录</h2><button class="btn btn-icon" data-close="versionsDialog" aria-label="关闭版本记录">×</button></div><p class="dialog-description">保存（包括 Ctrl / ⌘ S）及 AI 生成前后形成版本。日常编辑进入历史记录，自动保存草稿不产生版本。回退后继续编辑会保留原来的分支，AI 合并版本保留两份来源。记录保存在此浏览器，可导出备份。</p><div class="version-tools"><button class="btn btn-sm" id="versionsExportBtn">导出版本备份</button><button class="btn btn-sm" id="versionsImportBtn">导入版本备份</button></div><div id="versionsList" class="versions-list"></div></dialog>
   <dialog id="mergeDialog" class="merge-dialog"><div class="dialog-heading"><h2>合并 AI 修改</h2><button class="btn btn-icon" data-close="mergeDialog" aria-label="关闭合并">×</button></div><p class="dialog-description" id="mergeSummary"></p><p class="field-help">互不冲突的字段已自动合并。冲突需要逐项选择；未选择时预览保留本地内容。</p><div id="mergeConflicts" class="merge-conflicts"></div><iframe id="mergePreview" title="合并结果预览" sandbox="allow-scripts"></iframe><p class="form-error" id="mergeError" role="alert"></p><div class="dialog-actions"><button class="btn" data-close="mergeDialog">稍后处理</button><button class="btn btn-primary" id="mergeApplyBtn">确认合并</button></div></dialog>
   <dialog id="projectDialog"><form id="projectForm"><div class="dialog-heading"><h2>导入工程</h2><button class="btn btn-icon" type="button" data-close="projectDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">支持工程 JSON 和 HTML。导入将替换当前画布，可撤销；建议先导出当前工程。工程 JSON 同时恢复自定义组件库。</p><label class="field">工程文件<input id="projectFileInput" type="file" accept=".json,.html,.htm,application/json,text/html" required></label><div class="field-grid"><label class="field">HTML 设计宽度 px<input id="importWidth" type="number" min="100" max="2000" value="1280" required></label><label class="field">HTML 设计高度 px<input id="importHeight" type="number" min="100" max="2000" value="800" required></label></div><p class="field-help">普通 HTML 在此尺寸下计算布局并识别可见组件，保留内联和页面 CSS 样式。隐藏内容不导入，脚本不执行，外链样式、字体与图片不载入；请将资源内嵌。工程 JSON 和新版导出的 HTML 使用原工程尺寸。</p><p class="form-error" id="projectError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="projectDialog">取消</button><button class="btn btn-primary" id="applyProjectImportBtn" type="submit">导入并替换画布</button></div></form></dialog>
-  <dialog id="componentDialog"><form id="componentForm"><div class="dialog-heading"><h2 id="dialogTitle">新建 HTML 组件</h2><button class="btn btn-icon" type="button" data-close="componentDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">将常用的界面片段保存到组件库，随时复用。</p><label class="field">组件名称<input id="customName" maxlength="80" placeholder="例如：欢迎卡片" required></label><div class="field-grid"><label class="field">默认宽度<input id="customWidth" type="number" min="1" max="2000" value="200" required></label><label class="field">默认高度<input id="customHeight" type="number" min="1" max="2000" value="100" required></label></div><label class="checkbox-field"><input id="customOrientationEnabled" type="checkbox">跟随屏幕方向</label><div id="customOrientationFields" hidden><label class="field">竖屏时<select id="customPortraitAction"></select></label><label class="field">横屏时<select id="customLandscapeAction"></select></label></div><p class="field-help">添加到画布后继承方向响应，可在组件属性中单独调整。</p><label class="field" id="codeField">组件代码<textarea id="customCode" rows="8" maxlength="12582912" spellcheck="false" required></textarea></label><p class="field-help">支持静态 HTML / SVG 和内联样式；图片可单独上传。</p><section id="componentPreviewSection" data-collapsible="component-preview" hidden aria-label="组件预览"><div class="section-label">组件预览 <span id="componentPreviewSize"></span></div><div id="componentPreview" class="component-preview component-dialog-preview"></div></section><p class="form-error" id="componentError" role="alert"></p><div class="dialog-actions"><button class="btn" id="previewComponentBtn" type="button"><span data-icon="eye"></span>预览</button><button class="btn" type="button" data-close="componentDialog">取消</button><button class="btn btn-primary" type="submit">添加到组件库</button></div></form></dialog>
+  <dialog id="componentDialog"><form id="componentForm"><div class="dialog-heading"><h2 id="dialogTitle">新建 HTML 组件</h2><button class="btn btn-icon" type="button" data-close="componentDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">将常用的界面片段保存到组件库，随时复用。</p><label class="field">组件名称<input id="customName" maxlength="80" placeholder="例如：欢迎卡片" required></label><label class="field">分组<select id="customGroup"></select></label><div class="field-grid"><label class="field">默认宽度<input id="customWidth" type="number" min="1" max="2000" value="200" required></label><label class="field">默认高度<input id="customHeight" type="number" min="1" max="2000" value="100" required></label></div><label class="checkbox-field"><input id="customOrientationEnabled" type="checkbox">跟随屏幕方向</label><div id="customOrientationFields" hidden><label class="field">竖屏时<select id="customPortraitAction"></select></label><label class="field">横屏时<select id="customLandscapeAction"></select></label></div><p class="field-help">添加到画布后继承方向响应，可在组件属性中单独调整。</p><label class="field" id="codeField">组件代码<textarea id="customCode" rows="8" maxlength="12582912" spellcheck="false" required></textarea></label><p class="field-help">支持静态 HTML / SVG 和内联样式；图片可单独上传。</p><section id="componentPreviewSection" data-collapsible="component-preview" hidden aria-label="组件预览"><div class="section-label">组件预览 <span id="componentPreviewSize"></span></div><div id="componentPreview" class="component-preview component-dialog-preview"></div></section><p class="form-error" id="componentError" role="alert"></p><div class="dialog-actions"><button class="btn" id="previewComponentBtn" type="button"><span data-icon="eye"></span>预览</button><button class="btn" type="button" data-close="componentDialog">取消</button><button class="btn btn-primary" type="submit">添加到组件库</button></div></form></dialog>
+  <dialog id="groupDialog"><form id="groupForm"><div class="dialog-heading"><h2 id="groupDialogTitle">新建分组</h2><button class="btn btn-icon" type="button" data-close="groupDialog" aria-label="关闭">×</button></div><label class="field">分组名称<input id="groupName" maxlength="40" required></label><p class="form-error" id="groupError" role="alert"></p><div class="dialog-actions"><button class="btn btn-danger" type="button" id="deleteGroupBtn">删除分组</button><button class="btn" type="button" data-close="groupDialog">取消</button><button class="btn btn-primary" type="submit">保存</button></div></form></dialog>
+  <dialog id="manageComponentDialog"><form id="manageComponentForm"><div class="dialog-heading"><h2>管理组件</h2><button class="btn btn-icon" type="button" data-close="manageComponentDialog" aria-label="关闭">×</button></div><label class="field">组件名称<input id="manageComponentName" maxlength="80" required></label><label class="field">分组<select id="manageComponentGroup"></select></label><p class="field-help">库中的更改用于后续添加，画布中已添加的组件保留当前设计。</p><p class="form-error" id="manageComponentError" role="alert"></p><div class="dialog-actions"><button class="btn btn-danger" type="button" id="deleteCustomComponentBtn">删除</button><button class="btn" type="button" id="exportComponentBtn">导出组件</button><button class="btn btn-primary" type="submit">保存</button></div></form></dialog>
   <dialog id="pageDialog"><form id="pageForm"><div class="dialog-heading"><h2>管理当前页面 / 弹窗 / Toast</h2><button class="btn btn-icon" type="button" data-close="pageDialog" aria-label="关闭页面管理">×</button></div><label class="field">名称<input id="pageName" maxlength="40" required></label><label class="checkbox-field"><input id="pageStart" type="checkbox">设为预览首页</label><p class="field-help">每页独立保存组件、尺寸与设备设置。弹窗和 Toast 可以像页面一样编辑，再通过组件点击动作打开；Toast 到时自动消失。删除后清除关联动作，可撤销恢复；至少保留一个普通页面。</p><p class="form-error" id="pageError" role="alert"></p><div class="dialog-actions page-dialog-actions"><button class="btn" type="button" id="duplicatePageBtn">复制</button><button class="btn btn-danger" type="button" id="deletePageBtn">删除</button><button class="btn btn-primary" type="submit">保存</button></div></form></dialog>
   <dialog id="previewDialog" class="preview-dialog"><div class="dialog-heading"><h2>原型预览 <small>支持编辑文字、拖拽尺寸与点击交互</small></h2><button class="btn btn-icon" data-close="previewDialog" aria-label="关闭预览"><span data-icon="close"></span></button></div><iframe id="previewFrame" title="原型预览" sandbox="allow-scripts"></iframe></dialog>
   <dialog id="frameDialog"><form id="frameForm"><div class="dialog-heading"><h2>自定义 HTML 外框</h2><button class="btn btn-icon" type="button" data-close="frameDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">HTML 绘制画布周围的外框装饰，画布会按以下留白嵌入。支持静态 HTML / SVG 和内联样式，宽高 100% 对应整个外框。</p><div class="field-grid"><label class="field">顶部留白 px<input id="frameTop" type="number" min="0" max="200" required></label><label class="field">右侧留白 px<input id="frameRight" type="number" min="0" max="200" required></label><label class="field">底部留白 px<input id="frameBottom" type="number" min="0" max="200" required></label><label class="field">左侧留白 px<input id="frameLeft" type="number" min="0" max="200" required></label></div><label class="field">外框 HTML<textarea id="frameCode" rows="8" maxlength="100000" spellcheck="false" required></textarea></label><p class="form-error" id="frameError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="frameDialog">取消</button><button class="btn btn-primary" type="submit">应用外框</button></div></form></dialog>

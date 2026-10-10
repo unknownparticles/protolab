@@ -61,7 +61,7 @@ export function completionURL(url) {
   return parsed.href;
 }
 const fields = {
-  update: ['name', 'type', 'content', 'x', 'y', 'width', 'height', 'radius', 'padding', 'margin', 'orientationResponse', 'interaction', 'visible'],
+  update: ['name', 'type', 'content', 'x', 'y', 'width', 'height', 'radius', 'padding', 'margin', 'orientationResponse', 'interaction', 'visible', 'collapseSpace'],
   canvas: ['width', 'height', 'background', 'preset'],
   frame: ['device', 'style', 'camera', 'statusBar', 'time', 'battery', 'navigation', 'html', 'insets'],
   safeArea: ['enabled', 'top', 'right', 'bottom', 'left'],
@@ -72,7 +72,7 @@ function checkFields(value, allowed) {
   for (const [key, entry] of Object.entries(value)) {
     if (['x', 'y', 'width', 'height', 'radius', 'top', 'right', 'bottom', 'left', 'battery'].includes(key) && (typeof entry !== 'number' || !Number.isFinite(entry))) throw new Error(`AI 字段 ${key} 必须为数字`);
     if (['name', 'type', 'content', 'padding', 'margin', 'background', 'preset', 'device', 'style', 'camera', 'time', 'navigation', 'html'].includes(key) && typeof entry !== 'string') throw new Error(`AI 字段 ${key} 必须为字符串`);
-    if (['enabled', 'statusBar', 'visible'].includes(key) && typeof entry !== 'boolean') throw new Error(`AI 字段 ${key} 必须为布尔值`);
+    if (['enabled', 'statusBar', 'visible', 'collapseSpace'].includes(key) && typeof entry !== 'boolean') throw new Error(`AI 字段 ${key} 必须为布尔值`);
     if (key === 'insets') checkFields(entry, fields.safeArea.filter(field => field !== 'enabled'));
     if (key === 'interaction') {
       checkFields(entry, ['type', 'targetId', 'targetIds', 'mode', 'duration']);

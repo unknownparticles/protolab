@@ -2,6 +2,7 @@ import { normalizeFrame } from './frames.js';
 import { normalizeAppearance } from './appearance.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { normalizeOrientationResponse } from './orientation.js';
+import { visibilityBounds } from './visibility.js';
 import { MAX_PAGES, PAGE_KINDS, normalizeInteraction, syncPages, pageBoard, validatePageLinks } from './pages.js';
 /** 与 DOM 无关的画布模型；坐标始终使用实际画布像素。 */
 export const PRESETS = Object.freeze({
@@ -36,6 +37,7 @@ export function spacing(value = '0') {
 }
 export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) {
   if (item.visible != null && typeof item.visible !== 'boolean') throw new Error('元素显示状态须为布尔值');
+  if (item.collapseSpace != null && typeof item.collapseSpace !== 'boolean') throw new Error('隐藏布局设置须为布尔值');
   const interaction = normalizeInteraction(item.interaction);
   const width = number(item.width, 100, 1, bounds.width);
   const height = number(item.height, 40, 1, bounds.height);
@@ -65,7 +67,7 @@ export function rotateProject(project) {
 }
 export function itemBounds(project) {
   const size = project.canvas.layoutSize;
-  return size ? { x: 0, y: 0, ...size } : placementBounds(project);
+  return visibilityBounds(size ? { x: 0, y: 0, ...size } : placementBounds(project), project.items);
 }
 export function constrainProject(project, fitToCanvas = false) {
   const next = { ...project, safeArea: normalizeSafeArea(project.safeArea, project.canvas, project.frame) };
@@ -99,6 +101,7 @@ export function validateLibrary(raw, sanitize) {
     if (seen.has(id)) throw new Error('组件库中存在重复标识');
     seen.add(id);
     return { id, name: entry.name.trim().slice(0, 80), type, content: safe,
+      groupId: typeof entry.groupId === 'string' && entry.groupId.length <= 100 ? entry.groupId : '',
       builtin: entry.builtin === true || entry.type === 'preset', category: type === 'svg' ? 'vector' : 'basic',
       orientationResponse: normalizeOrientationResponse(entry.orientationResponse),
       ...(entry.imageSlot === true ? { imageSlot: true } : {}),
@@ -123,7 +126,7 @@ function validateBoard(raw, sanitize) {
     const id = typeof item.id === 'string' ? item.id : uid();
     if (ids.has(id)) throw new Error('草稿中存在重复标识');
     ids.add(id);
-    return normalizeItem({ ...item, id, imported: item.imported === true, content: sanitize(item.content, item.type) }, project.canvas, itemBounds(project));
+    return normalizeItem({ ...item, id, imported: item.imported === true, content: sanitize(item.content, item.type) }, project.canvas, itemBounds({ ...project, items: raw.items.filter(value => value && Number.isFinite(value.height)) }));
   });
   return project;
 }

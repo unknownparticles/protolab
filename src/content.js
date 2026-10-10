@@ -1,6 +1,7 @@
 import { normalizeFrame, frameLayout, cameraLayout } from './frames.js';
 import { appearancePresentation, APPEARANCE_CSS } from './appearance.js';
 import { orientationPresentation } from './orientation.js';
+import { visibilityLayout } from './visibility.js';
 import { withPages, normalizeInteraction } from './pages.js';
 import { PROTOTYPE_RUNTIME, INTERACTION_CSS } from './prototype-runtime.js';
 import { previewEditorScript, PREVIEW_EDIT_CSS } from './preview-editor.js';
@@ -66,14 +67,14 @@ export function fitSVGImages(content, fit) {
   });
 }
 /** 编辑、预览和导出共用结构，确保尺寸、边距及零圆角一致。 */
-export function itemHTML(item, canvas) {
+export function itemHTML(item, canvas, position = item) {
   const appearance = appearancePresentation(item.appearance);
   const inner = item.type === 'image' ? `<img src="${escapeHTML(item.content)}" alt="${escapeHTML(item.name)}" style="width:100%;height:100%;object-fit:contain">` : fitSVGImages(item.content, item.appearance?.imageFit);
   const { hidden, angle } = orientationPresentation(item, canvas);
   const orientationHidden = orientationPresentation({ ...item, visible: true }, canvas).hidden;
   const action = normalizeInteraction(item.interaction);
   const interaction = action ? ` data-action="${escapeHTML(action.type)}"${action.targetId ? ` data-target="${escapeHTML(action.targetId)}"` : ''}${action.targetIds ? ` data-targets="${escapeHTML(JSON.stringify(action.targetIds))}" data-mode="${action.mode}"` : ''}${action.duration ? ` data-duration="${action.duration}"` : ''} role="button" tabindex="0" aria-label="${escapeHTML(item.name)}"` : '';
-  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}${appearance.classes ? ` ${appearance.classes}` : ''}" data-element-id="${escapeHTML(item.id || '')}" data-initial-visible="${item.visible !== false}"${orientationHidden ? ' data-orientation-hidden="true"' : ''}${hidden ? ' hidden' : ''} data-name="${escapeHTML(item.name)}"${interaction} style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${appearance.style ? `;${escapeHTML(appearance.style)}` : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
+  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}${appearance.classes ? ` ${appearance.classes}` : ''}" data-element-id="${escapeHTML(item.id || '')}" data-layout-y="${item.y}" data-visible="${item.visible !== false}" data-collapse-space="${item.collapseSpace !== false}" data-initial-visible="${item.visible !== false}"${orientationHidden ? ' data-orientation-hidden="true"' : ''}${hidden ? ' hidden' : ''} data-name="${escapeHTML(item.name)}"${interaction} style="left:${item.x}px;top:${position.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${appearance.style ? `;${escapeHTML(appearance.style)}` : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
 }
 export const PROTOTYPE_CSS = `
 ${APPEARANCE_CSS}
@@ -146,7 +147,8 @@ export function exportHTML(value, { preview = false, editToken = '' } = {}) {
   const startId = preview && active.kind === 'page' ? active.id : project.startPageId;
   const normalPages = project.pages.filter(page => page.kind === 'page');
   const markup = page => {
-    const screen = `<main class="prototype" style="background-color:${escapeHTML(page.canvas.background || '#fff')}" aria-label="原型画布">${page.items.map(item => itemHTML(item, page.canvas)).join('\n')}</main>`;
+    const positions = visibilityLayout(page.items);
+    const screen = `<main class="prototype" style="background-color:${escapeHTML(page.canvas.background || '#fff')}" aria-label="原型画布">${page.items.map((item, index) => itemHTML(item, page.canvas, positions[index])).join('\n')}</main>`;
     const device = deviceMarkup(page.canvas, page.frame, screen);
     return `<div class="${device.className}" style="${device.style}">${device.inner}</div>`;
   };

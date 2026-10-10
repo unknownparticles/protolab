@@ -2,6 +2,7 @@ import { clone, uid, PRESETS, validateProject, validateLibrary } from './model.j
 import { normalizeFrame } from './frames.js';
 import { withPages } from './pages.js';
 import { createVersions, validateWorkspace } from './versions.js';
+import { validateGroups } from './library-groups.js';
 
 export const PROJECTS_KEY = 'protolab.projects.v1';
 export const MAX_PROJECTS = 50;
@@ -26,7 +27,7 @@ export function validateProjects(raw, sanitize) {
     if (!entry || typeof entry.id !== 'string' || !entry.id || entry.id.length > 100 || ids.has(entry.id)) throw new Error('工程标识为空或重复');
     ids.add(entry.id);
     const project = validateProject(entry.project, sanitize);
-    return { id: entry.id, ...projectDetails(entry), project: withPages(project), library: validateLibrary(entry.library, sanitize),
+    return { id: entry.id, ...projectDetails(entry), project: withPages(project), library: validateLibrary(entry.library, sanitize), libraryGroups: validateGroups(entry.libraryGroups),
       workspace: validateWorkspace(entry.workspace, value => validateProject(value, sanitize)) };
   });
   if (!ids.has(raw.activeId)) throw new Error('当前工程不存在');

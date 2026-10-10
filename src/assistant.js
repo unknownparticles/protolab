@@ -249,7 +249,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     } catch (error) { $('mergeError').textContent = error.message; }
   });
   $('mergeDialog').addEventListener('close', () => $('mergePreview').removeAttribute('srcdoc'));
-  $('versionsBtn').addEventListener('click', () => { finishGesture(); renderVersions(); $('versionsDialog').showModal(); });
+  $('versionsBtn').addEventListener('click', () => { finishGesture(); renderVersions(); });
   $('versionsExportBtn').addEventListener('click', () => { finishGesture(); download(JSON.stringify(serialize(), null, 2), 'protolab-versions.json', 'application/json'); notify('项目、版本和对话已备份'); });
   $('versionsImportBtn').addEventListener('click', () => $('versionsFileInput').click());
   $('versionsFileInput').addEventListener('change', async event => {
@@ -281,11 +281,11 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       session++; controller?.abort(); controller = null;
       versions = createVersions(project, workspace.versions);
       messages = clone(workspace.messages); pending = clone(workspace.pending); generated = null; choices = {}; mergeHead = null;
-      for (const id of ['mergeDialog', 'versionsDialog', 'generationDialog']) if ($(id).open) $(id).close();
+      for (const id of ['mergeDialog', 'generationDialog']) if ($(id).open) $(id).close();
       $('aiRequirement').value = ''; $('aiStatus').textContent = ''; $('aiMode').value = 'modify'; renderMode(); renderMessages();
     },
     persist(savedAt) { writeStorage(WORKSPACE_KEY, { ...serialize(), savedAt }); },
     saveVersion(label = '手动保存') { versions.add(getProject(), label, { force: true }); renderVersions(); },
-    refreshVersions() { if ($('versionsDialog').open) renderVersions(); },
+    refreshVersions: renderVersions,
   };
 }

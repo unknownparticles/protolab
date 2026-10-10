@@ -1,5 +1,6 @@
+import { visibilityLayout } from './visibility.js';
 /** 固定的原型交互脚本；组件代码仍只允许静态内容。 */
-function runPrototype() {
+function runPrototype(layoutItems) {
   const pages = [...document.querySelectorAll('[data-prototype-page]')];
   const popups = [...document.querySelectorAll('dialog[data-prototype-popup]')];
   const body = document.body;
@@ -52,9 +53,18 @@ function runPrototype() {
     const targets = [...board.querySelectorAll('[data-element-id]')].filter(value => ids.includes(value.dataset.elementId));
     // 混合状态也整组切换，避免板块中一半显示、一半隐藏。
     const show = element.dataset.mode === 'show' || element.dataset.mode === 'toggle' && targets.every(value => value.hidden);
-    for (const target of targets) target.hidden = !show || target.dataset.orientationHidden === 'true';
+    for (const target of targets) { target.dataset.visible = String(show); target.hidden = !show || target.dataset.orientationHidden === 'true'; }
+    updateLayout();
     if (targets.some(target => target.contains(document.activeElement) && target.hidden)) board.focus({ preventScroll: true });
   }
+  function updateLayout() {
+    for (const board of document.querySelectorAll('.prototype')) {
+      const nodes = [...board.children].filter(node => node.classList.contains('prototype-item'));
+      const items = nodes.map(node => ({ id: node.dataset.elementId, x: parseFloat(node.style.left), y: Number(node.dataset.layoutY), width: parseFloat(node.style.width), height: parseFloat(node.style.height), visible: node.dataset.visible !== 'false', collapseSpace: node.dataset.collapseSpace !== 'false' }));
+      layoutItems(items).forEach((item, index) => { nodes[index].style.top = `${item.y}px`; });
+    }
+  }
+  document.addEventListener('prototype-layout', updateLayout);
   function execute(element) {
     const type = element.dataset.action;
     if (type === 'navigate') showPage(element.dataset.target);
@@ -84,14 +94,16 @@ function runPrototype() {
   backButton?.addEventListener('click', back);
   document.getElementById('prototypeRestart')?.addEventListener('click', () => {
     trail.length = 0;
-    for (const item of document.querySelectorAll('[data-element-id]')) item.hidden = item.dataset.initialVisible === 'false' || item.dataset.orientationHidden === 'true';
+    for (const item of document.querySelectorAll('[data-element-id]')) { item.dataset.visible = item.dataset.initialVisible; item.hidden = item.dataset.initialVisible === 'false' || item.dataset.orientationHidden === 'true'; }
+    updateLayout();
     showPage(body.dataset.startPage, false);
   });
   showPage(current, false);
+  updateLayout();
   if (body.dataset.initialPopup) openPopup(body.dataset.initialPopup);
   if (body.dataset.initialToast) showToast(body.dataset.initialToast, 2500, true);
 }
-export const PROTOTYPE_RUNTIME = `(${runPrototype.toString()})();`;
+export const PROTOTYPE_RUNTIME = `(${runPrototype.toString()})(${visibilityLayout.toString()});`;
 export const INTERACTION_CSS = `
 [hidden]{display:none!important}
 .prototype-item[data-action]{cursor:pointer}.prototype-item[data-action]:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}
