@@ -60,7 +60,7 @@ try {
   assert.equal(JSON.parse(archive).details.design.safeArea.top, 24);
   await menuClick('engineeringSettingsBtn'); await page.locator('#engineeringPalette').selectOption('none'); await page.locator('#engineeringSubmitBtn').click();
   await menuClick('importProjectBtn'); await page.locator('#projectFileInput').setInputFiles({ name: 'project.json', mimeType: 'application/json', buffer: Buffer.from(archive) }); await page.locator('#applyProjectImportBtn').click();
-  await saved(); assert.equal((await current()).design.palette.name, '商务紫');
+  await page.locator('#projectDialog').waitFor({ state: 'hidden' }); await saved(); assert.equal((await current()).design.palette.name, '商务紫');
   console.log('通过：工程切换隔离关联设置，工程导出导入完整恢复');
   const requests = [];
   await page.route('https://ai.example.test/**', async route => {

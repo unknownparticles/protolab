@@ -20,7 +20,8 @@
     "test:pages": "node scripts/pages-browser-test.mjs",
     "test:interactions": "node scripts/interactions-browser-test.mjs",
     "test:preview": "node scripts/preview-edit-browser-test.mjs",
-    "test:projects": "node scripts/projects-browser-test.mjs"
+    "test:projects": "node scripts/projects-browser-test.mjs",
+    "test:design": "node scripts/design-browser-test.mjs"
   },
   "engines": {
     "node": ">=20.11"
