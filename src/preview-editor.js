@@ -19,6 +19,10 @@ function runPreviewEditor(config, textTargets, resizeItem) {
   const toggle = document.createElement('button'); toggle.textContent = '编辑文字与尺寸'; toggle.type = 'button'; toggle.setAttribute('aria-pressed', 'false');
   const hint = document.createElement('span'); hint.textContent = '点击组件体验跳转与弹窗';
   tools.append(toggle, hint); document.body.prepend(tools);
+  const toggles = [toggle];
+  for (const heading of document.querySelectorAll('.prototype-popup-heading')) {
+    const button = toggle.cloneNode(true); button.className = 'preview-mode-toggle'; heading.append(button); toggles.push(button);
+  }
   const lookup = node => [...entries.values()].find(entry => entry.node === node);
   function send(entry, change) {
     parent.postMessage({ type: 'protolab-preview-edit', token: config.token, pageId: entry.page.id, itemId: entry.item.id, ...change }, '*');
@@ -67,10 +71,11 @@ function runPreviewEditor(config, textTargets, resizeItem) {
       label.append(input); form.append(label); return { index: targets.indexOf(target), input };
     });
     const actions = document.createElement('div'); actions.className = 'preview-text-actions';
-    const save = document.createElement('button'); save.type = 'submit'; save.textContent = '保存文字';
+    const save = document.createElement('button'); save.type = 'button'; save.className = 'preview-save'; save.textContent = '保存文字';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '取消'; cancel.onclick = closeTextEditor;
     actions.append(cancel, save); form.append(actions);
-    form.addEventListener('submit', event => { event.preventDefault(); send(entry, { kind: 'text', changes: fields.map(({ index, input }) => ({ index, value: input.value })) }); closeTextEditor(); });
+    save.addEventListener('click', () => { send(entry, { kind: 'text', changes: fields.map(({ index, input }) => ({ index, value: input.value })) }); closeTextEditor(); });
+    form.addEventListener('submit', event => event.preventDefault());
     form.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeTextEditor(); } });
     (entry.node.closest('dialog[open]') || document.body).append(form); textEditor = form;
     const rect = entry.node.getBoundingClientRect();
@@ -78,13 +83,13 @@ function runPreviewEditor(config, textTargets, resizeItem) {
     form.style.top = `${Math.max(8, Math.min(rect.bottom + 8, innerHeight - form.offsetHeight - 8))}px`;
     fields[0].input.focus(); fields[0].input.select();
   }
-  toggle.addEventListener('click', () => {
+  for (const button of toggles) button.addEventListener('click', () => {
     finish(true); closeTextEditor(); editing = !editing; select(null);
-    document.body.classList.toggle('preview-editing', editing); toggle.setAttribute('aria-pressed', String(editing));
+    document.body.classList.toggle('preview-editing', editing); for (const value of toggles) value.setAttribute('aria-pressed', String(editing));
     hint.textContent = editing ? '双击文字编辑 · 拖动边缘或角点调整尺寸 · 修改自动保存' : '点击组件体验跳转与弹窗';
   });
   document.addEventListener('click', event => {
-    if (!editing || event.target.closest('.preview-edit-tools,.preview-text-editor')) return;
+    if (!editing || event.target.closest('.preview-edit-tools,.preview-text-editor,.preview-mode-toggle')) return;
     const node = event.target.closest('[data-preview-item],.preview-selection');
     if (node) { event.preventDefault(); event.stopImmediatePropagation(); if (node.dataset.previewItem) select(lookup(node)); }
     else if (event.target.closest('.prototype')) select(null);
@@ -112,7 +117,7 @@ function runPreviewEditor(config, textTargets, resizeItem) {
   document.addEventListener('pointercancel', event => { if (event.pointerId === gesture?.pointerId) finish(true); });
   document.addEventListener('lostpointercapture', event => { if (event.pointerId === gesture?.pointerId) finish(true); });
   document.addEventListener('keydown', event => {
-    if (!editing || event.target.closest('.preview-text-editor,.preview-edit-tools')) return;
+    if (!editing || event.target.closest('.preview-text-editor,.preview-edit-tools,.preview-mode-toggle')) return;
     if (event.key === 'Escape' && (gesture || selected)) { event.preventDefault(); event.stopImmediatePropagation(); finish(true); select(null); }
     if (event.target.closest('[data-preview-item],.preview-selection') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, true);
@@ -140,8 +145,9 @@ export function previewEditorScript(project, token) {
 export const PREVIEW_EDIT_CSS = `
 .preview-edit-tools{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;font:12px system-ui;color:#475569}
 .preview-edit-tools button,.preview-text-editor button{font:inherit;border:1px solid #cbd5e1;border-radius:6px;background:white;padding:7px 12px;cursor:pointer;color:#334155}
-.preview-edit-tools button[aria-pressed=true],.preview-text-editor button[type=submit]{background:#2563eb;color:white;border-color:#2563eb}
+.preview-edit-tools button[aria-pressed=true],.preview-mode-toggle[aria-pressed=true],.preview-text-editor .preview-save{background:#2563eb;color:white;border-color:#2563eb}
 .preview-editing .prototype-item{cursor:default}.preview-editing .prototype-content{cursor:text}
+.preview-editing [data-protolab-text]{display:inline-block;min-width:1em;min-height:1em;border-bottom:1px dashed #93c5fd}
 .preview-selection{position:absolute;box-sizing:border-box;border:2px solid #2563eb;z-index:1000;pointer-events:none}
 .preview-resize{position:absolute;width:12px;height:12px;background:white;border:1px solid #2563eb;padding:0;border-radius:2px;pointer-events:auto;touch-action:none}
 .preview-resize.nw{left:-6px;top:-6px;cursor:nwse-resize}.preview-resize.ne{right:-6px;top:-6px;cursor:nesw-resize}.preview-resize.sw{left:-6px;bottom:-6px;cursor:nesw-resize}.preview-resize.se{right:-6px;bottom:-6px;cursor:nwse-resize}
