@@ -1,3 +1,4 @@
+import { translate } from './i18n.js';
 import { textTargets } from './text-targets.js';
 import { resizePreviewItem } from './preview-resize.js';
 import { itemBounds } from './model.js';
@@ -6,6 +7,11 @@ import { frameLayout } from './frames.js';
 import { attachViewportZoom } from './viewport-zoom.js';
 
 function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
+  // iframe 内自包含翻译，不依赖编辑器全局变量。
+  const t = (source, ...values) => {
+    const key = Array.isArray(source) ? source.reduce((text, part, index) => text + (index ? '{' + (index - 1) + '}' : '') + part, '') : source;
+    return (config.labels[key] || key).replace(/\{(\d+)\}/g, (match, index) => index < values.length ? String(values[index]) : match);
+  };
   let editing = false, selected = null, gesture = null, textEditor = null;
   const entries = new Map();
   for (const page of config.pages) {
@@ -17,9 +23,9 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     });
   }
   const tools = document.createElement('nav'); tools.className = 'preview-edit-tools';
-  tools.setAttribute('aria-label', '预览编辑');
-  const toggle = document.createElement('button'); toggle.textContent = '编辑文字与尺寸'; toggle.type = 'button'; toggle.setAttribute('aria-pressed', 'false');
-  const hint = document.createElement('span'); hint.textContent = '点击组件体验跳转与弹窗';
+  tools.setAttribute('aria-label', t('预览编辑'));
+  const toggle = document.createElement('button'); toggle.textContent = t('编辑文字与尺寸'); toggle.type = 'button'; toggle.setAttribute('aria-pressed', 'false');
+  const hint = document.createElement('span'); hint.textContent = t('点击组件体验跳转与弹窗');
   tools.append(toggle, hint); document.body.prepend(tools);
   for (const page of config.pages) {
     const board = [...document.querySelectorAll('[data-prototype-page],[data-prototype-popup],[data-prototype-toast]')].find(node => (node.dataset.prototypePage || node.dataset.prototypePopup || node.dataset.prototypeToast) === page.id);
@@ -30,9 +36,9 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     const scaler = document.createElement('div'); scaler.className = 'preview-zoom-scaler';
     shell.replaceWith(viewport); viewport.append(stage); stage.append(scaler); scaler.append(shell);
     const controls = document.createElement('span'); controls.className = 'preview-zoom-controls';
-    const label = document.createElement('output'); label.setAttribute('aria-label', '预览缩放'); label.textContent = '100%';
-    const reset = document.createElement('button'); reset.type = 'button'; reset.textContent = '重置缩放';
-    const help = document.createElement('span'); help.textContent = '滚轮 / 双指缩放';
+    const label = document.createElement('output'); label.setAttribute('aria-label', t('预览缩放')); label.textContent = '100%';
+    const reset = document.createElement('button'); reset.type = 'button'; reset.textContent = t('重置缩放');
+    const help = document.createElement('span'); help.textContent = t('滚轮 / 双指缩放');
     controls.append(help, label, reset);
     (board.querySelector('.prototype-popup-heading,.prototype-toast-heading') || tools).append(controls);
     controls.hidden = board.hidden;
@@ -71,7 +77,7 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     const overlay = document.createElement('div'); overlay.className = 'preview-selection';
     for (const direction of ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']) {
       const handle = document.createElement('button'); handle.type = 'button'; handle.dataset.resize = direction;
-      handle.className = `preview-resize ${direction}`; handle.setAttribute('aria-label', `调整尺寸 ${direction}`);
+      handle.className = `preview-resize ${direction}`; handle.setAttribute('aria-label', t`调整尺寸 ${direction}`);
       overlay.append(handle);
     }
     entry.node.parentElement.append(overlay); entry.overlay = overlay; position(entry);
@@ -88,21 +94,21 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
   function editText(entry, event) {
     closeTextEditor();
     const targets = textTargets(entry.node.querySelector('.prototype-content'));
-    if (!targets.length) { hint.textContent = '此组件没有可编辑文字，可拖动控制点调整尺寸'; return; }
+    if (!targets.length) { hint.textContent = t('此组件没有可编辑文字，可拖动控制点调整尺寸'); return; }
     const range = document.caretRangeFromPoint?.(event.clientX, event.clientY);
     const direct = targets.filter(target => target.node === range?.startContainer || target.node === event.target);
     const nearby = targets.filter(target => event.target.contains(target.node));
     const chosen = direct.length ? direct : nearby.length ? nearby : targets;
-    const form = document.createElement('form'); form.className = 'preview-text-editor'; form.setAttribute('aria-label', '编辑组件文字');
-    const title = document.createElement('strong'); title.textContent = '编辑文字'; form.append(title);
+    const form = document.createElement('form'); form.className = 'preview-text-editor'; form.setAttribute('aria-label', t('编辑组件文字'));
+    const title = document.createElement('strong'); title.textContent = t('编辑文字'); form.append(title);
     const fields = chosen.map(target => {
-      const label = document.createElement('label'); label.textContent = target.label;
-      const input = document.createElement('textarea'); input.value = target.value; input.rows = 2; input.setAttribute('aria-label', target.label);
+      const label = document.createElement('label'); label.textContent = t(target.label);
+      const input = document.createElement('textarea'); input.value = target.value; input.rows = 2; input.setAttribute('aria-label', t(target.label));
       label.append(input); form.append(label); return { index: targets.indexOf(target), input };
     });
     const actions = document.createElement('div'); actions.className = 'preview-text-actions';
-    const save = document.createElement('button'); save.type = 'button'; save.className = 'preview-save'; save.textContent = '保存文字';
-    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '取消'; cancel.onclick = closeTextEditor;
+    const save = document.createElement('button'); save.type = 'button'; save.className = 'preview-save'; save.textContent = t('保存文字');
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = t('取消'); cancel.onclick = closeTextEditor;
     actions.append(cancel, save); form.append(actions);
     save.addEventListener('click', () => { send(entry, { kind: 'text', changes: fields.map(({ index, input }) => ({ index, value: input.value })) }); closeTextEditor(); });
     form.addEventListener('submit', event => event.preventDefault());
@@ -116,7 +122,7 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
   for (const button of toggles) button.addEventListener('click', () => {
     finish(true); closeTextEditor(); editing = !editing; select(null);
     document.body.classList.toggle('preview-editing', editing); for (const value of toggles) value.setAttribute('aria-pressed', String(editing));
-    hint.textContent = editing ? '双击文字编辑 · 拖动边缘或角点调整尺寸 · 修改自动保存' : '点击组件体验跳转与弹窗';
+    hint.textContent = editing ? t('双击文字编辑 · 拖动边缘或角点调整尺寸 · 修改自动保存') : t('点击组件体验跳转与弹窗');
   });
   document.addEventListener('click', event => {
     if (!editing || event.target.closest('.preview-edit-tools,.preview-text-editor,.preview-mode-toggle')) return;
@@ -163,7 +169,7 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     entry.node.replaceWith(node); entry.node = node;
     document.dispatchEvent(new Event('prototype-layout'));
     entry.offsetY = entry.item.y - parseFloat(node.style.top); position(entry);
-    hint.textContent = '修改已同步 · 双击文字编辑 · 拖动控制点调整尺寸';
+    hint.textContent = t('修改已同步 · 双击文字编辑 · 拖动控制点调整尺寸');
   });
   // 弹窗关闭或页面跳转后清理选框，防止编辑状态停留在不可见页面。
   new MutationObserver(() => {
@@ -172,7 +178,8 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
 }
 
 export function previewEditorScript(project, token) {
-  const config = { token, pages: project.pages.map(page => ({ id: page.id, bounds: itemBounds(page), layout: frameLayout(page.canvas, page.frame), items: page.items.map(item => ({ id: item.id, x: item.x, y: item.y, width: item.width, height: item.height, angle: orientationPresentation(item, page.canvas).angle })) })) };
+  const labels = Object.fromEntries(["文本", "输入提示", "输入内容", "预览编辑","编辑文字与尺寸","点击组件体验跳转与弹窗","预览缩放","重置缩放","滚轮 / 双指缩放","调整尺寸 {0}","此组件没有可编辑文字，可拖动控制点调整尺寸","编辑组件文字","编辑文字","保存文字","取消","双击文字编辑 · 拖动边缘或角点调整尺寸 · 修改自动保存","点击组件体验跳转与弹窗","修改已同步 · 双击文字编辑 · 拖动控制点调整尺寸"].map(key => [key, translate(key)]));
+  const config = { token, labels, pages: project.pages.map(page => ({ id: page.id, bounds: itemBounds(page), layout: frameLayout(page.canvas, page.frame), items: page.items.map(item => ({ id: item.id, x: item.x, y: item.y, width: item.width, height: item.height, angle: orientationPresentation(item, page.canvas).angle })) })) };
   return `(${runPreviewEditor.toString()})(${JSON.stringify(config).replace(/</g, '\\u003c')},${textTargets.toString()},${resizePreviewItem.toString()},${attachViewportZoom.toString()});`;
 }
 

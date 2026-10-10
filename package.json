@@ -21,7 +21,8 @@
     "test:interactions": "node scripts/interactions-browser-test.mjs",
     "test:preview": "node scripts/preview-edit-browser-test.mjs",
     "test:projects": "node scripts/projects-browser-test.mjs",
-    "test:design": "node scripts/design-browser-test.mjs"
+    "test:design": "node scripts/design-browser-test.mjs",
+    "test:i18n": "node scripts/i18n-browser-test.mjs"
   },
   "engines": {
     "node": ">=20.11"

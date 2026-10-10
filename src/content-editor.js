@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import { textTargets } from './text-targets.js';
 import { isImageData, sanitizeContent } from './content.js';
 import { MAX_IMAGE } from './model.js';
@@ -11,9 +12,9 @@ function contentDocument(item) {
 
 export function editableContent(item) {
   const template = contentDocument(item);
-  const texts = textTargets(template.content).map(({ label, value }, index) => ({ label: `${label} ${index + 1}`, value }));
-  const images = item.type === 'image' ? [{ label: '图片 1', source: item.content }] : [...template.content.querySelectorAll('img, svg image')].map((node, index) => ({ label: node.getAttribute('alt') || `图片 ${index + 1}`, source: node.getAttribute('src') || node.getAttribute('href') || '', vector: node.localName === 'image' }));
-  if (!images.length && item.imageSlot) images.push({ label: '设置图片', source: '' });
+  const texts = textTargets(template.content).map(({ label, value }, index) => ({ label: `${t(label)} ${index + 1}`, value }));
+  const images = item.type === 'image' ? [{ label: t('图片 1'), source: item.content }] : [...template.content.querySelectorAll('img, svg image')].map((node, index) => ({ label: node.getAttribute('alt') || t`图片 ${index + 1}`, source: node.getAttribute('src') || node.getAttribute('href') || '', vector: node.localName === 'image' }));
+  if (!images.length && item.imageSlot) images.push({ label: t('设置图片'), source: '' });
   return { texts, images };
 }
 
@@ -21,7 +22,7 @@ export function updateTextContent(item, values) {
   if (item.type === 'image') return item.content;
   const template = contentDocument(item);
   const targets = textTargets(template.content);
-  if (targets.length !== values.length) throw new Error('组件内容已变化，请重新选择组件');
+  if (targets.length !== values.length) throw new Error(t('组件内容已变化，请重新选择组件'));
   targets.forEach(({ node, attribute }, index) => {
     if (attribute) node.setAttribute(attribute, values[index]);
     else {
@@ -37,8 +38,8 @@ export function updateTextContent(item, values) {
 }
 
 export function updateImageContent(item, index, source) {
-  if (!isImageData(source)) throw new Error('请上传有效图片或粘贴内嵌图片数据');
-  if (source.length > MAX_IMAGE * 1.4) throw new Error('图片不能超过 3 MB');
+  if (!isImageData(source)) throw new Error(t('请上传有效图片或粘贴内嵌图片数据'));
+  if (source.length > MAX_IMAGE * 1.4) throw new Error(t('图片不能超过 3 MB'));
   if (item.type === 'image') return source;
   const template = contentDocument(item);
   const images = [...template.content.querySelectorAll('img, svg image')];
@@ -49,7 +50,7 @@ export function updateImageContent(item, index, source) {
     template.content.replaceChildren(img);
   } else {
     const image = images[index];
-    if (!image) throw new Error('图片位置已变化，请重新选择组件');
+    if (!image) throw new Error(t('图片位置已变化，请重新选择组件'));
     image.setAttribute(image.localName === 'image' ? 'href' : 'src', source);
     // 新图片应覆盖导入内容中的旧候选资源。
     image.removeAttribute('srcset');

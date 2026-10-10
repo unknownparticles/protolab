@@ -1,5 +1,6 @@
 const paths = {
-  logo: '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4z"/><path d="M13 13h7v7h-7z" fill="currentColor"/>',
+  logo: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 7h8v4H8zM8 15h8M8 18h5"/><path d="m14 13 3 2-3 4z" fill="currentColor" stroke="none"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 6h14M5 18h14"/>',
   button: '<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 12h8"/>',
   text: '<path d="M4 5h16M12 5v15M8 20h8"/>',
   input: '<rect x="2" y="6" width="20" height="12" rx="3"/><path d="M7 10v4M10 12h7"/>',

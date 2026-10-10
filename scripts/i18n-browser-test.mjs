@@ -1,0 +1,119 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdir, readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { clickAction } from './browser-actions.mjs';
+
+const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
+const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4191';
+const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4191' }, stdio: 'pipe' });
+const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
+await mkdir(output, { recursive: true });
+let browser;
+try {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    try { if ((await fetch(base)).ok) break; } catch { /* 等待服务 */ }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
+  const errors = [];
+  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+  await page.goto(base); await page.locator('.component-item').first().waitFor();
+  assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+  assert.equal(await page.title(), 'Protolab · Prototype Designer');
+  assert.equal(await page.locator('#languageSelect').inputValue(), 'system');
+  assert.equal(await page.locator('#fileMenuBtn').textContent(), 'File');
+  assert.match(await page.locator('[data-comp-id="lib-btn"]').textContent(), /Button/);
+  const iconURL = await page.locator('link[rel="icon"]').getAttribute('href');
+  assert.equal((await context.request.get(new URL(iconURL, base).href)).status(), 200);
+  assert.match(await page.locator('.brand-symbol').innerHTML(), /<svg/);
+  console.log('通过：默认英文系统语言、品牌、标题及矢量图标');
+
+  await page.locator('#componentSearch').fill('button');
+  assert.equal(await page.locator('#presetList .component-item').count(), 1);
+  await page.locator('#componentSearch').fill('');
+  await page.locator('[data-comp-id="lib-btn"]').click();
+  const designName = '组件库';
+  await page.locator('#propName').fill(designName);
+  await page.locator('#propX').fill('63');
+  await page.locator('#languageSelect').selectOption('zh');
+  assert.equal(await page.locator('html').getAttribute('lang'), 'zh-CN');
+  assert.equal(await page.title(), '易设 · 原型设计工具');
+  assert.match(await page.locator('.brand').textContent(), /易设/);
+  assert.equal(await page.locator('#propName').inputValue(), designName);
+  assert.equal(await page.locator('#propX').inputValue(), '63');
+  await page.locator('#selectionProps button[type="submit"]').click();
+  await page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
+  const before = await page.evaluate(() => localStorage.getItem('protolab.projects.v1'));
+  await page.locator('#languageSelect').selectOption('en');
+  assert.equal(await page.locator('#propName').inputValue(), designName);
+  assert.match(await page.locator('.layer-item').textContent(), /组件库/);
+  assert.equal(await page.evaluate(() => localStorage.getItem('protolab.projects.v1')), before);
+  assert.equal(await page.locator('#saveState').textContent(), 'Autosaved');
+  assert.equal(await page.locator('#propClickAction option[value="openPopup"]').textContent(), 'Open popup');
+  assert.match(await page.locator('#presetLabel').textContent(), /Phone · Portrait/);
+  await page.reload(); await page.locator('.editor-item').waitFor();
+  assert.equal(await page.locator('#languageSelect').inputValue(), 'en');
+  assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+  console.log('通过：双语即时切换、未应用表单保留、用户名称与工程数据不变、偏好刷新恢复');
+
+  await clickAction(page, '#aiToggleBtn');
+  await page.locator('#aiRequirement').fill('菜单 中文 English');
+  await page.locator('#languageSelect').selectOption('zh');
+  assert.equal(await page.locator('#aiRequirement').inputValue(), '菜单 中文 English');
+  assert.match(await page.locator('#aiModeHelp').textContent(), /当前工程/);
+  await page.locator('#aiCloseBtn').click();
+  await page.locator('#languageSelect').selectOption('en');
+  await page.locator('#previewBtn').click();
+  const preview = page.frameLocator('#previewFrame');
+  await preview.locator('.preview-edit-tools').waitFor();
+  assert.equal(await preview.locator('.preview-edit-tools>button').textContent(), 'Edit text & size');
+  assert.equal(await preview.locator('html').getAttribute('lang'), 'en');
+  assert.match(await preview.locator('.prototype-content').textContent(), /按钮/);
+  await page.locator('[data-close="previewDialog"]').click();
+  const exported = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
+  const html = await readFile(await (await exported).path(), 'utf8');
+  assert.match(html, /<html lang="en"/); assert.match(html, /<title>Protolab Prototype<\/title>/);
+  assert.match(html, /组件库/); assert.match(html, /按钮/);
+  console.log('通过：对话输入保留、预览和导出控件按语言显示、设计内容保持原文');
+
+  // 模拟系统首选语言变化，并验证显式偏好不会被系统覆盖。
+  await page.locator('#languageSelect').selectOption('system');
+  await page.evaluate(() => { Object.defineProperty(navigator, 'languages', { configurable: true, value: ['zh-TW'] }); dispatchEvent(new Event('languagechange')); });
+  assert.equal(await page.locator('html').getAttribute('lang'), 'zh-CN');
+  await page.locator('#languageSelect').selectOption('en');
+  await page.evaluate(() => dispatchEvent(new Event('languagechange')));
+  assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+  await page.locator('#languageSelect').selectOption('zh');
+  await page.screenshot({ path: resolve(output, 'i18n-chinese.png') });
+  await page.locator('#languageSelect').selectOption('en');
+  await page.screenshot({ path: resolve(output, 'i18n-english.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.locator('body').evaluate(element => element.scrollWidth > innerWidth), false);
+  await page.locator('[data-panel="properties"]').click();
+  assert.equal(await page.locator('#propertiesPanel').isVisible(), true);
+  await page.screenshot({ path: resolve(output, 'i18n-mobile.png') });
+  console.log('通过：系统语言动态跟随、显式偏好优先与窄屏双语界面');
+
+  const chineseContext = await browser.newContext({ locale: 'zh-CN' });
+  const chinese = await chineseContext.newPage(); chinese.on('pageerror', error => errors.push(error.message));
+  await chinese.goto(base); await chinese.locator('.component-item').first().waitFor();
+  assert.equal(await chinese.locator('html').getAttribute('lang'), 'zh-CN');
+  assert.equal(await chinese.locator('#languageSelect').inputValue(), 'system');
+  assert.equal(await chinese.locator('#fileMenuBtn').textContent(), '文件');
+  const restrictedContext = await browser.newContext({ locale: 'fr-FR' });
+  const restricted = await restrictedContext.newPage(); restricted.on('pageerror', error => errors.push(error.message));
+  await restricted.addInitScript(() => {
+    Storage.prototype.getItem = () => { throw new DOMException('禁用存储', 'SecurityError'); };
+    Storage.prototype.setItem = () => { throw new DOMException('禁用存储', 'SecurityError'); };
+  });
+  await restricted.goto(base); await restricted.locator('.component-item').first().waitFor();
+  assert.equal(await restricted.locator('html').getAttribute('lang'), 'en');
+  await restricted.locator('#languageSelect').selectOption('zh');
+  assert.equal(await restricted.locator('html').getAttribute('lang'), 'zh-CN');
+  assert.equal(await restricted.locator('#fileMenuBtn').textContent(), '文件');
+  assert.deepEqual(errors, []);
+  console.log('通过：中文系统默认、其他语言回退英文、存储受限仍可切换、无浏览器运行错误');
+} finally { await browser?.close(); server?.kill(); }

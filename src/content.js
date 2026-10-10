@@ -1,3 +1,4 @@
+import { t, getLocale } from './i18n.js';
 import { normalizeFrame, frameLayout, cameraLayout } from './frames.js';
 import { appearancePresentation, APPEARANCE_CSS } from './appearance.js';
 import { orientationPresentation } from './orientation.js';
@@ -133,12 +134,12 @@ export function deviceMarkup(canvas, rawFrame, screenHTML = '') {
     if (frame.style === 'classic') decoration += '<span class="device-home"></span>';
     if (frame.style === 'monitor') decoration += '<span class="device-stand"></span>';
     if (frame.style === 'laptop') decoration += '<span class="device-trackpad"></span>';
-    if (frame.style === 'browser') decoration += '<div class="device-browser-bar"><i></i><i></i><i></i><span>原型预览</span></div>';
+    if (frame.style === 'browser') decoration += `<div class="device-browser-bar"><i></i><i></i><i></i><span>${escapeHTML(t('原型预览'))}</span></div>`;
     decoration += '</div>';
   }
   const mobile = frame.device !== 'pc';
-  const status = mobile && frame.statusBar ? `<div class="device-status" style="height:${camera?.statusHeight || 28}px;padding-left:${camera?.statusPaddingLeft || 16}px" aria-label="顶部时间电量栏"><span>${frame.time}</span><span class="device-indicators"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 14h2v-3H1zm4 0h2V8H5zm4 0h2V5H9zm4 0h2V2h-2z"/></svg><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1 6a11 11 0 0 1 14 0M4 9a6 6 0 0 1 8 0M6 12a3 3 0 0 1 4 0"/></svg><span>${frame.battery}%</span><span class="device-battery"><i style="width:${frame.battery}%"></i></span></span></div>` : '';
-  const navigation = mobile && frame.navigation !== 'none' ? `<div class="device-navigation ${frame.navigation}" aria-label="底部导航栏">${frame.navigation === 'gesture' ? '<span class="device-gesture"></span>' : '<span class="device-nav-back"></span><span class="device-nav-home"></span><span class="device-nav-recent"></span>'}</div>` : '';
+  const status = mobile && frame.statusBar ? `<div class="device-status" style="height:${camera?.statusHeight || 28}px;padding-left:${camera?.statusPaddingLeft || 16}px" aria-label="${escapeHTML(t('顶部系统栏'))}"><span>${frame.time}</span><span class="device-indicators"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 14h2v-3H1zm4 0h2V8H5zm4 0h2V5H9zm4 0h2V2h-2z"/></svg><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1 6a11 11 0 0 1 14 0M4 9a6 6 0 0 1 8 0M6 12a3 3 0 0 1 4 0"/></svg><span>${frame.battery}%</span><span class="device-battery"><i style="width:${frame.battery}%"></i></span></span></div>` : '';
+  const navigation = mobile && frame.navigation !== 'none' ? `<div class="device-navigation ${frame.navigation}" aria-label="${escapeHTML(t('底部导航栏'))}">${frame.navigation === 'gesture' ? '<span class="device-gesture"></span>' : '<span class="device-nav-back"></span><span class="device-nav-home"></span><span class="device-nav-recent"></span>'}</div>` : '';
   return { layout, className: `device-shell ${key}`, style: `width:${layout.width}px;height:${layout.height}px`, inner: `<div class="device-decoration" aria-hidden="true">${decoration}</div><div class="device-screen" style="left:${layout.left}px;top:${layout.top}px;width:${canvas.width}px;height:${canvas.height}px">${screenHTML}${status}${navigation}${cutout}</div>` };
 }
 export function exportHTML(value, { preview = false, editToken = '' } = {}) {
@@ -148,17 +149,17 @@ export function exportHTML(value, { preview = false, editToken = '' } = {}) {
   const normalPages = project.pages.filter(page => page.kind === 'page');
   const markup = page => {
     const positions = visibilityLayout(page.items);
-    const screen = `<main class="prototype" style="background-color:${escapeHTML(page.canvas.background || '#fff')}" aria-label="原型画布">${page.items.map((item, index) => itemHTML(item, page.canvas, positions[index])).join('\n')}</main>`;
+    const screen = `<main class="prototype" style="background-color:${escapeHTML(page.canvas.background || '#fff')}" aria-label="${escapeHTML(t('原型画布'))}">${page.items.map((item, index) => itemHTML(item, page.canvas, positions[index])).join('\n')}</main>`;
     const device = deviceMarkup(page.canvas, page.frame, screen);
     return `<div class="${device.className}" style="${device.style}">${device.inner}</div>`;
   };
-  const controls = normalPages.length > 1 ? '<nav class="prototype-controls" aria-label="原型导航"><button id="prototypeBack" disabled>返回</button><span id="prototypePageName"></span><button id="prototypeRestart">回到首页</button></nav>' : '';
+  const controls = normalPages.length > 1 ? `<nav class="prototype-controls" aria-label="${escapeHTML(t('原型导航'))}"><button id="prototypeBack" disabled>${escapeHTML(t('返回'))}</button><span id="prototypePageName"></span><button id="prototypeRestart">${escapeHTML(t('回到首页'))}</button></nav>` : '';
   const pages = normalPages.map(page => `<section class="prototype-page" data-prototype-page="${escapeHTML(page.id)}" data-page-name="${escapeHTML(page.name)}" tabindex="-1"${page.id !== startId ? ' hidden inert' : ''}>${markup(page)}</section>`).join('\n');
-  const popups = project.pages.filter(page => page.kind === 'popup').map(page => `<dialog class="prototype-popup" data-prototype-popup="${escapeHTML(page.id)}" aria-label="${escapeHTML(page.name)}"><div class="prototype-popup-heading"><h2>${escapeHTML(page.name)}</h2><button data-action="closePopup" aria-label="关闭弹窗">关闭 ×</button></div>${markup(page)}</dialog>`).join('\n');
+  const popups = project.pages.filter(page => page.kind === 'popup').map(page => `<dialog class="prototype-popup" data-prototype-popup="${escapeHTML(page.id)}" aria-label="${escapeHTML(page.name)}"><div class="prototype-popup-heading"><h2>${escapeHTML(page.name)}</h2><button data-action="closePopup" aria-label="${escapeHTML(t('关闭弹窗'))}">${escapeHTML(t('关闭'))} ×</button></div>${markup(page)}</dialog>`).join('\n');
   const toasts = project.pages.filter(page => page.kind === 'toast').map(page => `<div class="prototype-toast" popover="manual" data-prototype-toast="${escapeHTML(page.id)}" aria-label="${escapeHTML(page.name)}" role="status" aria-live="polite">${preview && editToken ? '<div class="prototype-toast-heading"></div>' : ''}${markup(page)}</div>`).join('\n');
   const maxWidth = Math.max(...normalPages.map(page => frameLayout(page.canvas, page.frame).width));
   return `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Protolab 原型</title><style>
+<html lang="${getLocale()}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(t('易设原型'))}</title><style>
 html,body{margin:0;min-height:100%;background:#f1f5f9}body{display:flex;flex-direction:column;align-items:center;padding:32px;box-sizing:border-box}
 ${PROTOTYPE_CSS}
 ${INTERACTION_CSS}

@@ -1,6 +1,8 @@
-# Protolab · 原型实验室
+# 易设 · Protolab
 
 浏览器里的轻量原型设计器：从组件库拖拽搭建界面，编辑尺寸与布局，导出可独立打开的 HTML。纯静态 HTML、CSS、原生 JavaScript，无框架、无后端、无运行时依赖。
+
+顶部语言选择支持「跟随系统」「中文」与「English」。首次打开跟随系统首选语言（中文地区使用中文，英文地区使用英文，其他语言回退英文）；选择会保存在当前浏览器。系统语言变化时自动跟随，显式选择优先。切换即时更新菜单、属性、提示和预览控件，保留未应用的表单输入及工程、页面、自定义组件和画布文案。中文品牌为「易设」，英文品牌为「Protolab」。
 
 ## 本地运行
 
@@ -121,6 +123,9 @@ src/guides.js             辅助线设置和像素标尺刻度
 src/presets.js            普通组件和矢量图形库
 src/frames.js             设备外框配置与几何尺寸
 src/icons.js              离线 SVG 界面图标
+src/assets/logo.svg       品牌标识与网站图标
+src/i18n.js               系统语言识别、偏好保存与界面翻译
+src/locales.js            中英双语文案目录
 src/content.js            静态内容清理、共享样式及 HTML 导出
 src/content-editor.js     文本节点、表单内容和图片编辑
 src/appearance.js         样式校验、四边间距及共享展示规则
@@ -162,6 +167,7 @@ npm run test:ai
 npm run test:orientation
 npm run test:pages
 npm run test:projects
+npm run test:i18n
 ```
 
 验收脚本自动启动临时服务，覆盖拖拽、缩放、属性、历史、文件导入导出、草稿恢复、窄屏面板和存储异常；截图写入不参与提交的 `test-results/`。已有 Playwright 可通过 `PROTOLAB_PLAYWRIGHT_MODULE` 指定其 `index.mjs`，通过 `PROTOLAB_BROWSER_EXECUTABLE` 指定浏览器执行文件，或用 `PROTOLAB_TEST_URL` 测试已启动服务。

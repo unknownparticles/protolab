@@ -14,7 +14,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const page = await browser.newPage();
+  const page = await browser.newPage({ locale: 'zh-CN' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('https://protolab.example.test/**', async route => {
     const url = new URL(route.request().url());

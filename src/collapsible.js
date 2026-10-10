@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 const STORAGE_KEY = 'protolab.collapsedSections';
 
 /** 收起只改变界面，不改变表单值、组件选择或工程历史。 */
@@ -28,6 +29,7 @@ export function initializeCollapsible(root = document) {
     const title = heading.cloneNode(true);
     title.querySelectorAll('span').forEach(node => node.remove());
     const label = title.textContent.trim();
+    heading.childNodes.forEach(node => { if (node.nodeType === 3) node.textContent = t(node.textContent.trim()); });
     const content = document.createElement('div');
     content.className = 'collapse-content';
     content.id = `collapse-${key}`;
@@ -44,7 +46,7 @@ export function initializeCollapsible(root = document) {
       content.hidden = collapsed;
       section.classList.toggle('section-collapsed', collapsed);
       button.setAttribute('aria-expanded', String(!collapsed));
-      button.setAttribute('aria-label', `${collapsed ? '展开' : '收起'}${label}`);
+      button.setAttribute('aria-label', collapsed ? t`展开${t(label)}` : t`收起${t(label)}`);
     };
     group.members.push({ key, update, button, content });
     const updateGroup = collapsed => {
@@ -67,7 +69,7 @@ export function initializeCollapsible(root = document) {
     button.className = 'panel-toggle';
     const label = document.createElement('span');
     label.className = 'panel-toggle-label';
-    label.textContent = title;
+    label.textContent = t(title);
     button.append(label);
     const contents = [...panel.children].filter(node => node !== heading);
     contents.forEach((node, index) => { if (!node.id) node.id = `collapse-${key}-${index}`; });
@@ -77,8 +79,8 @@ export function initializeCollapsible(root = document) {
       panel.classList.toggle('panel-collapsed', collapsed);
       contents.forEach(node => { node.inert = collapsed; });
       button.setAttribute('aria-expanded', String(!collapsed));
-      button.setAttribute('aria-label', `${collapsed ? '展开' : '收起'}${title}`);
-      button.title = `${collapsed ? '展开' : '收起'}${title}`;
+      button.setAttribute('aria-label', collapsed ? t`展开${t(title)}` : t`收起${t(title)}`);
+      button.title = collapsed ? t`展开${t(title)}` : t`收起${t(title)}`;
     };
     update(state[key] === true);
     button.addEventListener('click', () => {

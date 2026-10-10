@@ -190,3 +190,11 @@
 @media(max-width:1199px){.toolbar{gap:10px;padding-inline:14px}.toolbar .brand{margin-right:0}.toolbar .project-controls{margin-left:0}.menu-trigger{padding-inline:10px}}
 @media(max-width:899px){.toolbar .toolbar-end{margin-left:auto}.toolbar .project-controls select{width:150px}.menu-trigger{padding-inline:8px}}
 @media(max-width:599px){.toolbar{flex-wrap:wrap;gap:8px;padding:10px 12px}.toolbar .brand{margin-right:0;font-size:16px}.toolbar .project-controls{flex:1;min-width:0}.toolbar .project-controls select{width:100%;min-width:0;max-width:none}.toolbar .toolbar-end{gap:0}.toolbar .toolbar-end .btn{padding:7px 10px}.app-menubar{order:2;width:100%;gap:4px}.menu-trigger{padding:8px 12px}}
+
+.language-control{display:flex;align-items:center;gap:6px;color:var(--muted);flex-shrink:0}
+.language-control .icon{width:16px;height:16px}
+.language-control select{max-width:118px;padding:7px 22px 7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface,#fff);color:var(--text);font:inherit;font-size:12px;cursor:pointer}
+html[lang=en] .menu-dropdown{min-width:250px}
+html[lang=en] .library-tabs button{padding-inline:8px}
+html[lang=en] .panel-tabs button{font-size:10px}
+@media(max-width:599px){.toolbar .toolbar-end{gap:8px}.language-control .icon{display:none}.language-control select{max-width:106px;font-size:11px;padding-inline:6px}.toolbar .project-controls{order:3;flex-basis:100%}.canvas-topbar{gap:6px}.canvas-breadcrumb{min-width:0}.canvas-view-controls{flex-shrink:0}}

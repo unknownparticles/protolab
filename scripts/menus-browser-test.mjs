@@ -14,7 +14,7 @@ try {
   await mkdir(output, { recursive: true });
   for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
@@ -110,7 +110,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#fileMenuBtn').click(); await page.screenshot({ path: resolve(output, 'menus-mobile.png') });
   await page.keyboard.press('Escape');
-  const touch = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const touch = await browser.newContext({ locale: 'zh-CN', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const mobile = await touch.newPage(); mobile.on('pageerror', error => errors.push(error.message)); await mobile.goto(base);
   await mobile.locator('#fileMenuBtn').tap(); assert.equal(await mobile.locator('#fileMenu').isVisible(), true);
   await mobile.locator('#newProjectBtn').tap(); assert.equal(await mobile.locator('#engineeringDialog').isVisible(), true);

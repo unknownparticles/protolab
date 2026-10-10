@@ -14,7 +14,7 @@ let browser;
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const errors = []; page.on('pageerror', error => errors.push(error.message)); page.on('dialog', dialog => dialog.accept());
   const saved = () => page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   const libraryFile = async () => { const event = page.waitForEvent('download'); await page.locator('#exportLibBtn').click(); return JSON.parse(await readFile(await (await event).path(), 'utf8')); };

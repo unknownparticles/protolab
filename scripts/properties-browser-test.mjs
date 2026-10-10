@@ -14,7 +14,7 @@ let browser;
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
   const apply = async () => { await page.evaluate(() => { document.getElementById('statusMessage').textContent = ''; }); await page.locator('#selectionProps button[type=submit]').click(); await page.waitForFunction(() => document.getElementById('statusMessage').textContent === '组件属性已更新'); };
@@ -83,7 +83,7 @@ try {
   assert.ok(source.length > 100000);
   const upload = { name: 'noise.png', mimeType: 'image/png', buffer: Buffer.from(source.split(',')[1], 'base64') };
   // 大图上传与保存使用独立工程，避免填充模式遍历产生的大量历史耗尽浏览器配额。
-  const large = await browser.newPage({ viewport: { width: 1440, height: 1100 } }); await large.goto(base);
+  const large = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1100 } }); await large.goto(base);
   await large.locator('[data-comp-id="lib-image"]').click(); await large.locator('#propImageFile').setInputFiles(upload);
   await large.waitForFunction(() => document.getElementById('propImageSource').value.length > 100000);
   await large.locator('#selectionProps button[type=submit]').click();
@@ -132,7 +132,7 @@ try {
   await page.locator('[data-close="previewDialog"]').click();
   const htmlEvent = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
   const html = await readFile(await (await htmlEvent).path(), 'utf8');
-  const exportedPage = await browser.newPage(); await exportedPage.setContent(html);
+  const exportedPage = await browser.newPage({ locale: 'zh-CN' }); await exportedPage.setContent(html);
   assert.equal(await exportedPage.locator('[data-name="图片占位"] img').evaluate(node => getComputedStyle(node).objectFit), 'scale-down');
   assert.equal(await exportedPage.locator('button').filter({ hasText: '确认 <安全文本>' }).evaluate(node => getComputedStyle(node).color), 'rgb(171, 205, 239)');
   console.log('通过：工程导入导出、刷新恢复、预览和独立导出样式一致');

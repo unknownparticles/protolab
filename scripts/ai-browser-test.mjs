@@ -17,7 +17,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   let release;
   let requestBody;
@@ -141,7 +141,7 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []); console.log('通过：窄屏对话及无浏览器错误');
 
-  const partial = await browser.newPage();
+  const partial = await browser.newPage({ locale: 'zh-CN' });
   await partial.goto(base); await partial.locator('[data-comp-id="lib-btn"]').click();
   await partial.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await partial.evaluate(() => {

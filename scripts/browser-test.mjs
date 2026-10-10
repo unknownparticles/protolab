@@ -20,7 +20,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -212,7 +212,7 @@ try {
   assert.equal(await restricted.locator('.editor-item').count(), 4);
   assert.match(await restricted.locator('#toast').textContent(), /未(?:完整)?保存/);
   console.log('通过：存储不可用时保留内存设计并提示');
-  const stress = await (await browser.newContext()).newPage();
+  const stress = await (await browser.newContext({ locale: 'zh-CN' })).newPage();
   const projectSeed = await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')));
   projectSeed.items = Array.from({ length: 200 }, (_, index) => ({ ...projectSeed.items[1], id: `stress-${index}`, x: index % 10 * 20, y: Math.floor(index / 10) * 20 }));
   await stress.addInitScript(seed => localStorage.setItem('protolab.project.v1', JSON.stringify(seed)), projectSeed);
@@ -228,7 +228,7 @@ try {
   assert.equal(await stress.locator('#layerList .layer-item').nth(1).evaluate(element => element.classList.contains('selected')), true);
   console.log(`通过：200 组件加载与数量限制、图层排序（本机加载 ${renderTime} ms）`);
 
-  const damagedContext = await browser.newContext();
+  const damagedContext = await browser.newContext({ locale: 'zh-CN' });
   const damaged = await damagedContext.newPage();
   await damaged.addInitScript(() => { localStorage.setItem('protolab.project.v1', '{broken'); localStorage.setItem('protolab.library.v1', '{broken'); });
   await damaged.goto(base); await damaged.waitForSelector('.component-item');
@@ -238,7 +238,7 @@ try {
   console.log('通过：损坏存储回退且保留原始数据');
   await damagedContext.close();
 
-  const controlsContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const controlsContext = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
   const controls = await controlsContext.newPage();
   controls.on('pageerror', error => errors.push(error.message));
   await controls.goto(base);

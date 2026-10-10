@@ -14,7 +14,7 @@ let browser;
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const context = await browser.newContext({ viewport: { width: 1600, height: 1100 }, acceptDownloads: true });
+  const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1600, height: 1100 }, acceptDownloads: true });
   const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
   const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('protolab.projects.v1')));
@@ -147,7 +147,7 @@ try {
   assert.deepEqual(errors, []); console.log('通过：存储失败阻止切换、窄屏新建及无页面异常');
 
   // 旧单工程草稿、组件库与对话首次使用新功能时完整迁移。
-  const migrated = await browser.newPage();
+  const migrated = await browser.newPage({ locale: 'zh-CN' });
   await migrated.addInitScript(entry => {
     localStorage.setItem('protolab.project.v1', JSON.stringify(entry.project));
     localStorage.setItem('protolab.library.v1', JSON.stringify({ version: 1, components: entry.library }));

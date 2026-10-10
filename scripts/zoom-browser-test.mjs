@@ -9,7 +9,7 @@ let browser;
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, hasTouch: true });
+  const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, hasTouch: true });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
