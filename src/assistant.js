@@ -130,6 +130,13 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiRememberKey').checked = rememberKey;
     $('aiSettingsError').textContent = ''; $('settingsDialog').showModal();
   });
+  $('aiDeepSeekBtn').addEventListener('click', () => {
+    $('aiURL').value = 'https://api.deepseek.com/v1';
+    $('aiModel').value = 'deepseek-chat';
+    $('aiKey').value = ''; $('aiRememberKey').checked = false;
+    $('aiSettingsError').textContent = '';
+    $('aiKey').focus();
+  });
   $('aiSettingsForm').addEventListener('submit', event => {
     event.preventDefault();
     try {

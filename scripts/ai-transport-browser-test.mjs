@@ -57,4 +57,30 @@ try {
   assert.equal(await page.locator('#aiSendBtn').isEnabled(), true);
   assert.deepEqual(errors, []);
   console.log('通过：网络或跨域失败显示配置要求，保留设计并可重试');
+  await page.route('https://api.deepseek.com/**', async route => {
+    sent = route.request();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ version: 1, summary: '已更新标题', changes: [{ op: 'update', id: 'transport-title', fields: { name: 'DeepSeek 标题' } }] }) } }] }) });
+  });
+  await page.locator('#settingsBtn').click();
+  await page.locator('#aiRememberKey').check();
+  await page.locator('#aiDeepSeekBtn').click();
+  assert.equal(await page.locator('#aiURL').inputValue(), 'https://api.deepseek.com/v1');
+  assert.equal(await page.locator('#aiModel').inputValue(), 'deepseek-chat');
+  assert.equal(await page.locator('#aiKey').inputValue(), '');
+  assert.equal(await page.locator('#aiRememberKey').isChecked(), false);
+  await page.locator('[data-close="settingsDialog"]').first().click();
+  await page.locator('#settingsBtn').click();
+  assert.equal(await page.locator('#aiURL').inputValue(), 'https://ai.example.test/v1');
+  assert.equal(await page.locator('#aiKey').inputValue(), 'mock-secret');
+  await page.locator('#aiDeepSeekBtn').click();
+  await page.locator('#aiKey').fill('mock-deepseek-key');
+  await page.locator('#aiSettingsForm button[type=submit]').click();
+  await send();
+  assert.equal(sent.url(), 'https://api.deepseek.com/v1/chat/completions');
+  assert.equal(sent.headers().authorization, 'Bearer mock-deepseek-key');
+  assert.equal(sent.postDataJSON().model, 'deepseek-chat');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.ai.settings.v1')).key), '');
+  assert.equal(await page.locator('[data-item-id="transport-title"] .item-label').textContent(), 'DeepSeek 标题');
+  assert.deepEqual(errors, []);
+  console.log('通过：DeepSeek 快捷配置、清空旧 Key、取消恢复及保存后正确请求和应用');
 } finally { await browser?.close(); server?.kill(); }
