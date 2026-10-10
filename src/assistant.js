@@ -6,7 +6,7 @@ import { WORKSPACE_KEY, createVersions, validateWorkspace, mergeProjects } from 
 
 const $ = id => document.getElementById(id);
 const validate = value => validateProject(value, sanitizeContent);
-export function createAssistant({ initial, initialSavedAt, initialWorkspace, getProject, getRules, restoreInitial, applyProject, applyGeneration, finishGesture, notify, scheduleSave, startupWarning }) {
+export function createAssistant({ initial, initialSavedAt, initialWorkspace, getProject, getRules, getDesignAssets, restoreInitial, applyProject, applyGeneration, finishGesture, notify, scheduleSave, startupWarning }) {
   let saved = initialWorkspace;
   try { if (initialWorkspace === undefined) saved = readStorage(WORKSPACE_KEY, value => validateWorkspace(value, validate)); }
   catch { startupWarning('版本或对话记录读取失败，已使用本地草稿'); }
@@ -156,8 +156,10 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     const mode = $('aiMode').value;
     const currentSession = session;
     const requestProject = clone(getProject());
+    const assets = getDesignAssets ? clone(getDesignAssets()) : {};
+    const designOptions = { designContext: assets.context, library: assets.library };
     const baseId = versions.add(requestProject, 'AI 生成前', { force: true });
-    const base = mode === 'modify' ? requestProject : generationBase(requestProject, mode);
+    const base = mode === 'modify' ? requestProject : generationBase(requestProject, mode, assets.context);
     const context = clone(messages);
     controller = new AbortController(); const active = controller;
     let timedOut = false;
@@ -165,12 +167,12 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     addMessage('user', requirement); $('aiRequirement').value = '';
     $('aiStatus').textContent = 'AI 正在生成…可以继续编辑画布。';
     try {
-      const text = await requestAI(settings, requirement, base, context, active.signal, fetch, { mode, rules: getRules() });
+      const text = await requestAI(settings, requirement, base, context, active.signal, fetch, { mode, rules: getRules(), ...designOptions });
       if (currentSession !== session) return;
       if (active.signal.aborted) throw new Error('请求已取消');
       finishGesture();
       if (mode !== 'modify') {
-        generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent), mode };
+        generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent, designOptions), mode };
         versions.add(getProject(), `AI 生成后（待确认）：${generated.summary}`, { force: true });
         addMessage('assistant', generated.summary);
         $('aiGeneratedSummary').textContent = `${generated.name} · ${generated.summary}`;
@@ -178,7 +180,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
         showGenerated();
         return;
       }
-      const response = parseAIResponse(text, base, sanitizeContent);
+      const response = parseAIResponse(text, base, sanitizeContent, designOptions);
       const aiId = versions.add(response.project, `AI：${response.summary}`, { parent: baseId, branch: true });
       addMessage('assistant', response.summary);
       if (versions.head === baseId && JSON.stringify(getProject()) === JSON.stringify(requestProject)) {
@@ -229,7 +231,8 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     const mode = $('aiMode').value;
     $('aiModeHelp').textContent = mode === 'modify' ? '发送当前工程和最近对话，修改当前页。' : mode === 'component' ? '根据提示词和规范独立生成组件，预览后保存到当前工程组件库。' : '根据提示词和规范独立生成页面，预览后添加为新页面。';
     $('aiSendBtn').textContent = mode === 'modify' ? '发送需求' : mode === 'component' ? '生成组件' : '生成页面';
-    $('aiRulesSummary').textContent = `自动注入内置设计规范${getRules() ? '及当前工程规范' : ''}，可在「工程设置」中查看和编辑。`;
+    const design = getDesignAssets?.().context;
+    $('aiRulesSummary').textContent = `自动使用内置规范${getRules() ? '、工程规范' : ''}${design?.palette ? `、${design.palette.name}配色` : ''}${design ? `、${design.library.components.length} 个关联组件及安全区信息` : ''}，可在「工程设置」中编辑。`;
     $('aiBuiltinRules').textContent = DESIGN_SPEC;
   }
   $('aiCancelBtn').addEventListener('click', () => controller?.abort());

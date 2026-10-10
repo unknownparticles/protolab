@@ -1015,6 +1015,10 @@ $('saveSelectionComponentBtn').addEventListener('click', () => {
   $('customWidth').value = item.width; $('customHeight').value = item.height;
   if (item.type !== 'image') $('customCode').value = item.content;
   $('componentForm').dataset.sourceId = item.id;
+  const response = normalizeOrientationResponse(item.orientationResponse);
+  $('customOrientationEnabled').checked = response.enabled;
+  $('customPortraitAction').value = response.portrait; $('customLandscapeAction').value = response.landscape;
+  updateOrientationFields('custom');
 });
 $('libFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
@@ -1098,6 +1102,7 @@ $('componentForm').addEventListener('submit', event => {
   try {
     if (library.length >= MAX_LIBRARY) throw new Error('组件库最多支持 200 个组件');
     const component = readCustomComponent();
+    groupFilter = component.groupId || '';
     library = validateLibrary([...library, component], sanitizeContent); commit(`添加自定义组件：${component.name}`); setLibraryTab('custom'); $('componentDialog').close();
     assistant.saveVersion('保存自定义组件');
     if (persistLibrary()) notify(`「${component.name}」已添加并保存到组件库`);

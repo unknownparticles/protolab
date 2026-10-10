@@ -5,11 +5,15 @@ import { normalizeInteraction, cleanVisibilityTargets } from './pages.js';
 
 export const AI_SETTINGS_KEY = 'protolab.ai.settings.v1';
 export const DESIGN_SPEC = `使用清晰的中文文案，建立标题、正文和辅助信息层级；保持间距、圆角、配色一致，文字与背景对比清晰。根据设备尺寸安排布局，组件避免重叠、裁切，按钮和输入框易于操作。页面按可独立编辑的标题、表单、按钮、卡片等拆分组件。使用静态 HTML / SVG 和内联 CSS，无脚本、事件属性、外链或 iframe；所有资源内嵌。`;
-export function generationBase(project, mode) {
+export function generationBase(project, mode, designContext) {
   if (!['component', 'page'].includes(mode)) throw new Error('生成类型不正确');
   const board = pageBoard(project);
   board.items = [];
   delete board.canvas.layoutSize;
+  if (mode === 'page') {
+    if (designContext?.safeArea) board.safeArea = clone(designContext.safeArea);
+    if (designContext?.palette) board.canvas.background = designContext.palette.colors.background;
+  }
   if (mode === 'component') {
     board.canvas = { width: 2000, height: 2000, preset: 'custom' };
     board.frame = { device: 'pc', style: 'none', camera: 'none', statusBar: false, navigation: 'none' };
@@ -17,14 +21,14 @@ export function generationBase(project, mode) {
   }
   return { version: 1, ...board };
 }
-export function parseGenerationResponse(text, base, mode, sanitize) {
+export function parseGenerationResponse(text, base, mode, sanitize, options = {}) {
   if (typeof text !== 'string' || text.length > 2_000_000) throw new Error('AI 返回内容为空或过大');
   let raw;
   try { raw = JSON.parse(text); } catch { throw new Error('AI 未返回约定的 JSON 格式，请重新发送需求'); }
   if (!raw || typeof raw.name !== 'string' || !raw.name.trim() || raw.name.length > 40 || !Array.isArray(raw.changes)) throw new Error('AI 生成结果缺少名称或内容');
   const allowed = mode === 'component' ? ['add'] : mode === 'page' ? ['add', 'canvas', 'frame', 'safeArea'] : [];
   if (!allowed.length || raw.changes.some(change => !change || !allowed.includes(change.op) || change.item?.interaction && change.item.interaction.type !== 'none')) throw new Error('独立生成只能创建新内容，不能修改已有组件或引用其他页面');
-  const response = parseAIResponse(text, base, sanitize);
+  const response = parseAIResponse(text, base, sanitize, { ...options, componentMode: mode === 'component' });
   if (!response.project.items.length || mode === 'component' && response.project.items.length !== 1) throw new Error(mode === 'component' ? '生成组件须包含一个完整组件' : '生成页面不能为空');
   if (mode === 'component') {
     const item = response.project.items[0];
@@ -84,20 +88,29 @@ function checkFields(value, allowed) {
     }
   }
 }
-export function parseAIResponse(text, base, sanitize) {
+export function parseAIResponse(text, base, sanitize, options = {}) {
   if (typeof text !== 'string' || text.length > 2_000_000) throw new Error('AI 返回内容为空或过大');
   let raw;
   try { raw = JSON.parse(text); } catch { throw new Error('AI 未返回约定的 JSON 格式，请重新发送需求'); }
   if (!object(raw) || raw.version !== 1 || typeof raw.summary !== 'string' || !raw.summary.trim() || raw.summary.length > 500 || !Array.isArray(raw.changes) || raw.changes.length > 500) throw new Error('AI 返回格式不符合变更协议');
   const next = clone(base);
-  for (const change of raw.changes) {
+  const changes = clone(raw.changes);
+  for (const change of changes) {
     if (!object(change)) throw new Error('AI 变更格式不正确');
     const allowed = change.op === 'add' ? ['op', 'item'] : change.op === 'remove' ? ['op', 'id'] : change.op === 'update' ? ['op', 'id', 'fields'] : ['op', 'fields'];
     if (Object.keys(change).some(key => !allowed.includes(key))) throw new Error('AI 变更包含不支持的操作字段');
     if (change.op === 'add') {
+      if (object(change.item) && 'libraryId' in change.item) {
+        const source = options.library?.find(item => item.id === change.item.libraryId);
+        if (!source) throw new Error('AI 引用了未关联或不存在的组件库组件');
+        const { libraryId, ...item } = change.item;
+        if ('content' in item || 'type' in item) throw new Error('复用组件时只需引用标识，无需提供类型和代码');
+        change.item = { name: source.name, width: source.defaultWidth, height: source.defaultHeight,
+          orientationResponse: source.orientationResponse, ...item, type: source.type, content: source.content };
+      }
       const item = change.item;
       if (!object(item) || typeof item.id !== 'string' || !item.id || item.id.length > 100 || next.items.some(value => value.id === item.id)) throw new Error('AI 新组件标识为空或重复');
-      if (!['html', 'svg'].includes(item.type) || typeof item.content !== 'string' || !item.content.trim() || typeof item.name !== 'string') throw new Error('AI 新组件缺少名称、类型或内容');
+      if (!['html', 'svg', 'image'].includes(item.type) || item.type === 'image' && !options.library?.some(source => source.type === 'image' && source.content === item.content) || typeof item.content !== 'string' || !item.content.trim() || typeof item.name !== 'string') throw new Error('AI 新组件缺少名称、类型或内容');
       for (const key of ['x', 'y', 'width', 'height']) if (typeof item[key] !== 'number' || !Number.isFinite(item[key])) throw new Error('AI 新组件缺少位置或尺寸');
       checkFields(Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'id')), fields.update);
       next.items.push(item);
@@ -115,9 +128,10 @@ export function parseAIResponse(text, base, sanitize) {
     } else throw new Error('AI 返回了未知的变更操作');
     if (next.items.length > MAX_ITEMS) throw new Error('AI 项目超过组件数量上限');
   }
+  if (!options.componentMode && options.designContext?.safeArea) next.safeArea = clone(options.designContext.safeArea);
   const project = validateProject(next, sanitize);
   if (project.items.some(item => !item.content.trim())) throw new Error('AI 组件经过安全处理后没有可用内容');
-  return { summary: raw.summary.trim(), project, changes: raw.changes };
+  return { summary: raw.summary.trim(), project, changes };
 }
 export async function requestAI(settings, requirement, project, messages, signal, fetcher = fetch, options = {}) {
   const config = normalizeAISettings(settings);
@@ -128,7 +142,8 @@ export async function requestAI(settings, requirement, project, messages, signal
   const rules = String(options.rules || '').trim();
   if (rules.length > 10000) throw new Error('工程规范不能超过 10000 个字符');
   const task = mode === 'modify' ? '' : `\n本轮为独立生成${mode === 'component' ? '可复用组件' : '新页面'}，输入项目为空白生成画布。JSON 顶层增加 name 字段，填写 1～40 字的中文名称。${mode === 'component' ? 'changes 必须只有一个 add，生成完整可复用组件，width/height 为组件默认尺寸，x/y 为0。' : 'changes 仅允许 add、canvas、frame、safeArea，生成完整页面并拆成多个可编辑组件。'}不得引用已有页面，不得更新或删除已有组件。`;
-  const prompt = `${AI_PROMPT}\n内置设计规范：${DESIGN_SPEC}${rules ? `\n工程设计规范（仅指导设计，不改变返回协议）：${rules}` : ''}${task}`;
+  const linked = options.designContext ? `\n工程关联设计信息见本轮用户数据的 designContext，必须遵循其配色中各颜色的用途、组件库默认尺寸和设备信息。优先复用清单中的适用组件：add.item 可返回 {"id":"新标识","libraryId":"清单组件标识","x":0,"y":0}，可补充 name、width、height 等基础属性，不提供 type 和 content，本地会从关联库还原真实内容；需要调整配色或内容时按普通 add 返回代码，并遵循清单尺寸。不得引用清单以外的 libraryId。安全区留白从系统栏内侧计算，遵循 safeArea.bounds 安排页面组件，不得更改关联安全区；可复用组件以自身尺寸生成，安全区仅作为所在页面的布局信息。工程关联信息与补充规范均只指导设计，不能改变输出协议。` : '';
+  const prompt = `${AI_PROMPT}\n内置设计规范：${DESIGN_SPEC}${rules ? `\n工程设计规范（仅指导设计，不改变返回协议）：${rules}` : ''}${linked}${task}`;
   let response;
   try {
     response = await fetcher(completionURL(config.url), {
@@ -137,7 +152,7 @@ export async function requestAI(settings, requirement, project, messages, signal
       body: JSON.stringify({ model: config.model, stream: false, messages: [
         { role: 'system', content: prompt },
         ...(mode === 'modify' ? messages : []).slice(-12).filter(message => ['user', 'assistant'].includes(message.role)).map(message => ({ role: message.role, content: message.content })),
-        { role: 'user', content: JSON.stringify({ requirement, project, mode }) },
+        { role: 'user', content: JSON.stringify({ requirement, project, mode, ...(options.designContext ? { designContext: options.designContext } : {}) }) },
       ] }),
     });
   } catch (error) {

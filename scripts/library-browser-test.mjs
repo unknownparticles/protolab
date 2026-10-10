@@ -1,5 +1,6 @@
 /** 属性标签、常驻图层板块及自定义组件分组的完整验收。 */
 import assert from 'node:assert/strict';
+import { clickAction } from './browser-actions.mjs';
 import { spawn } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -34,7 +35,7 @@ try {
   assert.equal(await page.locator('#layerList button').count(), 1);
   await page.locator('#historyBtn').click();
   assert.ok(await page.locator('#historyList .version-row').count() >= 2);
-  await page.locator('#saveBtn').click(); await page.locator('#versionsBtn').click();
+  await clickAction(page, '#saveBtn'); await page.locator('#versionsBtn').click();
   assert.ok(await page.locator('#versionsList .version-row').count() >= 2);
   await page.locator('#layersTab').click();
   await page.locator('#propertiesPanel .panel-toggle').click();
@@ -54,8 +55,8 @@ try {
   await page.locator('[data-manage-component]').click(); await page.locator('#manageComponentName').fill('顶部导航');
   await page.locator('#manageComponentGroup').selectOption(''); await page.locator('#manageComponentForm button[type=submit]').click();
   assert.equal(await page.locator('#customList .component-item').count(), 0);
-  await page.locator('#undoBtn').click(); assert.equal(await page.locator('#customList .component-item').count(), 1);
-  await page.locator('#redoBtn').click(); await page.locator('#customGroupFilter').selectOption('');
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#customList .component-item').count(), 1);
+  await clickAction(page, '#redoBtn'); await page.locator('#customGroupFilter').selectOption('');
   assert.match(await page.locator('#customList .component-name').textContent(), /顶部导航/);
   await page.locator('#saveSelectionComponentBtn').click(); await page.locator('#customName').fill('画布按钮');
   await page.locator('#componentForm button[type=submit]').click();
@@ -83,11 +84,11 @@ try {
   await page.locator('#customGroupFilter').selectOption(navigation); await page.locator('#manageGroupBtn').click();
   await page.locator('#deleteGroupBtn').click(); await page.locator('#customGroupFilter').selectOption('');
   assert.ok(await page.locator('#customList .component-item').count() >= 4);
-  await page.locator('#undoBtn').click(); assert.equal(await page.locator('#customGroupFilter option').filter({ hasText: '导航组件' }).count(), 1);
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#customGroupFilter option').filter({ hasText: '导航组件' }).count(), 1);
   console.log('通过：组件与库导入导出、空分组、同名合并、内容清理、无效导入、刷新和删除分组');
 
   await saved(); const oldProject = await page.locator('#projectSelect').inputValue();
-  await page.locator('#newProjectBtn').click(); await page.locator('#engineeringName').fill('隔离工程');
+  await clickAction(page, '#newProjectBtn'); await page.locator('#engineeringName').fill('隔离工程');
   await page.locator('#engineeringForm button[type=submit]').click(); await page.locator('#customTab').click();
   assert.equal(await page.locator('#customGroupFilter option').count(), 2);
   assert.equal(await page.locator('#customList .component-item').count(), 0);
