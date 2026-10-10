@@ -1,5 +1,7 @@
 import { normalizeFrame, frameLayout, cameraLayout } from './frames.js';
 import { orientationPresentation } from './orientation.js';
+import { withPages, normalizeInteraction } from './pages.js';
+import { PROTOTYPE_RUNTIME, INTERACTION_CSS } from './prototype-runtime.js';
 /** 组件只承载静态标记，移除脚本、事件、页面级样式及外部资源。 */
 const HTML_TAGS = new Set('div span p strong b em i u s small h1 h2 h3 h4 h5 h6 section article header footer main nav aside ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col label button input textarea select option img a br hr pre code blockquote figure figcaption'.split(' '));
 const SVG_TAGS = new Set('svg g path rect circle ellipse line polyline polygon text tspan defs lineargradient radialgradient stop clippath mask title desc'.split(' '));
@@ -49,7 +51,9 @@ export const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ 
 export function itemHTML(item, canvas) {
   const inner = item.type === 'image' ? `<img src="${escapeHTML(item.content)}" alt="${escapeHTML(item.name)}" style="width:100%;height:100%;object-fit:contain">` : item.content;
   const { hidden, angle } = orientationPresentation(item, canvas);
-  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}" data-name="${escapeHTML(item.name)}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${hidden ? ';display:none' : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
+  const action = normalizeInteraction(item.interaction);
+  const interaction = action ? ` data-action="${escapeHTML(action.type)}"${action.targetId ? ` data-target="${escapeHTML(action.targetId)}"` : ''} role="button" tabindex="0" aria-label="${escapeHTML(item.name)}"` : '';
+  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}" data-name="${escapeHTML(item.name)}"${interaction} style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${hidden ? ';display:none' : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
 }
 export const PROTOTYPE_CSS = `
 .prototype{position:relative;background:#fff;overflow:hidden;color:#0f172a;font-family:Inter,system-ui,-apple-system,sans-serif}
@@ -115,13 +119,25 @@ export function deviceMarkup(canvas, rawFrame, screenHTML = '') {
   const navigation = mobile && frame.navigation !== 'none' ? `<div class="device-navigation ${frame.navigation}" aria-label="底部导航栏">${frame.navigation === 'gesture' ? '<span class="device-gesture"></span>' : '<span class="device-nav-back"></span><span class="device-nav-home"></span><span class="device-nav-recent"></span>'}</div>` : '';
   return { layout, className: `device-shell ${key}`, style: `width:${layout.width}px;height:${layout.height}px`, inner: `<div class="device-decoration" aria-hidden="true">${decoration}</div><div class="device-screen" style="left:${layout.left}px;top:${layout.top}px;width:${canvas.width}px;height:${canvas.height}px">${screenHTML}${status}${navigation}${cutout}</div>` };
 }
-export function exportHTML(project) {
-  const screen = `<main class="prototype" style="background-color:${escapeHTML(project.canvas.background || '#fff')}" aria-label="原型画布">${project.items.map(item => itemHTML(item, project.canvas)).join('\n')}</main>`;
-  const device = deviceMarkup(project.canvas, project.frame, screen);
+export function exportHTML(value, { preview = false } = {}) {
+  const project = withPages(value);
+  const active = project.pages.find(page => page.id === project.activePageId);
+  const startId = preview && active.kind === 'page' ? active.id : project.startPageId;
+  const normalPages = project.pages.filter(page => page.kind === 'page');
+  const markup = page => {
+    const screen = `<main class="prototype" style="background-color:${escapeHTML(page.canvas.background || '#fff')}" aria-label="原型画布">${page.items.map(item => itemHTML(item, page.canvas)).join('\n')}</main>`;
+    const device = deviceMarkup(page.canvas, page.frame, screen);
+    return `<div class="${device.className}" style="${device.style}">${device.inner}</div>`;
+  };
+  const controls = normalPages.length > 1 ? '<nav class="prototype-controls" aria-label="原型导航"><button id="prototypeBack" disabled>返回</button><span id="prototypePageName"></span><button id="prototypeRestart">回到首页</button></nav>' : '';
+  const pages = normalPages.map(page => `<section class="prototype-page" data-prototype-page="${escapeHTML(page.id)}" data-page-name="${escapeHTML(page.name)}" tabindex="-1"${page.id !== startId ? ' hidden inert' : ''}>${markup(page)}</section>`).join('\n');
+  const popups = project.pages.filter(page => page.kind === 'popup').map(page => `<dialog class="prototype-popup" data-prototype-popup="${escapeHTML(page.id)}" aria-label="${escapeHTML(page.name)}"><div class="prototype-popup-heading"><h2>${escapeHTML(page.name)}</h2><button data-action="closePopup" aria-label="关闭弹窗">关闭 ×</button></div>${markup(page)}</dialog>`).join('\n');
+  const maxWidth = Math.max(...normalPages.map(page => frameLayout(page.canvas, page.frame).width));
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Protolab 原型</title><style>
-html,body{margin:0;min-height:100%;background:#f1f5f9}body{display:grid;place-items:start center;padding:32px;box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#f1f5f9}body{display:flex;flex-direction:column;align-items:center;padding:32px;box-sizing:border-box}
 ${PROTOTYPE_CSS}
-@media(max-width:${device.layout.width + 64}px){body{padding:0;display:block}}
-</style></head><body><div class="${device.className}" style="${device.style}">${device.inner}</div><script type="application/json" id="protolab-project">${JSON.stringify(project).replace(/</g, '\\u003c')}</script></body></html>`;
+${INTERACTION_CSS}
+@media(max-width:${maxWidth + 64}px){body{padding:0;align-items:flex-start}}
+</style></head><body data-start-page="${escapeHTML(startId)}"${preview && active.kind === 'popup' ? ` data-initial-popup="${escapeHTML(active.id)}"` : ''}>${controls}${pages}${popups}<script type="application/json" id="protolab-project">${JSON.stringify(value.pages ? project : value).replace(/</g, '\\u003c')}</script><script>${PROTOTYPE_RUNTIME}</script></body></html>`;
 }

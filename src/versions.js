@@ -1,4 +1,5 @@
 import { clone, uid } from './model.js';
+import { withPages, pageBoard } from './pages.js';
 
 export const WORKSPACE_KEY = 'protolab.workspace.v1';
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -52,6 +53,11 @@ export function mergeProjects(base, local, remote, choices = {}) {
   function merge(b, l, r, path) {
     if (equal(l, r) || equal(r, b)) return clone(l);
     if (equal(l, b)) return clone(r);
+    if (['pages', 'items'].includes(path.at(-1)) && [b, l, r].every(Array.isArray)) {
+      const maps = [b, l, r].map(values => new Map(values.map(value => [value.id, value])));
+      const ids = new Set([...maps[1].keys(), ...maps[2].keys(), ...maps[0].keys()]);
+      return [...ids].map(id => merge(maps[0].get(id), maps[1].get(id), maps[2].get(id), [...path, id])).filter(value => value !== undefined);
+    }
     if ([b, l, r].every(value => value && typeof value === 'object' && !Array.isArray(value))) {
       const result = {};
       for (const key of new Set([...Object.keys(b), ...Object.keys(l), ...Object.keys(r)])) {
@@ -63,6 +69,14 @@ export function mergeProjects(base, local, remote, choices = {}) {
     const key = JSON.stringify(path);
     conflicts.push({ key, path, base: clone(b), local: clone(l), remote: clone(r) });
     return clone(choices[key] === 'ai' ? r : l);
+  }
+  if ([base, local, remote].some(project => project.pages)) {
+    [base, local, remote] = [base, local, remote].map(withPages);
+    const pages = merge(base.pages, local.pages, remote.pages, ['pages']);
+    const startPageId = merge(base.startPageId, local.startPageId, remote.startPageId, ['startPageId']);
+    const active = pages.find(page => page.id === local.activePageId) || pages.find(page => page.id === startPageId) || pages.find(page => page.kind === 'page');
+    if (!active) throw new Error('合并后至少需要一个普通页面');
+    return { project: { version: 1, pages, startPageId, activePageId: active.id, ...pageBoard(active) }, conflicts };
   }
   const project = {};
   for (const key of new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)])) {

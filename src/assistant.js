@@ -79,10 +79,17 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
     $('mergeSummary').textContent = `${pending.summary} · ${result.conflicts.length ? `${result.conflicts.length} 项冲突需要选择` : '没有字段冲突，确认后应用合并结果'}`;
     $('mergeConflicts').replaceChildren();
     const entries = versions.entries;
-    const sourceItems = [...getProject().items, ...entries.find(entry => entry.id === pending.aiId).project.items, ...entries.find(entry => entry.id === pending.baseId).project.items];
+    const sources = [getProject(), entries.find(entry => entry.id === pending.aiId).project, entries.find(entry => entry.id === pending.baseId).project];
+    const sourceItems = sources.flatMap(project => project.pages ? project.pages.flatMap(page => page.items) : project.items);
     for (const conflict of result.conflicts) {
       const row = document.createElement('section'); row.className = 'merge-conflict';
-      const path = conflict.path[0] === 'items' ? [`组件「${sourceItems.find(item => item.id === conflict.path[1])?.name || '未命名'}」`, ...conflict.path.slice(2)] : conflict.path;
+      let path = conflict.path;
+      if (path[0] === 'pages') {
+        const page = sources.flatMap(project => project.pages || []).find(page => page.id === path[1]);
+        path = [`${page?.kind === 'popup' ? '弹窗' : '页面'}「${page?.name || '未命名'}」`, ...path.slice(2)];
+      }
+      const itemIndex = path.indexOf('items');
+      if (itemIndex >= 0) path = [...path.slice(0, itemIndex), `组件「${sourceItems.find(item => item.id === path[itemIndex + 1])?.name || '未命名'}」`, ...path.slice(itemIndex + 2)];
       const titleText = path.map(part => fieldNames[part] || part).join(' / ');
       const title = document.createElement('strong'); title.textContent = titleText;
       const values = document.createElement('div'); values.className = 'merge-values';
@@ -100,7 +107,7 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
   }
   function updateMergePreview() {
     try {
-      $('mergePreview').srcdoc = exportHTML(validate(pendingMerge().project));
+      $('mergePreview').srcdoc = exportHTML(validate(pendingMerge().project), { preview: true });
       $('mergeError').textContent = '';
     } catch (error) { $('mergePreview').removeAttribute('srcdoc'); $('mergeError').textContent = `合并结果不可用：${error.message}`; }
   }
