@@ -40,7 +40,7 @@ export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) 
   if (item.collapseSpace != null && typeof item.collapseSpace !== 'boolean') throw new Error('隐藏布局设置须为布尔值');
   const interaction = normalizeInteraction(item.interaction);
   const width = number(item.width, 100, 1, bounds.width);
-  const height = number(item.height, 40, 1, bounds.height);
+  const height = number(item.height, 40, 1, bounds.maxItemHeight ?? bounds.height);
   const result = {
     ...item, name: String(item.name || '未命名').slice(0, 80), width, height,
     x: number(item.x, bounds.x, bounds.x, bounds.x + bounds.width - width),

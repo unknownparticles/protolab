@@ -164,3 +164,28 @@
   .inspector-column.open{display:flex}
   .inspector-column .properties{position:static;inset:auto;display:flex;box-shadow:none}
 }
+
+/* 顶部应用菜单 */
+.toolbar{min-height:62px;flex-wrap:nowrap;gap:16px;padding:10px 20px}
+.toolbar .brand{flex-shrink:0;margin-right:8px}
+.app-menubar{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.menu-trigger{display:flex;align-items:center;gap:7px;border:0;border-radius:7px;padding:9px 12px;background:transparent;color:var(--secondary);font-size:13px;white-space:nowrap}
+.menu-trigger::after{content:"";width:5px;height:5px;border-right:1px solid var(--muted);border-bottom:1px solid var(--muted);transform:rotate(45deg);margin-top:-3px}
+.menu-trigger:hover,.menu-trigger[aria-expanded="true"]{background:#eff6ff;color:var(--brand)}
+.menu-trigger[aria-expanded="true"]::after{border-color:var(--brand);transform:rotate(225deg);margin-top:3px}
+.menu-dropdown{position:fixed;width:min(260px,calc(100vw - 24px));padding:6px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px #0f172a1a,0 2px 8px #0f172a08;z-index:30;overflow:auto}
+.menu-dropdown button{display:flex;align-items:center;gap:10px;width:100%;min-height:38px;border:0;border-radius:6px;padding:9px 12px;background:transparent;color:var(--secondary);text-align:left;font-size:12px;white-space:nowrap}
+.menu-dropdown button:hover:not(:disabled),.menu-dropdown button:focus-visible{background:#eff6ff;color:var(--brand);outline:none}
+.menu-dropdown button .icon{width:15px;height:15px}
+.menu-dropdown button[aria-checked="true"]{color:var(--brand);background:#eff6ff}
+.menu-dropdown button[aria-checked="true"]::after{content:"✓";margin-left:auto}
+.menu-shortcut{margin-left:auto;color:var(--muted);font-size:10px;white-space:nowrap}
+.menu-label{padding:7px 12px 5px;font-size:10px;color:var(--muted)}
+.menu-separator{height:1px;background:var(--border);margin:5px 6px}
+.toolbar .project-controls{order:initial;width:auto;margin-left:8px;flex-shrink:1}
+.toolbar .project-controls select{width:180px;min-width:90px;max-width:180px;padding:8px 10px;text-overflow:ellipsis}
+.toolbar .toolbar-end{margin-left:auto;align-items:center;flex-wrap:nowrap;gap:16px}
+.toolbar .save-state{margin:0;white-space:nowrap}
+@media(max-width:1199px){.toolbar{gap:10px;padding-inline:14px}.toolbar .brand{margin-right:0}.toolbar .project-controls{margin-left:0}.menu-trigger{padding-inline:10px}}
+@media(max-width:899px){.toolbar .toolbar-end{margin-left:auto}.toolbar .project-controls select{width:150px}.menu-trigger{padding-inline:8px}}
+@media(max-width:599px){.toolbar{flex-wrap:wrap;gap:8px;padding:10px 12px}.toolbar .brand{margin-right:0;font-size:16px}.toolbar .project-controls{flex:1;min-width:0}.toolbar .project-controls select{width:100%;min-width:0;max-width:none}.toolbar .toolbar-end{gap:0}.toolbar .toolbar-end .btn{padding:7px 10px}.app-menubar{order:2;width:100%;gap:4px}.menu-trigger{padding:8px 12px}}

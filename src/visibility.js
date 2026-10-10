@@ -35,5 +35,7 @@ export function expandedY(items, id, displayedY) {
 }
 
 export function visibilityBounds(bounds, items) {
-  return { ...bounds, height: bounds.height + items.filter(item => item.visible === false && item.collapseSpace !== false).reduce((sum, item) => sum + item.height, 0) };
+  const hidden = items.filter(item => item.visible === false && item.collapseSpace !== false);
+  if (!hidden.length) return bounds;
+  return { ...bounds, maxItemHeight: bounds.height, height: bounds.height + hidden.reduce((sum, item) => sum + Math.max(0, Math.min(bounds.height, Number(item.height) || 0)), 0) };
 }

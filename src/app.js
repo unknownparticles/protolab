@@ -21,6 +21,7 @@ import { initializeCollapsible } from './collapsible.js';
 import { attachViewportZoom } from './viewport-zoom.js';
 import { validateGroups, mergeLibrary } from './library-groups.js';
 import { initializeTabs } from './panel-tabs.js';
+import { initializeMenus } from './menus.js';
 
 const $ = id => document.getElementById(id);
 for (const prefix of ['prop', 'custom']) {
@@ -38,6 +39,7 @@ function readOrientationFields(prefix) {
 }
 document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
 initializeCollapsible();
+initializeMenus(document.querySelector('.app-menubar'));
 const setPropertiesTab = initializeTabs(document.querySelector('[aria-label="属性分类"]'), 'data-properties-tab');
 initializeTabs(document.querySelector('[aria-label="设计记录"]'), 'data-activity-tab');
 const sharedStyles = document.createElement('style');
@@ -269,6 +271,8 @@ function setLibraryTab(category, focus = false) {
 }
 function renderProperties() {
   const item = selectedItem();
+  $('menuDuplicateBtn').disabled = !item;
+  $('menuDeleteBtn').disabled = !item;
   $('saveSelectionComponentBtn').disabled = !item;
   $('noSelectionMsg').hidden = !!item;
   $('selectionProps').hidden = !item;
@@ -563,7 +567,7 @@ function renderCanvas() {
   $('canvasWidthInput').value = canvas.width; $('canvasHeightInput').value = canvas.height;
   $('canvasSizeLabel').textContent = $('artboardSize').textContent = `${canvas.width} × ${canvas.height}`;
   $('presetLabel').textContent = `${PRESETS[canvas.preset]?.label || '自定义'} · ${canvas.width > canvas.height ? '横屏' : '竖屏'}`;
-  document.querySelectorAll('[data-preset]').forEach(button => { const active = button.dataset.preset === canvas.preset; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
+  document.querySelectorAll('[data-preset]').forEach(button => { const active = button.dataset.preset === canvas.preset; button.classList.toggle('active', active); button.setAttribute('aria-checked', String(active)); });
   const ids = new Set(project.items.map(item => item.id));
   for (const [id, node] of itemNodes) if (!ids.has(id)) { node.remove(); itemNodes.delete(id); }
   const displayed = visibilityLayout(project.items);
@@ -797,6 +801,8 @@ $('selectionProps').addEventListener('submit', safeAction(async event => {
 }));
 $('deleteItemBtn').addEventListener('click', removeSelected);
 $('duplicateItemBtn').addEventListener('click', safeAction(duplicateSelected));
+$('menuDeleteBtn').addEventListener('click', removeSelected);
+$('menuDuplicateBtn').addEventListener('click', safeAction(duplicateSelected));
 $('undoBtn').addEventListener('click', () => restore('undo')); $('redoBtn').addEventListener('click', () => restore('redo'));
 $('zoomSelect').addEventListener('change', () => { finishGesture(); zoom = Number($('zoomSelect').value); updateZoom(); });
 attachViewportZoom($('canvasViewport'), $('canvasScaler'), {
@@ -814,6 +820,7 @@ function fitCanvas() {
   updateZoom();
 }
 $('fitBtn').addEventListener('click', fitCanvas);
+$('menuFitBtn').addEventListener('click', fitCanvas);
 $('saveBtn').addEventListener('click', () => saveProject());
 $('historyBtn').addEventListener('click', () => { finishGesture(); renderHistory(); });
 $('saveLibBtn').addEventListener('click', () => { finishGesture(); assistant.saveVersion('保存组件库'); if (persistLibrary()) notify('组件库已保存到当前浏览器'); });
@@ -1074,6 +1081,7 @@ document.querySelectorAll('[data-panel]').forEach(button => button.addEventListe
   if (shouldOpen) { panel.classList.add('open'); button.setAttribute('aria-expanded', 'true'); }
 }));
 document.addEventListener('keydown', safeAction(event => {
+  if (event.defaultPrevented) return;
   const command = event.ctrlKey || event.metaKey;
   if (command && event.key.toLowerCase() === 's') { event.preventDefault(); saveProject(); return; }
   if (document.querySelector('dialog[open]') || event.target.closest('input,textarea,select,[contenteditable="true"]')) return;

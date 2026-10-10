@@ -27,14 +27,13 @@ export function initializeMenus(root) {
     menu.style.left = `${Math.max(12, Math.min(bounds.left, window.innerWidth - menu.offsetWidth - 12))}px`;
     menu.style.top = `${bounds.bottom + 8}px`;
     menu.style.maxHeight = `${Math.max(0, window.innerHeight - bounds.bottom - 20)}px`;
-    if (focus) items(index)[focus === 'last' ? 'at' : 'slice'](-1);
     if (focus === 'first') items(index)[0]?.focus();
     if (focus === 'last') items(index).at(-1)?.focus();
   }
   triggers.forEach((trigger, index) => {
-    trigger.addEventListener('click', () => {
+    trigger.addEventListener('click', event => {
       if (opened === index) close(true);
-      else open(index);
+      else open(index, event.detail === 0 ? 'first' : null);
     });
     trigger.addEventListener('pointerenter', event => {
       if (event.pointerType === 'mouse' && opened >= 0 && opened !== index) { open(index); focusTrigger(index); }
