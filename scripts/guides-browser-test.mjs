@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 /** 标尺、网格、多选与对齐的浏览器验收；复用主验收的浏览器配置。 */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -57,11 +58,11 @@ try {
   const firstId = await page.locator('.editor-item').getAttribute('data-item-id');
   const expected = { left: [0, 30], right: [275, 30], top: [275, 0], bottom: [275, 627], centerX: [138, 627], centerY: [138, 314] };
   for (const [direction, point] of Object.entries(expected)) { await align(direction); assert.deepEqual(await position(), point); }
-  await page.locator('#undoBtn').click(); assert.deepEqual(await position(), [138, 627]);
-  await page.locator('#redoBtn').click(); assert.deepEqual(await position(), [138, 314]);
+  await clickAction(page, '#undoBtn'); assert.deepEqual(await position(), [138, 627]);
+  await clickAction(page, '#redoBtn'); assert.deepEqual(await position(), [138, 314]);
   await update({ X: 20, Y: 30 });
   await align('center'); assert.deepEqual(await position(), [138, 314]);
-  await page.locator('#undoBtn').click(); assert.deepEqual(await position(), [20, 30]);
+  await clickAction(page, '#undoBtn'); assert.deepEqual(await position(), [20, 30]);
   await page.locator('#alignReference').selectOption('selection');
   assert.equal(await page.locator('[data-align="center"]').isDisabled(), true);
   await page.locator('#alignReference').selectOption('canvas');
@@ -76,7 +77,7 @@ try {
   const groupExpected = { left: [[20, 30], [20, 200]], right: [[140, 30], [180, 200]], top: [[20, 30], [180, 30]], bottom: [[20, 240], [180, 200]], centerX: [[80, 30], [100, 200]], centerY: [[20, 135], [180, 115]], center: [[80, 135], [100, 115]] };
   for (const [direction, points] of Object.entries(groupExpected)) {
     await align(direction); assert.deepEqual(await positions(), points);
-    await page.locator('#undoBtn').click(); assert.deepEqual(await positions(), [[20, 30], [180, 200]]);
+    await clickAction(page, '#undoBtn'); assert.deepEqual(await positions(), [[20, 30], [180, 200]]);
   }
   await page.locator('#zoomSelect').selectOption('0.5');
   const first = page.locator(`#canvas [data-item-id="${firstId}"]`);
@@ -84,7 +85,7 @@ try {
   await page.mouse.move(box.x + 10, box.y + 10); await page.mouse.down();
   await page.mouse.move(box.x + 35, box.y + 30, { steps: 5 }); await page.mouse.up();
   assert.deepEqual(await positions(), [[70, 70], [230, 240]]);
-  await page.locator('#undoBtn').click(); assert.deepEqual(await positions(), [[20, 30], [180, 200]]);
+  await clickAction(page, '#undoBtn'); assert.deepEqual(await positions(), [[20, 30], [180, 200]]);
   await page.locator('#canvas').focus(); await page.keyboard.press('Shift+ArrowLeft');
   assert.deepEqual(await positions(), [[10, 30], [170, 200]]);
   await page.keyboard.press('Shift+ArrowLeft'); await page.keyboard.press('Shift+ArrowLeft');
@@ -118,7 +119,7 @@ try {
   const preview = page.frameLocator('#previewFrame'); await preview.locator('.prototype').waitFor();
   assert.equal(await preview.locator('.canvas-grid,.canvas-ruler').count(), 0);
   await page.locator('[data-close="previewDialog"]').click();
-  const downloading = page.waitForEvent('download'); await page.locator('#exportHtmlBtn').click();
+  const downloading = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
   const downloaded = await downloading; const html = await readFile(await downloaded.path(), 'utf8');
   assert.doesNotMatch(html, /canvas-grid|canvas-ruler|data-align/);
   await page.screenshot({ path: resolve(output, 'guides-desktop.png') });

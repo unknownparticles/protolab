@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 /** 多页、弹窗、点击动作与工程往返的独立浏览器验收。 */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -85,7 +86,7 @@ try {
 
   await selectPage(details); await renamePage('详情首页', true);
   await selectPage('page-home');
-  const downloading = async id => { const event = page.waitForEvent('download'); await page.locator(`#${id}`).click(); return readFile(await (await event).path(), 'utf8'); };
+  const downloading = async id => { const event = page.waitForEvent('download'); await clickAction(page, `#${id}`); return readFile(await (await event).path(), 'utf8'); };
   const json = await downloading('exportProjectBtn'); const bundle = JSON.parse(json);
   assert.equal(bundle.project.pages.length, 3); assert.equal(bundle.project.startPageId, details);
   const html = await downloading('exportHtmlBtn');
@@ -100,7 +101,7 @@ try {
   await exported.locator('#prototypeRestart').click();
   assert.equal(await exported.locator('[data-prototype-page]:not([hidden])').getAttribute('data-prototype-page'), details);
   const importFile = async (name, value) => {
-    await page.locator('#importProjectBtn').click();
+    await clickAction(page, '#importProjectBtn');
     await page.locator('#projectFileInput').setInputFiles({ name, mimeType: name.endsWith('.json') ? 'application/json' : 'text/html', buffer: Buffer.from(value) });
     await page.locator('#applyProjectImportBtn').click(); await page.locator('#projectDialog').waitFor({ state: 'hidden' });
   };
@@ -120,10 +121,10 @@ try {
   await selectPage(details); await page.locator('#layerList button').filter({ hasText: '显示确认框' }).click();
   assert.equal(await page.locator('#propClickAction').inputValue(), 'none');
   // 删除后已回到设定首页；一次撤销恢复弹窗与关联动作。
-  await page.locator('#undoBtn').click();
+  await clickAction(page, '#undoBtn');
   assert.equal(await page.locator(`[data-page-id="${popupId}"]`).count(), 1);
-  await page.locator('#redoBtn').click(); assert.equal(await page.locator(`[data-page-id="${popupId}"]`).count(), 0);
-  await page.locator('#undoBtn').click();
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator(`[data-page-id="${popupId}"]`).count(), 0);
+  await clickAction(page, '#undoBtn');
   await selectPage(details); await page.locator('#layerList button').filter({ hasText: '显示确认框' }).click();
   assert.equal(await page.locator('#propClickAction').inputValue(), 'openPopup');
   assert.equal(await page.locator('#propClickTarget').inputValue(), popupId);
@@ -134,7 +135,7 @@ try {
   const baseline = await savedProject();
   const damaged = structuredClone(bundle); damaged.project.pages[1].items[0].interaction = { type: 'openPopup', targetId: 'missing' };
   // 校验未编辑页的数据，失败后保留整个工程。
-  await page.locator('#importProjectBtn').click();
+  await clickAction(page, '#importProjectBtn');
   await page.locator('#projectFileInput').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(damaged)) });
   await page.locator('#applyProjectImportBtn').click();
   await page.waitForFunction(() => !document.getElementById('applyProjectImportBtn').disabled);

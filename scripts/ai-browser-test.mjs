@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -33,7 +34,7 @@ try {
     assert.equal(project.version, 1);
   });
   await page.goto(base);
-  await page.locator('#settingsBtn').click();
+  await clickAction(page, '#settingsBtn');
   await page.locator('#aiURL').fill('https://ai.example.test/v1');
   await page.locator('#aiKey').fill('mock-secret'); await page.locator('#aiModel').fill('test-model');
   await page.locator('#aiSettingsForm button[type=submit]').click();
@@ -41,12 +42,12 @@ try {
   await page.locator('[data-comp-id="lib-btn"]').click();
   const initialId = await page.locator('.editor-item').getAttribute('data-item-id');
   const send = async requirement => {
-    if (await page.locator('#aiPanel').isHidden()) await page.locator('#aiToggleBtn').click();
+    if (await page.locator('#aiPanel').isHidden()) await clickAction(page, '#aiToggleBtn');
     await page.locator('#aiRequirement').fill(requirement); await page.locator('#aiSendBtn').click();
   };
   const waitDone = () => page.waitForFunction(() => document.getElementById('aiCancelBtn').hidden);
   await page.locator('#canvas').focus(); await page.keyboard.press('ArrowRight');
-  await page.locator('#undoBtn').click(); await page.locator('#redoBtn').click();
+  await clickAction(page, '#undoBtn'); await clickAction(page, '#redoBtn');
   await page.waitForTimeout(350);
   const versionCount = () => page.evaluate(() => JSON.parse(localStorage.getItem('protolab.projects.v1')).entries[0].workspace.versions.entries.length);
   assert.equal(await versionCount(), 1);
@@ -57,7 +58,7 @@ try {
   await page.locator('#historyList .version-row').first().locator('button').click();
   assert.equal(await page.locator('.editor-item').count(), 1);
   await page.locator('[data-close="historyDialog"]').click();
-  await page.locator('#saveBtn').click(); assert.equal(await versionCount(), 2);
+  await clickAction(page, '#saveBtn'); assert.equal(await versionCount(), 2);
   await page.locator('#componentSearch').focus(); await page.keyboard.press('Control+s'); assert.equal(await versionCount(), 3);
   await page.keyboard.press('Meta+s'); assert.equal(await versionCount(), 4);
   console.log('通过：逐步历史可撤回重做，自动保存不生成版本，保存按钮及两种快捷键各生成版本');
@@ -90,9 +91,9 @@ try {
   await page.locator('[data-item-id="ai-heading"].editor-item').click();
   await page.locator('#propName').fill('本地名称'); await page.locator('#selectionProps button[type=submit]').click();
   release(); await waitDone();
-  await page.locator('#settingsBtn').click(); await page.locator('#aiRememberKey').check(); await page.locator('#aiSettingsForm button[type=submit]').click();
+  await clickAction(page, '#settingsBtn'); await page.locator('#aiRememberKey').check(); await page.locator('#aiSettingsForm button[type=submit]').click();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('protolab.workspace.v1'))?.pending);
-  await page.reload(); await page.locator('#aiToggleBtn').click();
+  await page.reload(); await clickAction(page, '#aiToggleBtn');
   assert.equal(await page.locator('#aiPending').isVisible(), true);
   await page.locator('#mergeOpenBtn').click();
   assert.equal(await page.locator('.merge-conflict').count(), 1);
@@ -132,7 +133,7 @@ try {
   await page.waitForFunction(size => document.querySelectorAll('.version-row').length === size, data.versions.entries.length * 2);
   await page.waitForTimeout(350); await page.reload();
   assert.equal(await page.locator('.editor-item').count(), 1);
-  await page.locator('#aiToggleBtn').click();
+  await clickAction(page, '#aiToggleBtn');
   assert.match(await page.locator('#aiMessages').textContent(), /新增标题/);
   console.log('通过：历史回退、保留分支、刷新及无 Key 备份导入导出');
   await page.setViewportSize({ width: 390, height: 844 });

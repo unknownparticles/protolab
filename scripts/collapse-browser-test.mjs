@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 /** 验证收起后的编辑状态、原生校验和窄屏入口。 */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -60,7 +61,7 @@ try {
   await page.locator('#vectorTab').click(); await roundTrip('vectorPanel');
   await page.locator('#customTab').click(); await roundTrip('customPanel');
   await page.locator('#basicTab').click();
-  await page.locator('#aiToggleBtn').click();
+  await clickAction(page, '#aiToggleBtn');
   await roundTrip('ai-history'); await roundTrip('ai-task');
   await page.locator('#aiRequirement').fill('保留需求草稿');
   await toggle('ai-task').click(); await toggle('ai-task').click();
@@ -68,7 +69,7 @@ try {
   await page.locator('#aiCloseBtn').click();
 
   for (const id of ['libraryPanel', 'propertiesPanel', 'aiPanel']) {
-    if (id === 'aiPanel') await page.locator('#aiToggleBtn').click();
+    if (id === 'aiPanel') await clickAction(page, '#aiToggleBtn');
     const panel = page.locator(`#${id}`), button = panel.locator('.panel-toggle');
     await button.click(); assert.equal(await button.getAttribute('aria-expanded'), 'false');
     assert.equal(await panel.evaluate(node => node.getBoundingClientRect().width), 44);

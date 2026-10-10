@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 /** 多页、弹窗、点击动作与工程往返的独立浏览器验收。 */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -30,7 +31,7 @@ try {
     { id: 'details', name: '详情', kind: 'page', canvas, frame, items: [item('open', '<button>打开弹窗</button>', 40, 40, 180, 60, { interaction: { type: 'openPopup', targetId: 'popup' } })] },
     { id: 'popup', name: '确认', kind: 'popup', canvas: { width: 320, height: 240, preset: 'custom' }, frame, items: [item('popup-text', '<span>弹窗文字</span>', 40, 60, 180, 60)] }
   ] };
-  await page.locator('#importProjectBtn').click();
+  await clickAction(page, '#importProjectBtn');
   await page.locator('#projectFileInput').setInputFiles({ name: '预览测试.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
   await page.locator('#applyProjectImportBtn').click();
   await page.locator('#projectDialog').waitFor({ state: 'hidden' });
@@ -101,15 +102,15 @@ try {
   await preview.locator('[data-name="popup-text"]').click(); await drag('e', 20, 0);
   await preview.locator('[data-name="popup-text"]').evaluate(node => new Promise(resolve => { const timer = setInterval(() => { if (node.style.width === '200px') { clearInterval(timer); resolve(); } }, 10); }));
   await page.locator('[data-close="previewDialog"]').click();
-  await page.locator('#undoBtn').click();
-  const undoneEvent = page.waitForEvent('download'); await page.locator('#exportProjectBtn').click();
+  await clickAction(page, '#undoBtn');
+  const undoneEvent = page.waitForEvent('download'); await clickAction(page, '#exportProjectBtn');
   const undone = JSON.parse(await readFile(await (await undoneEvent).path(), 'utf8')).project;
   assert.equal(undone.pages.find(page => page.id === 'popup').items[0].width, 180);
   assert.match(undone.pages.find(page => page.id === 'popup').items[0].content, /新弹窗文字/);
-  await page.locator('#redoBtn').click();
+  await clickAction(page, '#redoBtn');
   await page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await page.reload();
-  const event = page.waitForEvent('download'); await page.locator('#exportProjectBtn').click();
+  const event = page.waitForEvent('download'); await clickAction(page, '#exportProjectBtn');
   const exported = JSON.parse(await readFile(await (await event).path(), 'utf8')).project;
   assert.equal(exported.activePageId, 'home');
   assert.match(exported.items.find(item => item.id === 'card').content, /恢复标题/);
@@ -117,7 +118,7 @@ try {
   assert.match(exported.pages.find(page => page.id === 'details').items[0].content, /新的弹窗按钮/);
   assert.match(exported.pages.find(page => page.id === 'popup').items[0].content, /新弹窗文字/);
   assert.equal(exported.pages.find(page => page.id === 'popup').items[0].width, 200);
-  const htmlEvent = page.waitForEvent('download'); await page.locator('#exportHtmlBtn').click();
+  const htmlEvent = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
   const html = await readFile(await (await htmlEvent).path(), 'utf8');
   const standalone = await context.newPage(); await standalone.setContent(html);
   assert.equal(await standalone.locator('.preview-edit-tools').count(), 0);

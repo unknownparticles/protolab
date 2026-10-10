@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 /** 组件分类、文本、图片、样式和持久化的浏览器验收。 */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -46,8 +47,8 @@ try {
   assert.equal(await selected().locator('button').textContent(), '确认 <安全文本>');
   assert.deepEqual(await selected().evaluate(node => { const style = getComputedStyle(node), text = getComputedStyle(node.querySelector('button')); return [style.width, style.height, style.padding, getComputedStyle(node.firstElementChild).margin, style.opacity, text.fontSize, text.fontWeight, text.color, text.backgroundColor, text.fontFamily]; }), ['180px', '70px', '1px 2px 3px 4px', '5px 6px 7px 8px', '0.55', '22px', '700', 'rgb(171, 205, 239)', 'rgb(18, 52, 86)', 'serif']);
   await page.screenshot({ path: resolve(output, 'properties-text.png') });
-  await page.locator('#undoBtn').click(); assert.equal(await selected().locator('button').textContent(), '按钮');
-  await page.locator('#redoBtn').click(); assert.equal(await selected().locator('button').textContent(), '确认 <安全文本>');
+  await clickAction(page, '#undoBtn'); assert.equal(await selected().locator('button').textContent(), '按钮');
+  await clickAction(page, '#redoBtn'); assert.equal(await selected().locator('button').textContent(), '确认 <安全文本>');
   await saved(); await page.reload(); await page.locator('#layerList button').first().click();
   assert.equal(await page.locator('#propFontSize').inputValue(), '22');
   console.log('通过：宽高、四边间距、颜色、字体、字号、字重、透明度及撤销刷新');
@@ -102,7 +103,7 @@ try {
   assert.equal(await selected().evaluate(node => getComputedStyle(node).mixBlendMode), 'multiply');
   for (const fit of ['fill', 'contain', 'none', 'scale-down']) { await page.locator('#propImageFit').selectOption(fit); await apply(); assert.equal(await selected().locator('img').evaluate(node => getComputedStyle(node).objectFit), fit); }
   await page.screenshot({ path: resolve(output, 'properties-image.png') });
-  await page.locator('#undoBtn').click(); await page.locator('#redoBtn').click();
+  await clickAction(page, '#undoBtn'); await clickAction(page, '#redoBtn');
   await custom('多图片卡片', `<div style="width:100%;height:100%"><span>图片说明</span><img alt="首图" src="${smallSource}" style="width:40%;height:60px"><img alt="次图" src="${smallSource}" style="width:40%;height:60px"></div>`);
   assert.equal(await page.locator('#propImageTarget option').count(), 2);
   const replacement = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = 2; canvas.height = 2; return canvas.toDataURL('image/png'); });
@@ -116,11 +117,11 @@ try {
   console.log('通过：大于标记长度限制的图片上传、全部填充模式、混合模式和多图独立替换');
 
   await saved();
-  const downloadEvent = page.waitForEvent('download'); await page.locator('#exportProjectBtn').click();
+  const downloadEvent = page.waitForEvent('download'); await clickAction(page, '#exportProjectBtn');
   const json = await readFile(await (await downloadEvent).path(), 'utf8');
   const exported = JSON.parse(json); assert.ok(exported.project.items.some(item => item.appearance?.blendMode === 'multiply'));
   await page.reload();
-  await page.locator('#importProjectBtn').click(); await page.locator('#projectFileInput').setInputFiles({ name: 'properties.json', mimeType: 'application/json', buffer: Buffer.from(json) });
+  await clickAction(page, '#importProjectBtn'); await page.locator('#projectFileInput').setInputFiles({ name: 'properties.json', mimeType: 'application/json', buffer: Buffer.from(json) });
   await page.locator('#applyProjectImportBtn').click(); await page.locator('#projectDialog').waitFor({ state: 'hidden' });
   await page.locator('#previewBtn').click();
   const preview = page.frameLocator('#previewFrame');
@@ -128,7 +129,7 @@ try {
   assert.equal(await preview.locator('[data-name="图片占位"] img').getAttribute('src'), smallSource);
   assert.equal(await preview.locator('[data-name="图片占位"]').evaluate(node => getComputedStyle(node).mixBlendMode), 'multiply');
   await page.locator('[data-close="previewDialog"]').click();
-  const htmlEvent = page.waitForEvent('download'); await page.locator('#exportHtmlBtn').click();
+  const htmlEvent = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
   const html = await readFile(await (await htmlEvent).path(), 'utf8');
   const exportedPage = await browser.newPage(); await exportedPage.setContent(html);
   assert.equal(await exportedPage.locator('[data-name="图片占位"] img').evaluate(node => getComputedStyle(node).objectFit), 'scale-down');

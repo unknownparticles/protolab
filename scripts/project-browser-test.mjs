@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -21,7 +22,7 @@ try {
   await page.goto(base); await page.locator('[data-comp-id="lib-btn"]').click();
   const savedProject = () => page.evaluate(() => { const { savedAt, ...value } = JSON.parse(localStorage.getItem('protolab.project.v1')); return value; });
   const importFile = async (name, text, width = '600', height = '400') => {
-    await page.locator('#importProjectBtn').click();
+    await clickAction(page, '#importProjectBtn');
     await page.locator('#projectFileInput').setInputFiles({ name, mimeType: name.endsWith('.json') ? 'application/json' : 'text/html', buffer: Buffer.from(text) });
     await page.locator('#importWidth').fill(width); await page.locator('#importHeight').fill(height);
     await page.locator('#applyProjectImportBtn').click();
@@ -53,8 +54,8 @@ try {
   await reference.screenshot({ path: resolve(output, 'project-source.png') });
   await page.screenshot({ path: resolve(output, 'project-imported.png') });
   const count = await page.locator('.editor-item').count();
-  await page.locator('#undoBtn').click(); assert.equal(await page.locator('.editor-item').count(), 1);
-  await page.locator('#redoBtn').click(); assert.equal(await page.locator('.editor-item').count(), count);
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('.editor-item').count(), 1);
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('.editor-item').count(), count);
   await page.locator('.editor-item').filter({ has: page.locator('button') }).click();
   const x = Number(await page.locator('#propX').inputValue());
   await page.locator('#canvas').focus(); await page.keyboard.press('ArrowRight');
@@ -64,10 +65,10 @@ try {
   // 工程包含自定义组件及设备设置，导出的 HTML 也可恢复精确模型。
   await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('工程自定义组件');
   await page.locator('#customCode').fill('<div>工程片段</div>'); await page.locator('#componentForm button[type="submit"]').click();
-  const jsonDownload = page.waitForEvent('download'); await page.locator('#exportProjectBtn').click();
+  const jsonDownload = page.waitForEvent('download'); await clickAction(page, '#exportProjectBtn');
   const jsonFile = await jsonDownload; const json = await readFile(await jsonFile.path(), 'utf8');
   const bundle = JSON.parse(json); assert.equal(bundle.components.length, 1);
-  const htmlDownload = page.waitForEvent('download'); await page.locator('#exportHtmlBtn').click();
+  const htmlDownload = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
   const htmlFile = await htmlDownload; const html = await readFile(await htmlFile.path(), 'utf8');
   await importFile('project.json', json); await page.waitForFunction(() => !document.getElementById('projectDialog').open);
   let saved = await savedProject();

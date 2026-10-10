@@ -3,13 +3,14 @@ import { normalizeFrame } from './frames.js';
 import { withPages } from './pages.js';
 import { createVersions, validateWorkspace } from './versions.js';
 import { validateGroups } from './library-groups.js';
+import { normalizeDesign } from './project-design.js';
 
 export const PROJECTS_KEY = 'protolab.projects.v1';
 export const MAX_PROJECTS = 50;
 export function projectDetails(raw = {}) {
   if (typeof raw.name !== 'string' || !raw.name.trim() || raw.name.trim().length > 40) throw new Error('工程名称请输入 1～40 个字符');
   if (typeof (raw.rules ?? '') !== 'string' || (raw.rules || '').length > 10000) throw new Error('工程规范不能超过 10000 个字符');
-  return { name: raw.name.trim(), rules: (raw.rules || '').trim() };
+  return { name: raw.name.trim(), rules: (raw.rules || '').trim(), design: normalizeDesign(raw.design) };
 }
 export function emptyProject(preset = 'phone') {
   if (!PRESETS[preset]) throw new Error('请选择有效的设备尺寸');

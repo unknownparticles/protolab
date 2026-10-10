@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 /** 方向切换、组件响应及工程往返的独立浏览器验收。 */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -32,15 +33,15 @@ try {
   await page.locator('#selectionProps button[type="submit"]').click();
   const geometry = async () => page.locator('.editor-item').evaluateAll(nodes => nodes.map(node => [node.style.left, node.style.top, node.style.width, node.style.height]));
   const initial = await geometry();
-  await page.locator('#rotateBtn').click();
+  await clickAction(page, '#rotateBtn');
   assert.equal(await page.locator('#canvasHeightInput').inputValue(), '375');
   assert.deepEqual(await geometry(), initial);
   await page.locator('#propName').fill('底部固定组件已改名');
   await page.locator('#selectionProps button[type="submit"]').click();
   assert.deepEqual(await geometry(), initial);
-  await page.locator('#rotateBtn').click(); assert.deepEqual(await geometry(), initial);
-  await page.locator('#undoBtn').click(); assert.equal(await page.locator('#canvasHeightInput').inputValue(), '375');
-  await page.locator('#redoBtn').click(); assert.equal(await page.locator('#canvasHeightInput').inputValue(), '667');
+  await clickAction(page, '#rotateBtn'); assert.deepEqual(await geometry(), initial);
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#canvasHeightInput').inputValue(), '375');
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#canvasHeightInput').inputValue(), '667');
   console.log('通过：启用安全区的边缘组件保留坐标、尺寸，切换、属性编辑及撤销重做不重排');
 
   await page.locator('[data-comp-id="lib-btn"]').click();
@@ -56,7 +57,7 @@ try {
   await page.locator('#customList .component-item').click();
   assert.equal(await page.locator('#propLandscapeAction').inputValue(), 'hide');
   const portraitGeometry = await geometry();
-  await page.locator('#rotateBtn').click();
+  await clickAction(page, '#rotateBtn');
   assert.deepEqual(await geometry(), portraitGeometry);
   const rotating = page.locator('.editor-item').nth(1), hidden = page.locator('.editor-item').nth(2);
   assert.equal(await rotating.evaluate(node => node.style.transform), 'rotate(90deg)');
@@ -67,8 +68,8 @@ try {
   await page.locator('#propOrientationEnabled').uncheck();
   await page.locator('#selectionProps button[type="submit"]').click();
   assert.equal(await hidden.isVisible(), true);
-  await page.locator('#undoBtn').click(); assert.equal(await hidden.isVisible(), false);
-  await page.locator('#redoBtn').click(); assert.equal(await hidden.isVisible(), true);
+  await clickAction(page, '#undoBtn'); assert.equal(await hidden.isVisible(), false);
+  await clickAction(page, '#redoBtn'); assert.equal(await hidden.isVisible(), true);
   await page.locator('#propOrientationEnabled').check();
   await page.locator('#selectionProps button[type="submit"]').click();
   await page.locator('#layerList .layer-item').filter({ hasText: '方向旋转组件' }).click();
@@ -80,9 +81,9 @@ try {
   }
   await page.locator('#propPortraitAction').selectOption('hide');
   await page.locator('#selectionProps button[type="submit"]').click();
-  await page.locator('#rotateBtn').click();
+  await clickAction(page, '#rotateBtn');
   assert.equal(await rotating.isVisible(), false); assert.equal(await hidden.isVisible(), true);
-  await page.locator('#rotateBtn').click();
+  await clickAction(page, '#rotateBtn');
   assert.equal(await rotating.isVisible(), true); assert.equal(await hidden.isVisible(), false);
   console.log('通过：新建组件继承响应，分别设置横竖屏旋转和隐藏，图层修改隐藏组件，关闭及历史恢复');
 
@@ -99,7 +100,7 @@ try {
   assert.equal(await preview.locator('.prototype-item').nth(2).isVisible(), false);
   await page.locator('[data-close="previewDialog"]').click();
   const downloadFile = async id => {
-    const downloading = page.waitForEvent('download'); await page.locator(`#${id}`).click();
+    const downloading = page.waitForEvent('download'); await clickAction(page, `#${id}`);
     return readFile(await (await downloading).path(), 'utf8');
   };
   const html = await downloadFile('exportHtmlBtn');
@@ -111,7 +112,7 @@ try {
   assert.deepEqual(library.components.find(component => component.name === '横屏隐藏卡片').orientationResponse, { enabled: true, portrait: 'none', landscape: 'hide' });
   const projectJSON = await downloadFile('exportProjectBtn');
   const importFile = async (name, mimeType, value) => {
-    await page.locator('#importProjectBtn').click();
+    await clickAction(page, '#importProjectBtn');
     await page.locator('#projectFileInput').setInputFiles({ name, mimeType, buffer: Buffer.from(value) });
     await page.locator('#applyProjectImportBtn').click();
     await page.locator('#projectDialog').waitFor({ state: 'hidden' });
@@ -121,10 +122,10 @@ try {
   };
   await importFile('方向工程.json', 'application/json', projectJSON);
   await importFile('方向原型.html', 'text/html', html);
-  await page.locator('#rotateBtn').click();
+  await clickAction(page, '#rotateBtn');
   assert.deepEqual(await geometry(), portraitGeometry);
   assert.equal(await rotating.isVisible(), false); assert.equal(await hidden.isVisible(), true);
-  await page.locator('#rotateBtn').click();
+  await clickAction(page, '#rotateBtn');
   await page.locator('#layerList .layer-item').filter({ hasText: '方向旋转组件' }).click();
   await page.screenshot({ path: resolve(output, 'orientation-editor.png') });
   console.log('通过：刷新、预览、独立 HTML 导出、组件库数据、工程 JSON / HTML 往返及方向恢复');

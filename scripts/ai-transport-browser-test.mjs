@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -30,10 +31,10 @@ try {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ version: 1, summary: '已新增标题', changes: [{ op: 'add', item: { id: 'transport-title', name: '标题', type: 'html', content: '<h1>标题</h1>', x: 20, y: 20, width: 200, height: 50 } }] }) } }] }) });
   });
   await page.goto('https://protolab.example.test/');
-  await page.locator('#settingsBtn').click();
+  await clickAction(page, '#settingsBtn');
   assert.equal(await page.locator('#aiURL').inputValue(), 'https://ai.example.test/v1');
   await page.locator('[data-close="settingsDialog"]').first().click();
-  await page.locator('#aiToggleBtn').click();
+  await clickAction(page, '#aiToggleBtn');
   const send = async () => {
     await page.locator('#aiRequirement').fill('新增标题');
     await page.locator('#aiSendBtn').click();
@@ -44,7 +45,7 @@ try {
   assert.equal(sent.headers().authorization, 'Bearer mock-secret');
   assert.equal(await page.locator('.editor-item').count(), 1);
   console.log('通过：HTTPS 页面读取旧 HTTP 设置，使用 HTTPS 携带鉴权请求并应用 AI 结果');
-  await page.locator('#settingsBtn').click();
+  await clickAction(page, '#settingsBtn');
   await page.locator('#aiURL').fill('http://ai.example.test/v1');
   await page.locator('#aiSettingsForm button[type=submit]').click();
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.ai.settings.v1')).url), 'https://ai.example.test/v1');
@@ -61,7 +62,7 @@ try {
     sent = route.request();
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ version: 1, summary: '已更新标题', changes: [{ op: 'update', id: 'transport-title', fields: { name: 'DeepSeek 标题' } }] }) } }] }) });
   });
-  await page.locator('#settingsBtn').click();
+  await clickAction(page, '#settingsBtn');
   await page.locator('#aiRememberKey').check();
   await page.locator('#aiDeepSeekBtn').click();
   assert.equal(await page.locator('#aiURL').inputValue(), 'https://api.deepseek.com/v1');
@@ -69,7 +70,7 @@ try {
   assert.equal(await page.locator('#aiKey').inputValue(), '');
   assert.equal(await page.locator('#aiRememberKey').isChecked(), false);
   await page.locator('[data-close="settingsDialog"]').first().click();
-  await page.locator('#settingsBtn').click();
+  await clickAction(page, '#settingsBtn');
   assert.equal(await page.locator('#aiURL').inputValue(), 'https://ai.example.test/v1');
   assert.equal(await page.locator('#aiKey').inputValue(), 'mock-secret');
   await page.locator('#aiDeepSeekBtn').click();

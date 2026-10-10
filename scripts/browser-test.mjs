@@ -1,3 +1,4 @@
+import { clickAction } from './browser-actions.mjs';
 /** 可选端到端验收；本地安装 playwright 或通过环境变量指定已安装模块。 */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -51,8 +52,8 @@ try {
 
   await page.locator('#canvas').focus(); await page.keyboard.press('ArrowRight'); await page.keyboard.press('Shift+ArrowDown');
   assert.equal(await page.locator('#propX').inputValue(), '1'); assert.equal(await page.locator('#propY').inputValue(), '10');
-  await page.locator('#undoBtn').click(); assert.equal(await page.locator('#propY').inputValue(), '0');
-  await page.locator('#redoBtn').click(); assert.equal(await page.locator('#propY').inputValue(), '10');
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#propY').inputValue(), '0');
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#propY').inputValue(), '10');
   await page.locator('#duplicateItemBtn').click(); assert.equal(await page.locator('.editor-item').count(), 2);
   await page.locator('#deleteItemBtn').click(); assert.equal(await page.locator('.editor-item').count(), 1);
   console.log('通过：微调、撤销、重做、复制、删除');
@@ -70,13 +71,13 @@ try {
   console.log('通过：缩放后的拖动与库组件放置');
 
   await page.locator('#canvasWidthInput').fill('432'); await page.locator('#canvasHeightInput').fill('876');
-  await page.locator('#applyCanvasSizeBtn').click(); await page.locator('#rotateBtn').click();
+  await page.locator('#applyCanvasSizeBtn').click(); await clickAction(page, '#rotateBtn');
   assert.equal(await page.locator('#canvasWidthInput').inputValue(), '876');
   assert.equal(await page.locator('#canvasHeightInput').inputValue(), '432');
-  await page.locator('#rotateBtn').click();
-  await page.locator('[data-preset="pc"]').click();
+  await clickAction(page, '#rotateBtn');
+  await clickAction(page, '[data-preset="pc"]');
   assert.match(await page.locator('#presetLabel').textContent(), /横屏/);
-  await page.locator('[data-preset="phone"]').click();
+  await clickAction(page, '[data-preset="phone"]');
   await page.locator('#zoomSelect').selectOption('1');
   console.log('通过：预设、自定义与旋转');
 
@@ -90,23 +91,23 @@ try {
   await page.locator('#navigationStyle').selectOption('buttons');
   assert.match(await page.locator('.device-status').textContent(), /13:20.*67%/);
   assert.equal(await page.locator('.device-navigation.buttons').count(), 1);
-  await page.locator('#undoBtn').click(); assert.equal(await page.locator('.device-navigation').count(), 0);
-  await page.locator('#redoBtn').click(); assert.equal(await page.locator('.device-navigation.buttons').count(), 1);
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('.device-navigation').count(), 0);
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('.device-navigation.buttons').count(), 1);
   await page.locator('#navigationStyle').selectOption('gesture');
   assert.equal(await page.locator('.device-gesture').count(), 1);
-  await page.locator('[data-preset="tablet"]').click();
+  await clickAction(page, '[data-preset="tablet"]');
   for (const style of ['modern', 'classic']) {
     await page.locator('#frameStyle').selectOption(style);
     assert.equal(await page.locator(`#deviceShell.tablet-${style}`).count(), 1);
     assert.equal(await page.locator('.device-status').count(), 1);
   }
-  await page.locator('[data-preset="pc"]').click();
+  await clickAction(page, '[data-preset="pc"]');
   for (const style of ['monitor', 'laptop', 'browser']) {
     await page.locator('#frameStyle').selectOption(style);
     assert.equal(await page.locator(`#deviceShell.pc-${style}`).count(), 1);
     assert.equal(await page.locator('.device-status,.device-navigation').count(), 0);
   }
-  await page.locator('[data-preset="phone"]').click();
+  await clickAction(page, '[data-preset="phone"]');
   await page.locator('#frameStyle').selectOption('none');
   assert.equal(await page.locator('#deviceShell').evaluate(element => element.clientWidth), 375);
   await page.locator('#frameStyle').selectOption('custom');
@@ -120,8 +121,8 @@ try {
   assert.equal(await page.locator('#deviceShell').evaluate(element => element.clientHeight), 701);
   assert.equal(await page.locator('#deviceShell script,#deviceShell style,#deviceShell [onclick]').count(), 0);
   assert.match(await page.locator('.device-decoration').textContent(), /自定义外框/);
-  await page.locator('#undoBtn').click(); assert.equal(await page.locator('#frameStyle').inputValue(), 'none');
-  await page.locator('#redoBtn').click(); assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#frameStyle').inputValue(), 'none');
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
   await page.locator('#editFrameBtn').click(); await page.locator('[data-close="frameDialog"]').first().click();
   assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
   console.log('通过：各设备外框、系统栏、时间电量、自定义 HTML 清理、留白和撤销重做');
@@ -177,7 +178,7 @@ try {
   assert.match(await preview.locator('.device-status').textContent(), /13:20.*67%/);
   assert.equal(await preview.locator('.device-shell').evaluate(element => element.clientWidth), 409);
   await page.locator('[data-close="previewDialog"]').click();
-  const prototypeDownload = page.waitForEvent('download'); await page.locator('#exportHtmlBtn').click();
+  const prototypeDownload = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
   const prototypeFile = await prototypeDownload;
   const prototype = await readFile(await prototypeFile.path(), 'utf8');
   const exported = await context.newPage(); await exported.setContent(prototype);
@@ -256,13 +257,13 @@ try {
   }
   await controls.locator('#cameraStyle').selectOption('none');
   assert.equal(await controls.locator('.device-cutout').count(), 0);
-  await controls.locator('#undoBtn').click(); assert.equal(await controls.locator('#cameraStyle').inputValue(), 'punch-left');
-  await controls.locator('#redoBtn').click(); assert.equal(await controls.locator('.device-cutout').count(), 0);
+  await clickAction(controls, '#undoBtn'); assert.equal(await controls.locator('#cameraStyle').inputValue(), 'punch-left');
+  await clickAction(controls, '#redoBtn'); assert.equal(await controls.locator('.device-cutout').count(), 0);
   await controls.locator('#cameraStyle').selectOption('notch');
-  await controls.locator('#rotateBtn').click();
+  await clickAction(controls, '#rotateBtn');
   assert.equal(await controls.locator('.device-cutout.notch.landscape').count(), 1);
   assert.equal(await controls.locator('.device-cutout').evaluate(element => element.offsetLeft), 0);
-  await controls.locator('#rotateBtn').click();
+  await clickAction(controls, '#rotateBtn');
   await controls.locator('#frameStyle').selectOption('classic');
   assert.equal(await controls.locator('.device-cutout').count(), 0);
   await controls.locator('#frameStyle').selectOption('modern');
@@ -272,7 +273,7 @@ try {
   await controls.locator('#previewBtn').click();
   assert.equal(await controls.frameLocator('#previewFrame').locator('.device-cutout.notch').count(), 1);
   await controls.locator('[data-close="previewDialog"]').click();
-  const cameraDownload = controls.waitForEvent('download'); await controls.locator('#exportHtmlBtn').click();
+  const cameraDownload = controls.waitForEvent('download'); await clickAction(controls, '#exportHtmlBtn');
   const cameraFile = await cameraDownload;
   const cameraExport = await controlsContext.newPage(); await cameraExport.setContent(await readFile(await cameraFile.path(), 'utf8'));
   assert.equal(await cameraExport.locator('.device-cutout.notch').count(), 1);

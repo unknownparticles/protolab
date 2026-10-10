@@ -17,6 +17,7 @@ import { snapItems } from './snapping.js';
 import { createAssistant } from './assistant.js';
 import { INTERACTIONS, PAGE_KINDS, activePage, withPages, switchPage, addPage, deletePage, normalizeInteraction, pageBoard, copyItems, cleanVisibilityTargets } from './pages.js';
 import { PROJECTS_KEY, emptyProject, projectRecord, projectDetails, validateProjects, saveActiveProject, activateProject, appendProject } from './projects.js';
+import { COLOR_ROLES, PALETTES, normalizeDesign, linkedComponents, libraryManifest, designAssets } from './project-design.js';
 import { initializeCollapsible } from './collapsible.js';
 import { attachViewportZoom } from './viewport-zoom.js';
 import { validateGroups, mergeLibrary } from './library-groups.js';
@@ -131,7 +132,8 @@ try {
   if (catalog) { project = currentRecord().project; library = completeLibrary(currentRecord().library); libraryGroups = currentRecord().libraryGroups; initialSavedAt = null; }
 } catch { catalogReadable = false; startupWarnings.push('工程列表读取失败，原始数据已保留；请备份本地数据后恢复，暂不允许新建或切换工程'); }
 const assistant = createAssistant({
-  initial: project, initialSavedAt, initialWorkspace: currentRecord()?.workspace, getProject: () => project, getRules: () => currentRecord()?.rules || '', finishGesture, notify, scheduleSave,
+  initial: project, initialSavedAt, initialWorkspace: currentRecord()?.workspace, getProject: () => project, getRules: () => currentRecord()?.rules || '',
+  getDesignAssets: () => designAssets(currentRecord()?.design, project, library, libraryGroups), finishGesture, notify, scheduleSave,
   restoreInitial(value) { project = withPages(value); },
   applyProject(value, label) { finishGesture(); project = withPages(value); selectedId = null; selectedIds.clear(); commit(label); },
   applyGeneration(result) {
@@ -167,10 +169,74 @@ function openProjectDetails(create) {
   $('engineeringForm').dataset.create = String(create);
   $('engineeringName').value = create ? '' : currentRecord().name;
   $('engineeringRules').value = create ? '' : currentRecord().rules;
+  fillEngineeringDesign(create ? normalizeDesign() : normalizeDesign(currentRecord().design));
   $('engineeringPresetField').hidden = !create;
   $('engineeringSubmitBtn').textContent = create ? '创建并切换' : '保存设置';
   $('engineeringDialog').showModal(); $('engineeringName').focus();
 }
+function engineeringLibrary() {
+  return $('engineeringForm').dataset.create === 'true' ? COMPONENTS : library;
+}
+function engineeringGroups() {
+  return $('engineeringForm').dataset.create === 'true' ? [] : libraryGroups;
+}
+function readEngineeringDesign() {
+  const palette = $('engineeringPalette').value === 'none' ? null : { name: $('engineeringPaletteName').value,
+    colors: Object.fromEntries(Object.keys(COLOR_ROLES).map(role => [role, document.getElementById(`engineeringColor-${role}`).value])) };
+  return normalizeDesign({ palette, library: { scope: $('engineeringLibraryScope').value,
+    groupIds: [...$('engineeringLibraryGroups').querySelectorAll('input:checked')].map(input => input.value) },
+    safeArea: { mode: $('engineeringSafeMode').value, ...Object.fromEntries(['top', 'right', 'bottom', 'left'].map(edge => [edge, Number(document.getElementById(`engineeringSafe${edge[0].toUpperCase()}${edge.slice(1)}`).value)])) } });
+}
+function engineeringManifest() {
+  const selection = { library: { scope: $('engineeringLibraryScope').value,
+    groupIds: [...$('engineeringLibraryGroups').querySelectorAll('input:checked')].map(input => input.value) } };
+  return libraryManifest(linkedComponents(selection, engineeringLibrary(), engineeringGroups()), engineeringGroups());
+}
+function renderEngineeringLinks() {
+  const paletteEnabled = $('engineeringPalette').value !== 'none';
+  $('engineeringPaletteFields').hidden = !paletteEnabled;
+  $('engineeringPaletteName').required = paletteEnabled;
+  const customSafe = $('engineeringSafeMode').value === 'custom';
+  $('engineeringSafeFields').hidden = !customSafe;
+  for (const input of $('engineeringSafeFields').querySelectorAll('input')) { input.disabled = !customSafe; input.required = customSafe; }
+  $('engineeringLibraryGroups').hidden = $('engineeringLibraryScope').value !== 'groups';
+  const manifest = engineeringManifest();
+  $('engineeringManifestSummary').textContent = `轻量组件清单 · ${manifest.components.length} 个组件`;
+  $('engineeringManifest').textContent = JSON.stringify(manifest, null, 2);
+}
+function fillEngineeringColors(palette) {
+  $('engineeringPaletteName').value = palette.name;
+  $('engineeringColors').replaceChildren(...Object.entries(COLOR_ROLES).map(([role, name]) => {
+    const label = document.createElement('label'); label.className = 'field'; label.textContent = name;
+    const input = document.createElement('input'); input.type = 'color'; input.id = `engineeringColor-${role}`; input.value = palette.colors[role]; label.append(input); return label;
+  }));
+}
+function fillEngineeringDesign(design) {
+  $('engineeringPalette').value = design.palette ? 'custom' : 'none';
+  fillEngineeringColors(design.palette || PALETTES.blue);
+  $('engineeringLibraryScope').value = design.library.scope;
+  $('engineeringLibraryGroups').replaceChildren(...engineeringGroups().map(group => {
+    const label = document.createElement('label'); label.className = 'checkbox-field';
+    const input = document.createElement('input'); input.type = 'checkbox'; input.value = group.id; input.checked = design.library.groupIds.includes(group.id);
+    label.append(input, document.createTextNode(group.name)); return label;
+  }));
+  if (!engineeringGroups().length) $('engineeringLibraryGroups').textContent = '当前工程暂无分组，请先在组件库中新建分组。';
+  $('engineeringSafeMode').value = design.safeArea.mode;
+  for (const edge of ['top', 'right', 'bottom', 'left']) document.getElementById(`engineeringSafe${edge[0].toUpperCase()}${edge.slice(1)}`).value = design.safeArea[edge] || 0;
+  renderEngineeringLinks();
+}
+$('engineeringPalette').addEventListener('change', () => {
+  if (PALETTES[$('engineeringPalette').value]) fillEngineeringColors(PALETTES[$('engineeringPalette').value]);
+  renderEngineeringLinks();
+});
+$('engineeringColors').addEventListener('input', () => { $('engineeringPalette').value = 'custom'; });
+$('engineeringPaletteName').addEventListener('input', () => { $('engineeringPalette').value = 'custom'; });
+$('engineeringLibraryScope').addEventListener('change', renderEngineeringLinks);
+$('engineeringLibraryGroups').addEventListener('change', renderEngineeringLinks);
+$('engineeringSafeMode').addEventListener('change', renderEngineeringLinks);
+$('exportEngineeringManifestBtn').addEventListener('click', () => {
+  download(JSON.stringify(engineeringManifest(), null, 2), 'protolab-library-manifest.json', 'application/json'); notify('轻量组件清单已导出');
+});
 function installProject(next) {
   // 先原子写入完整工程集合，再切换内存；写入失败保留当前工程。
   writeStorage(PROJECTS_KEY, next);
@@ -200,7 +266,7 @@ $('projectSelect').addEventListener('change', safeAction(() => {
 $('engineeringForm').addEventListener('submit', event => {
   event.preventDefault();
   try {
-    const details = projectDetails({ name: $('engineeringName').value, rules: $('engineeringRules').value });
+    const details = projectDetails({ name: $('engineeringName').value, rules: $('engineeringRules').value, design: readEngineeringDesign() });
     finishGesture();
     if (!persistProject()) throw new Error('当前工程保存失败，请先导出备份，再新建或更改工程设置');
     if ($('engineeringForm').dataset.create === 'true') {
@@ -208,7 +274,7 @@ $('engineeringForm').addEventListener('submit', event => {
       installProject(appendProject(catalog, entry));
     } else {
       const next = saveActiveProject(catalog, details);
-      writeStorage(PROJECTS_KEY, next); catalog = next; renderProjects(); $('engineeringDialog').close(); notify('工程名称和 AI 设计规范已保存');
+      writeStorage(PROJECTS_KEY, next); catalog = next; renderProjects(); $('engineeringDialog').close(); notify('工程设置及配色、组件库、安全区关联已保存');
     }
   } catch (error) { $('engineeringError').textContent = error.message; }
 });
