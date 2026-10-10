@@ -7,8 +7,10 @@ import { FRAME_STYLES, CAMERA_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLa
 import { LIBRARY_KEY, PROJECT_KEY, readStorage, writeStorage, download, readFile } from './storage.js';
 import { alignItems, moveItems } from './layout.js';
 import { GUIDES_KEY, normalizeGuides, rulerMarkup } from './guides.js';
+import { projectFile, importProjectFile } from './project-import.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { snapItems } from './snapping.js';
+import { createAssistant } from './assistant.js';
 
 const $ = id => document.getElementById(id);
 document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
@@ -46,8 +48,8 @@ function safeAction(action) {
 function persistProject() {
   clearTimeout(saveTimer);
   saveTimer = null;
-  try { writeStorage(PROJECT_KEY, project); $('saveState').textContent = '已自动保存'; }
-  catch { $('saveState').textContent = '草稿未保存'; notify('浏览器存储不可用或已满，草稿未保存。请导出 HTML 保留设计。', true); }
+  try { assistant.persist(); writeStorage(PROJECT_KEY, project); $('saveState').textContent = '已自动保存'; }
+  catch { $('saveState').textContent = '草稿或版本未保存'; notify('浏览器存储不可用或已满，请导出版本备份保留设计与历史。', true); }
 }
 function scheduleSave() {
   $('saveState').textContent = '正在保存…';
@@ -71,6 +73,12 @@ try {
   const saved = readStorage(PROJECT_KEY, value => validateProject(value, sanitizeContent));
   if (saved) project = saved;
 } catch { startupWarnings.push('草稿读取失败，已打开空画布'); }
+const assistant = createAssistant({
+  initial: project, getProject: () => project, finishGesture, notify, scheduleSave,
+  restoreInitial(value) { project = value; },
+  applyProject(value, label) { finishGesture(); project = value; selectedId = null; selectedIds.clear(); commit(label); },
+  startupWarning(message) { startupWarnings.push(message); },
+});
 const history = createHistory(project);
 try { guides = readStorage(GUIDES_KEY, normalizeGuides) || guides; }
 catch { startupWarnings.push('辅助线设置读取失败，已使用默认设置'); }
@@ -172,6 +180,7 @@ function updateGuides() {
 }
 for (const id of ['showRulers', 'showGrid', 'gridSize', 'snapComponents']) $(id).addEventListener('change', updateGuides);
 function renderSafeArea() {
+  $('safeAreaError').textContent = '';
   const area = project.safeArea;
   const bounds = placementBounds(project);
   $('safeAreaEnabled').checked = area.enabled;
@@ -182,10 +191,14 @@ function renderSafeArea() {
 }
 function applySafeArea(event) {
   event.preventDefault();
+  if (event.type === 'change' && !$('safeAreaEnabled').checked) {
+    finishGesture(); project.safeArea = { ...project.safeArea, enabled: false };
+    commit(); notify('安全区限制已关闭'); return;
+  }
   if (!$('safeAreaForm').reportValidity()) { $('safeAreaEnabled').checked = project.safeArea.enabled; return; }
   const raw = { enabled: $('safeAreaEnabled').checked };
   for (const side of ['top', 'right', 'bottom', 'left']) raw[side] = Number($(`safe${side[0].toUpperCase()}${side.slice(1)}`).value);
-  const bars = systemBarInsets(project.frame);
+  const bars = systemBarInsets(project.frame, project.canvas);
   if (raw.left + raw.right >= project.canvas.width || raw.top + raw.bottom >= project.canvas.height - bars.top - bars.bottom) {
     $('safeAreaError').textContent = '左右或上下留白总和过大，请至少保留 1 px 的可放置区域';
     $('safeAreaEnabled').checked = project.safeArea.enabled;
@@ -238,6 +251,7 @@ function renderCanvas() {
   const canvas = project.canvas;
   $('canvas').style.width = `${canvas.width}px`;
   $('canvas').style.height = `${canvas.height}px`;
+  $('canvas').style.backgroundColor = canvas.background || '#fff';
   renderDevice();
   $('canvasWidthInput').value = canvas.width; $('canvasHeightInput').value = canvas.height;
   $('canvasSizeLabel').textContent = $('artboardSize').textContent = `${canvas.width} × ${canvas.height}`;
@@ -274,11 +288,12 @@ function select(id, toggle = false) {
   for (const [key, node] of itemNodes) node.classList.toggle('selected', selectedIds.has(key));
   renderProperties(); renderLayers();
 }
-function commit() { project = constrainProject(project); history.push(project); renderCanvas(); scheduleSave(); }
-function add(component, x = 40, y = 40) {
+function commit(label) { project = constrainProject(project); history.push(project); assistant.record(project, label); renderCanvas(); scheduleSave(); }
+function add(component, x = 40, y = 40, snap = false) {
   if (project.items.length >= MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
   const item = createItem(component, project.canvas, x, y, placementBounds(project));
   project.items.push(item); selectedId = item.id; selectedIds = new Set([item.id]);
+  if (snap) project = snapItems(project, new Map([[item.id, { x: item.x, y: item.y }]]), 0, 0, zoom).project;
   commit(); notify(`已添加「${item.name}」`);
 }
 function removeSelected() {
@@ -297,6 +312,7 @@ function duplicateSelected() {
 function restore(direction) {
   finishGesture();
   project = direction === 'undo' ? history.undo() : history.redo();
+  assistant.record(project, direction === 'undo' ? '撤销修改' : '重做修改');
   if (!selectedItem()) selectedId = null;
   renderCanvas(); scheduleSave();
 }
@@ -354,10 +370,7 @@ $('canvas').addEventListener('drop', safeAction(event => {
   const component = library.find(value => value.id === event.dataTransfer.getData('text/plain'));
   if (!component) return;
   const point = clientToCanvas(event.clientX, event.clientY, $('canvas').getBoundingClientRect(), zoom);
-  add(component, point.x, point.y);
-  const item = selectedItem();
-  project = snapItems(project, new Map([[item.id, { x: item.x, y: item.y }]]), 0, 0, zoom, guides.snap && !event.altKey).project;
-  commit();
+  add(component, point.x, point.y, guides.snap && !event.altKey);
 }));
 $('componentSearch').addEventListener('input', renderLibrary);
 $('layerList').addEventListener('click', event => { const button = event.target.closest('[data-item-id]'); if (button) select(button.dataset.itemId, event.shiftKey); });
@@ -445,6 +458,27 @@ function fitCanvas() {
 $('fitBtn').addEventListener('click', fitCanvas);
 $('saveLibBtn').addEventListener('click', () => { if (persistLibrary()) notify('组件库已保存到当前浏览器'); });
 $('exportLibBtn').addEventListener('click', () => { download(JSON.stringify({ version: 1, components: library }, null, 2), 'protolab-library.json', 'application/json'); notify('组件库 JSON 已导出'); });
+$('exportProjectBtn').addEventListener('click', safeAction(() => {
+  finishGesture(); download(projectFile(project, library), 'protolab-project.json', 'application/json'); notify('工程已导出，包含画布、设备设置和自定义组件');
+}));
+$('importProjectBtn').addEventListener('click', () => {
+  $('projectForm').reset(); $('projectError').textContent = ''; $('projectDialog').showModal();
+});
+$('projectForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const file = $('projectFileInput').files[0]; if (!file || $('applyProjectImportBtn').disabled) return;
+  const button = $('applyProjectImportBtn'); button.disabled = true; button.textContent = '正在识别组件…'; $('projectError').textContent = '';
+  try {
+    const imported = await importProjectFile(file, { width: Number($('importWidth').value), height: Number($('importHeight').value) }, readFile);
+    const nextLibrary = imported.components ? completeLibrary(imported.components) : library;
+    finishGesture(); project = imported.project; library = nextLibrary;
+    selectedId = null; selectedIds.clear(); commit(); renderLibrary();
+    if (imported.components) persistLibrary();
+    persistProject(); fitCanvas(); $('projectDialog').close();
+    notify(`工程已导入，识别 ${project.items.length} 个组件${imported.warnings.length ? `；${imported.warnings.join('；')}` : ''}`);
+  } catch (error) { $('projectError').textContent = error.message || '工程导入失败'; }
+  finally { button.disabled = false; button.textContent = '导入并替换画布'; }
+});
 $('importLibBtn').addEventListener('click', () => $('libFileInput').click());
 $('libFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;

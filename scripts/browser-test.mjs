@@ -25,6 +25,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   page.on('dialog', dialog => dialog.accept());
   await page.goto(base);
+  await page.locator('#snapComponents').uncheck();
   await page.waitForSelector('.component-item');
   assert.equal(await page.locator('.component-item').count(), builtinCount);
   await page.screenshot({ path: resolve(output, 'desktop-empty.png') });

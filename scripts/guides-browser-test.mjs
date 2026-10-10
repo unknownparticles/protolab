@@ -21,6 +21,8 @@ try {
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
+  // 自由移动回归关闭吸附；吸附与安全区由专门流程验证。
+  await page.locator('#snapComponents').uncheck();
   const position = async () => [Number(await page.locator('#propX').inputValue()), Number(await page.locator('#propY').inputValue())];
   const positions = async () => page.locator('.editor-item').evaluateAll(nodes => nodes.map(node => [parseInt(node.style.left), parseInt(node.style.top)]));
   const align = direction => page.locator(`[data-align="${direction}"]`).click();

@@ -9,7 +9,9 @@
     "test": "node --test tests/*.test.mjs",
     "check": "node scripts/check.mjs",
     "test:browser": "node scripts/browser-test.mjs",
-    "test:guides": "node scripts/guides-browser-test.mjs"
+    "test:guides": "node scripts/guides-browser-test.mjs",
+    "test:project": "node scripts/project-browser-test.mjs",
+    "test:ai": "node scripts/ai-browser-test.mjs"
   },
   "engines": {
     "node": ">=20.11"

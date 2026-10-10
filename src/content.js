@@ -5,6 +5,10 @@ const SVG_TAGS = new Set('svg g path rect circle ellipse line polyline polygon t
 const REMOVE = new Set('script style iframe object embed link meta base form foreignobject animate animatetransform set use'.split(' '));
 const ATTRS = new Set('title alt placeholder value type disabled checked selected readonly multiple rows cols maxlength min max step role tabindex width height viewbox fill stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray stroke-dashoffset fill-rule clip-rule d x y x1 x2 y1 y2 cx cy r rx ry points opacity fill-opacity stroke-opacity transform preserveaspectratio offset stop-color stop-opacity gradientunits gradienttransform spreadmethod vector-effect'.split(' '));
 export const STYLES = new Set('display position flex flex-direction flex-wrap flex-grow flex-shrink align-items align-self justify-content gap row-gap column-gap grid-template-columns grid-template-rows grid-column grid-row width height min-width min-height max-width max-height top right bottom left margin margin-top margin-right margin-bottom margin-left padding padding-top padding-right padding-bottom padding-left background background-color background-image background-size background-position color border border-width border-style border-color border-top border-right border-bottom border-left border-radius box-shadow box-sizing overflow overflow-x overflow-y opacity font-size font-family font-weight font-style line-height letter-spacing text-align text-decoration text-transform white-space word-break object-fit object-position vertical-align cursor appearance list-style-type text-indent text-overflow border-collapse border-spacing'.split(' '));
+// CSSOM 将简写展开为长属性，清理时也需要保留这些属性。
+for (const side of ['top', 'right', 'bottom', 'left']) for (const value of ['width', 'style', 'color']) STYLES.add(`border-${side}-${value}`);
+for (const corner of ['top-left', 'top-right', 'bottom-left', 'bottom-right']) STYLES.add(`border-${corner}-radius`);
+for (const property of ['flex-basis', 'background-repeat', 'background-origin', 'background-clip', 'background-position-x', 'background-position-y', 'text-decoration-line', 'text-decoration-color', 'text-decoration-style', 'text-decoration-thickness', 'grid-column-start', 'grid-column-end', 'grid-row-start', 'grid-row-end']) STYLES.add(property);
 export function isImageData(value) {
   return /^data:image\/(?:png|jpeg|gif|webp|avif);base64,[A-Za-z0-9+/=\s]+$/.test(value);
 }
@@ -53,7 +57,7 @@ export const PROTOTYPE_CSS = `
 .prototype-content p,.prototype-content h1,.prototype-content h2,.prototype-content h3{margin:0}
 .prototype-content input,.prototype-content textarea,.prototype-content button{font-family:inherit}
 .prototype-item.vector-item{background:transparent;box-shadow:none}
-.prototype-item.imported-item{background:transparent;box-shadow:none}
+.prototype-item.imported-item{background:transparent;box-shadow:none;overflow:visible}
 .imported-item>.prototype-content{display:block;overflow:visible}
 .device-shell{position:relative;flex-shrink:0;isolation:isolate;font-family:system-ui,-apple-system,sans-serif}
 .device-decoration{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;border-radius:32px}

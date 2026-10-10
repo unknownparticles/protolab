@@ -6,9 +6,10 @@ export const FRAME_STYLES = Object.freeze({
 });
 export const CAMERA_STYLES = Object.freeze({ none: '无屏内摄像头', notch: '刘海', island: '灵动岛', 'punch-center': '居中打孔', 'punch-left': '左侧打孔' });
 const bounded = (value, fallback, max) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(max, Math.round(Number(value)))) : fallback;
-export function systemBarInsets(frame) {
+export function systemBarInsets(frame, canvas) {
   const mobile = frame && frame.device !== 'pc';
-  return { top: mobile && frame.statusBar ? 28 : 0,
+  const camera = mobile && canvas ? cameraLayout(canvas, frame) : null;
+  return { top: mobile && frame.statusBar ? camera?.statusHeight || 28 : 0,
     bottom: mobile && frame.navigation === 'buttons' ? 40 : mobile && frame.navigation === 'gesture' ? 28 : 0 };
 }
 export function normalizeFrame(raw = {}, preset = 'phone', sanitize = value => value) {
