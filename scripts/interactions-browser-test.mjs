@@ -112,12 +112,19 @@ try {
   await preview.locator('.preview-edit-tools button').filter({ hasText: '编辑文字与尺寸' }).click();
   await visible('后续内容').click();
   assert.equal(await preview.locator('.preview-selection').evaluate(node => parseFloat(node.style.top)), 160);
+  const handle = await preview.locator('.preview-selection [data-resize="e"]').boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 20, handle.y + handle.height / 2, { steps: 4 }); await page.mouse.up();
+  await page.waitForFunction(id => document.querySelector(`.editor-item[data-item-id="${id}"]`).style.width === '220px', footer);
+  assert.equal(await previewTop(), 160);
   await page.screenshot({ path: resolve(output, 'interactions-collapsed.png') });
   await page.locator('[data-close="previewDialog"]').click();
   console.log('通过：显隐三种动作、键盘与反复切换、页面及弹窗提示自动消失、弹窗跳转页面、重置显隐');
 
   const download = async id => { const pending = page.waitForEvent('download'); await click(id); return readFile(await (await pending).path(), 'utf8'); };
   const json = await download('exportProjectBtn'), html = await download('exportHtmlBtn');
+  const savedFooter = JSON.parse(json).project.items.find(item => item.id === footer);
+  assert.equal(savedFooter.y, 300); assert.equal(savedFooter.width, 220);
   const path = resolve(output, 'interactions-prototype.html'); await writeFile(path, html);
   const exported = await context.newPage(); exported.on('pageerror', error => errors.push(error.message));
   await exported.goto(pathToFileURL(path).href);

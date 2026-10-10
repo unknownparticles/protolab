@@ -72,7 +72,7 @@ try {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ version: 1, name: '品牌登录', summary: '使用品牌组件', changes: [{ op: 'add', item: { id: `reuse-${data.mode}`, libraryId: componentId, x: 0, y: 0 } }] }) } }] }) });
   });
   await menuClick('settingsBtn'); await page.locator('#aiURL').fill('https://ai.example.test/v1'); await page.locator('#aiModel').fill('test-model'); await page.locator('#aiSettingsForm button[type=submit]').click();
-  await page.locator('#aiToggleBtn').click();
+  await menuClick('aiToggleBtn');
   for (const mode of ['modify', 'page', 'component']) {
     await page.locator('#aiMode').selectOption(mode); await page.locator('#aiRequirement').fill('生成品牌登录'); await page.locator('#aiSendBtn').click();
     await page.waitForFunction(() => document.getElementById('aiCancelBtn').hidden);

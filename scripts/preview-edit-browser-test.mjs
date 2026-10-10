@@ -69,8 +69,11 @@ try {
   await preview.locator('[data-name="card"]').click({ position: { x: 10, y: 10 } });
   const drag = async (direction, dx, dy, cancel = false) => {
     const box = await preview.locator(`[data-resize="${direction}"]`).boundingBox();
+    const frameBox = await page.locator('#previewFrame').boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 5 });
+    // 指针留在预览区域内，保证松开事件送达；终点仍可超过画布边界。
+    await page.mouse.move(Math.max(frameBox.x + 2, Math.min(frameBox.x + frameBox.width - 2, box.x + box.width / 2 + dx)),
+      Math.max(frameBox.y + 2, Math.min(frameBox.y + frameBox.height - 2, box.y + box.height / 2 + dy)), { steps: 5 });
     if (cancel) await preview.locator(`[data-resize="${direction}"]`).press('Escape');
     await page.mouse.up();
   };
