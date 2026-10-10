@@ -70,9 +70,10 @@ export function itemHTML(item, canvas) {
   const appearance = appearancePresentation(item.appearance);
   const inner = item.type === 'image' ? `<img src="${escapeHTML(item.content)}" alt="${escapeHTML(item.name)}" style="width:100%;height:100%;object-fit:contain">` : fitSVGImages(item.content, item.appearance?.imageFit);
   const { hidden, angle } = orientationPresentation(item, canvas);
+  const orientationHidden = orientationPresentation({ ...item, visible: true }, canvas).hidden;
   const action = normalizeInteraction(item.interaction);
-  const interaction = action ? ` data-action="${escapeHTML(action.type)}"${action.targetId ? ` data-target="${escapeHTML(action.targetId)}"` : ''} role="button" tabindex="0" aria-label="${escapeHTML(item.name)}"` : '';
-  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}${appearance.classes ? ` ${appearance.classes}` : ''}" data-name="${escapeHTML(item.name)}"${interaction} style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${appearance.style ? `;${escapeHTML(appearance.style)}` : ''}${hidden ? ';display:none' : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
+  const interaction = action ? ` data-action="${escapeHTML(action.type)}"${action.targetId ? ` data-target="${escapeHTML(action.targetId)}"` : ''}${action.targetIds ? ` data-targets="${escapeHTML(JSON.stringify(action.targetIds))}" data-mode="${action.mode}"` : ''}${action.duration ? ` data-duration="${action.duration}"` : ''} role="button" tabindex="0" aria-label="${escapeHTML(item.name)}"` : '';
+  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}${appearance.classes ? ` ${appearance.classes}` : ''}" data-element-id="${escapeHTML(item.id || '')}" data-initial-visible="${item.visible !== false}"${orientationHidden ? ' data-orientation-hidden="true"' : ''}${hidden ? ' hidden' : ''} data-name="${escapeHTML(item.name)}"${interaction} style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${appearance.style ? `;${escapeHTML(appearance.style)}` : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
 }
 export const PROTOTYPE_CSS = `
 ${APPEARANCE_CSS}
@@ -152,6 +153,7 @@ export function exportHTML(value, { preview = false, editToken = '' } = {}) {
   const controls = normalPages.length > 1 ? '<nav class="prototype-controls" aria-label="原型导航"><button id="prototypeBack" disabled>返回</button><span id="prototypePageName"></span><button id="prototypeRestart">回到首页</button></nav>' : '';
   const pages = normalPages.map(page => `<section class="prototype-page" data-prototype-page="${escapeHTML(page.id)}" data-page-name="${escapeHTML(page.name)}" tabindex="-1"${page.id !== startId ? ' hidden inert' : ''}>${markup(page)}</section>`).join('\n');
   const popups = project.pages.filter(page => page.kind === 'popup').map(page => `<dialog class="prototype-popup" data-prototype-popup="${escapeHTML(page.id)}" aria-label="${escapeHTML(page.name)}"><div class="prototype-popup-heading"><h2>${escapeHTML(page.name)}</h2><button data-action="closePopup" aria-label="关闭弹窗">关闭 ×</button></div>${markup(page)}</dialog>`).join('\n');
+  const toasts = project.pages.filter(page => page.kind === 'toast').map(page => `<div class="prototype-toast" popover="manual" data-prototype-toast="${escapeHTML(page.id)}" aria-label="${escapeHTML(page.name)}" role="status" aria-live="polite">${preview && editToken ? '<div class="prototype-toast-heading"></div>' : ''}${markup(page)}</div>`).join('\n');
   const maxWidth = Math.max(...normalPages.map(page => frameLayout(page.canvas, page.frame).width));
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Protolab 原型</title><style>
@@ -160,5 +162,5 @@ ${PROTOTYPE_CSS}
 ${INTERACTION_CSS}
 ${preview && editToken ? PREVIEW_EDIT_CSS : ''}
 @media(max-width:${maxWidth + 64}px){body{padding:0;align-items:flex-start}}
-</style></head><body data-start-page="${escapeHTML(startId)}"${preview && active.kind === 'popup' ? ` data-initial-popup="${escapeHTML(active.id)}"` : ''}>${controls}${pages}${popups}<script type="application/json" id="protolab-project">${JSON.stringify(value.pages ? project : value).replace(/</g, '\\u003c')}</script><script>${PROTOTYPE_RUNTIME}</script>${preview && editToken ? `<script>${previewEditorScript(project, editToken)}</script>` : ''}</body></html>`;
+</style></head><body data-start-page="${escapeHTML(startId)}"${preview && active.kind === 'popup' ? ` data-initial-popup="${escapeHTML(active.id)}"` : ''}${preview && active.kind === 'toast' ? ` data-initial-toast="${escapeHTML(active.id)}"` : ''}>${controls}${pages}${popups}${toasts}<script type="application/json" id="protolab-project">${JSON.stringify(value.pages ? project : value).replace(/</g, '\\u003c')}</script><script>${PROTOTYPE_RUNTIME}</script>${preview && editToken ? `<script>${previewEditorScript(project, editToken)}</script>` : ''}</body></html>`;
 }

@@ -16,5 +16,5 @@ export function normalizeOrientationResponse(raw) {
 export function orientationPresentation(item, canvas) {
   const response = normalizeOrientationResponse(item.orientationResponse);
   const action = response.enabled && canvas ? response[canvas.width > canvas.height ? 'landscape' : 'portrait'] : 'none';
-  return { hidden: action === 'hide', angle: { rotate90: 90, rotate180: 180, rotate270: -90 }[action] || 0 };
+  return { hidden: item.visible === false || action === 'hide', angle: { rotate90: 90, rotate180: 180, rotate270: -90 }[action] || 0 };
 }

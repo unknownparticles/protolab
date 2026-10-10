@@ -6,6 +6,7 @@ function runPrototype() {
   let current = body.dataset.startPage;
   const trail = [];
   let opened = [];
+  let toastTimer, currentToast;
   const findPopup = id => popups.find(popup => popup.dataset.prototypePopup === id);
   const backButton = document.getElementById('prototypeBack');
   function closePopups() { for (const popup of [...opened].reverse()) popup.close(); opened = []; }
@@ -13,7 +14,7 @@ function runPrototype() {
     const page = pages.find(page => page.dataset.prototypePage === id);
     if (!page) return;
     if (remember && id !== current) trail.push(current);
-    closePopups(); current = id;
+    closePopups(); closeToast(); current = id;
     for (const value of pages) { value.hidden = value !== page; value.inert = value !== page; }
     if (backButton) backButton.disabled = !trail.length;
     const label = document.getElementById('prototypePageName');
@@ -29,12 +30,39 @@ function runPrototype() {
     if (opened.length) opened.at(-1).close();
     else if (trail.length) showPage(trail.pop(), false);
   }
+  function closeToast() {
+    clearTimeout(toastTimer);
+    currentToast?.hidePopover(); currentToast = null;
+  }
+  function showToast(id, duration = 2500, persistent = false) {
+    const toast = [...document.querySelectorAll('[data-prototype-toast]')].find(value => value.dataset.prototypeToast === id);
+    if (!toast) return;
+    closeToast(); currentToast = toast; toast.showPopover();
+    if (!persistent) {
+      const dismiss = () => {
+        if (body.classList.contains('preview-editing')) toastTimer = setTimeout(dismiss, 500);
+        else closeToast();
+      };
+      toastTimer = setTimeout(dismiss, duration);
+    }
+  }
+  function visibility(element) {
+    const board = element.closest('[data-prototype-page],[data-prototype-popup],[data-prototype-toast]');
+    const ids = JSON.parse(element.dataset.targets);
+    const targets = [...board.querySelectorAll('[data-element-id]')].filter(value => ids.includes(value.dataset.elementId));
+    // 混合状态也整组切换，避免板块中一半显示、一半隐藏。
+    const show = element.dataset.mode === 'show' || element.dataset.mode === 'toggle' && targets.every(value => value.hidden);
+    for (const target of targets) target.hidden = !show || target.dataset.orientationHidden === 'true';
+    if (targets.some(target => target.contains(document.activeElement) && target.hidden)) board.focus({ preventScroll: true });
+  }
   function execute(element) {
     const type = element.dataset.action;
     if (type === 'navigate') showPage(element.dataset.target);
     if (type === 'back') back();
     if (type === 'openPopup') openPopup(element.dataset.target);
     if (type === 'closePopup') opened.at(-1)?.close();
+    if (type === 'showToast') showToast(element.dataset.target, Number(element.dataset.duration));
+    if (type === 'visibility') visibility(element);
   }
   document.addEventListener('click', event => {
     const action = event.target.closest('[data-action]');
@@ -54,9 +82,14 @@ function runPrototype() {
     });
   }
   backButton?.addEventListener('click', back);
-  document.getElementById('prototypeRestart')?.addEventListener('click', () => { trail.length = 0; showPage(body.dataset.startPage, false); });
+  document.getElementById('prototypeRestart')?.addEventListener('click', () => {
+    trail.length = 0;
+    for (const item of document.querySelectorAll('[data-element-id]')) item.hidden = item.dataset.initialVisible === 'false' || item.dataset.orientationHidden === 'true';
+    showPage(body.dataset.startPage, false);
+  });
   showPage(current, false);
   if (body.dataset.initialPopup) openPopup(body.dataset.initialPopup);
+  if (body.dataset.initialToast) showToast(body.dataset.initialToast, 2500, true);
 }
 export const PROTOTYPE_RUNTIME = `(${runPrototype.toString()})();`;
 export const INTERACTION_CSS = `
@@ -71,4 +104,6 @@ export const INTERACTION_CSS = `
 .prototype-popup::backdrop{background:#0f172a66}
 .prototype-popup-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;font:12px system-ui;margin-bottom:12px}
 .prototype-popup-heading h2{font-size:14px;margin:0;overflow-wrap:anywhere}
+.prototype-toast{border:0;padding:0;background:transparent;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto;border-radius:12px;box-shadow:0 8px 30px #0f172a33}
+.prototype-toast-heading:empty{display:none}.prototype-toast-heading{padding:6px;background:#fff}
 `;

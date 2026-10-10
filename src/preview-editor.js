@@ -2,12 +2,14 @@ import { textTargets } from './text-targets.js';
 import { resizePreviewItem } from './preview-resize.js';
 import { itemBounds } from './model.js';
 import { orientationPresentation } from './orientation.js';
+import { frameLayout } from './frames.js';
+import { attachViewportZoom } from './viewport-zoom.js';
 
-function runPreviewEditor(config, textTargets, resizeItem) {
+function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
   let editing = false, selected = null, gesture = null, textEditor = null;
   const entries = new Map();
   for (const page of config.pages) {
-    const board = [...document.querySelectorAll('[data-prototype-page],[data-prototype-popup]')].find(node => (node.dataset.prototypePage || node.dataset.prototypePopup) === page.id);
+    const board = [...document.querySelectorAll('[data-prototype-page],[data-prototype-popup],[data-prototype-toast]')].find(node => (node.dataset.prototypePage || node.dataset.prototypePopup || node.dataset.prototypeToast) === page.id);
     const nodes = [...board.querySelector('.prototype').children];
     page.items.forEach((item, index) => {
       const node = nodes[index]; node.dataset.previewItem = item.id;
@@ -19,8 +21,35 @@ function runPreviewEditor(config, textTargets, resizeItem) {
   const toggle = document.createElement('button'); toggle.textContent = '编辑文字与尺寸'; toggle.type = 'button'; toggle.setAttribute('aria-pressed', 'false');
   const hint = document.createElement('span'); hint.textContent = '点击组件体验跳转与弹窗';
   tools.append(toggle, hint); document.body.prepend(tools);
+  for (const page of config.pages) {
+    const board = [...document.querySelectorAll('[data-prototype-page],[data-prototype-popup],[data-prototype-toast]')].find(node => (node.dataset.prototypePage || node.dataset.prototypePopup || node.dataset.prototypeToast) === page.id);
+    // 设备外壳可能包含边框与系统栏，整体缩放并保留原始画布坐标。
+    const shell = board.querySelector('.device-shell');
+    const viewport = document.createElement('div'); viewport.className = 'preview-viewport'; viewport.dataset.zoom = '1';
+    const stage = document.createElement('div'); stage.className = 'preview-zoom-stage';
+    const scaler = document.createElement('div'); scaler.className = 'preview-zoom-scaler';
+    shell.replaceWith(viewport); viewport.append(stage); stage.append(scaler); scaler.append(shell);
+    const controls = document.createElement('span'); controls.className = 'preview-zoom-controls';
+    const label = document.createElement('output'); label.setAttribute('aria-label', '预览缩放'); label.textContent = '100%';
+    const reset = document.createElement('button'); reset.type = 'button'; reset.textContent = '重置缩放';
+    const help = document.createElement('span'); help.textContent = '滚轮 / 双指缩放';
+    controls.append(help, label, reset);
+    (board.querySelector('.prototype-popup-heading,.prototype-toast-heading') || tools).append(controls);
+    controls.hidden = board.hidden;
+    new MutationObserver(() => { controls.hidden = board.hidden; }).observe(board, { attributes: true, attributeFilter: ['hidden'] });
+    let zoom = 1;
+    function updateZoom(value) {
+      zoom = value; viewport.dataset.zoom = String(zoom); label.textContent = `${Math.round(zoom * 100)}%`;
+      stage.style.width = `${page.layout.width * zoom}px`; stage.style.height = `${page.layout.height * zoom}px`;
+      scaler.style.transform = `scale(${zoom})`;
+      if (!board.matches('[data-prototype-page]')) viewport.style.height = `min(${page.layout.height * zoom + 32}px, calc(100dvh - 140px))`;
+    }
+    updateZoom(1);
+    const controller = attachZoom(viewport, scaler, { getZoom: () => zoom, setZoom: updateZoom, beforeZoom: () => { finish(true); closeTextEditor(); } });
+    reset.addEventListener('click', () => controller.reset());
+  }
   const toggles = [toggle];
-  for (const heading of document.querySelectorAll('.prototype-popup-heading')) {
+  for (const heading of document.querySelectorAll('.prototype-popup-heading,.prototype-toast-heading')) {
     const button = toggle.cloneNode(true); button.className = 'preview-mode-toggle'; heading.append(button); toggles.push(button);
   }
   const lookup = node => [...entries.values()].find(entry => entry.node === node);
@@ -77,7 +106,7 @@ function runPreviewEditor(config, textTargets, resizeItem) {
     save.addEventListener('click', () => { send(entry, { kind: 'text', changes: fields.map(({ index, input }) => ({ index, value: input.value })) }); closeTextEditor(); });
     form.addEventListener('submit', event => event.preventDefault());
     form.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeTextEditor(); } });
-    (entry.node.closest('dialog[open]') || document.body).append(form); textEditor = form;
+    (entry.node.closest('dialog[open],[popover]') || document.body).append(form); textEditor = form;
     const rect = entry.node.getBoundingClientRect();
     form.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - form.offsetWidth - 8))}px`;
     form.style.top = `${Math.max(8, Math.min(rect.bottom + 8, innerHeight - form.offsetHeight - 8))}px`;
@@ -110,7 +139,8 @@ function runPreviewEditor(config, textTargets, resizeItem) {
   document.addEventListener('pointermove', event => {
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     const g = gesture;
-    Object.assign(g.entry.item, resizeItem(g.start, g.direction, event.clientX - g.clientX, event.clientY - g.clientY, g.entry.page.bounds, g.entry.item.angle));
+    const zoom = Number(g.entry.node.closest('.preview-viewport').dataset.zoom);
+    Object.assign(g.entry.item, resizeItem(g.start, g.direction, (event.clientX - g.clientX) / zoom, (event.clientY - g.clientY) / zoom, g.entry.page.bounds, g.entry.item.angle));
     position(g.entry);
   });
   document.addEventListener('pointerup', event => { if (event.pointerId === gesture?.pointerId) finish(); });
@@ -138,12 +168,22 @@ function runPreviewEditor(config, textTargets, resizeItem) {
 }
 
 export function previewEditorScript(project, token) {
-  const config = { token, pages: project.pages.map(page => ({ id: page.id, bounds: itemBounds(page), items: page.items.map(item => ({ id: item.id, x: item.x, y: item.y, width: item.width, height: item.height, angle: orientationPresentation(item, page.canvas).angle })) })) };
-  return `(${runPreviewEditor.toString()})(${JSON.stringify(config).replace(/</g, '\\u003c')},${textTargets.toString()},${resizePreviewItem.toString()});`;
+  const config = { token, pages: project.pages.map(page => ({ id: page.id, bounds: itemBounds(page), layout: frameLayout(page.canvas, page.frame), items: page.items.map(item => ({ id: item.id, x: item.x, y: item.y, width: item.width, height: item.height, angle: orientationPresentation(item, page.canvas).angle })) })) };
+  return `(${runPreviewEditor.toString()})(${JSON.stringify(config).replace(/</g, '\\u003c')},${textTargets.toString()},${resizePreviewItem.toString()},${attachViewportZoom.toString()});`;
 }
 
 export const PREVIEW_EDIT_CSS = `
-.preview-edit-tools{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;font:12px system-ui;color:#475569}
+html:has(.preview-edit-tools),body:has(.preview-edit-tools){height:100%;min-height:0;overflow:hidden}
+body:has(.preview-edit-tools){height:100dvh;padding:16px;align-items:stretch}
+body:has(.preview-edit-tools)>.prototype-page{flex:1;min-height:0;max-width:none}
+.preview-viewport{width:100%;height:100%;overflow:auto;padding:16px;box-sizing:border-box;touch-action:pan-x pan-y}
+.preview-zoom-stage{position:relative;margin:0 auto}
+.preview-zoom-scaler{position:absolute;left:0;top:0;transform-origin:top left}
+.preview-zoom-controls{display:inline-flex;align-items:center;gap:8px;font:12px system-ui;color:#475569}
+.preview-zoom-controls output{min-width:4em;text-align:right;font-variant-numeric:tabular-nums}
+.prototype-popup:has(.preview-viewport){width:min(1000px,calc(100vw - 24px))}
+.prototype-popup:has(.preview-viewport)>.prototype-popup-heading{flex-wrap:wrap}
+.preview-edit-tools{display:flex;flex-shrink:0;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;font:12px system-ui;color:#475569}
 .preview-edit-tools button,.preview-text-editor button{font:inherit;border:1px solid #cbd5e1;border-radius:6px;background:white;padding:7px 12px;cursor:pointer;color:#334155}
 .preview-edit-tools button[aria-pressed=true],.preview-mode-toggle[aria-pressed=true],.preview-text-editor .preview-save{background:#2563eb;color:white;border-color:#2563eb}
 .preview-editing .prototype-item{cursor:default}.preview-editing .prototype-content{cursor:text}

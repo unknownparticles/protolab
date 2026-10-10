@@ -11,9 +11,13 @@ export function initializeCollapsible(root = document) {
     state[key] = collapsed;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* 不影响编辑。 */ }
   };
+  const groups = new Map();
 
   root.querySelectorAll('[data-collapsible]').forEach(section => {
     const key = section.dataset.collapsible;
+    const groupKey = section.dataset.collapseGroup || key;
+    if (!groups.has(groupKey)) groups.set(groupKey, { collapsed: state[key] === true, members: [] });
+    const group = groups.get(groupKey);
     let heading = section.querySelector(':scope > .section-label, :scope > legend, :scope > strong');
     if (!heading) {
       heading = document.createElement('div');
@@ -42,11 +46,17 @@ export function initializeCollapsible(root = document) {
       button.setAttribute('aria-expanded', String(!collapsed));
       button.setAttribute('aria-label', `${collapsed ? '展开' : '收起'}${label}`);
     };
-    update(state[key] === true);
-    button.addEventListener('click', () => { update(!content.hidden); save(key, content.hidden); });
+    group.members.push({ key, update, button, content });
+    const updateGroup = collapsed => {
+      group.collapsed = collapsed;
+      for (const member of group.members) { member.update(collapsed); save(member.key, collapsed); }
+    };
+    update(group.collapsed);
+    button.addEventListener('click', () => updateGroup(!content.hidden));
     // 原生校验发现收起的必填字段时先展开，保证错误可以定位。
-    content.addEventListener('invalid', () => { update(false); save(key, false); }, true);
+    content.addEventListener('invalid', () => updateGroup(false), true);
   });
+  for (const group of groups.values()) for (const member of group.members) member.button.setAttribute('aria-controls', group.members.map(value => value.content.id).join(' '));
 
   root.querySelectorAll('[data-collapsible-panel]').forEach(panel => {
     const key = panel.dataset.collapsiblePanel;

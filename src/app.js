@@ -14,9 +14,10 @@ import { projectFile, importProjectFile } from './project-import.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { snapItems } from './snapping.js';
 import { createAssistant } from './assistant.js';
-import { INTERACTIONS, activePage, withPages, switchPage, addPage, deletePage, normalizeInteraction, pageBoard } from './pages.js';
+import { INTERACTIONS, PAGE_KINDS, activePage, withPages, switchPage, addPage, deletePage, normalizeInteraction, pageBoard, copyItems, cleanVisibilityTargets } from './pages.js';
 import { PROJECTS_KEY, emptyProject, projectRecord, projectDetails, validateProjects, saveActiveProject, activateProject, appendProject } from './projects.js';
 import { initializeCollapsible } from './collapsible.js';
+import { attachViewportZoom } from './viewport-zoom.js';
 
 const $ = id => document.getElementById(id);
 for (const prefix of ['prop', 'custom']) {
@@ -278,6 +279,9 @@ function renderProperties() {
   $('propPortraitAction').value = response.portrait; $('propLandscapeAction').value = response.landscape;
   updateOrientationFields('prop');
   $('propClickAction').value = item.interaction?.type || 'none';
+  $('propVisible').checked = item.visible !== false;
+  $('propVisibilityMode').value = item.interaction?.mode || 'toggle';
+  $('propToastDuration').value = item.interaction?.duration || 2500;
   renderInteractionTargets(item.interaction?.targetId);
 }
 function syncColorPicker(field) {
@@ -324,14 +328,32 @@ $('propImageFile').addEventListener('change', safeAction(async event => {
 }));
 function renderInteractionTargets(targetId = $('propClickTarget').value) {
   const type = $('propClickAction').value;
-  const needsTarget = ['navigate', 'openPopup'].includes(type);
+  const needsTarget = ['navigate', 'openPopup', 'showToast'].includes(type);
   $('propClickTargetField').hidden = !needsTarget;
   $('propClickTarget').required = needsTarget;
   $('propClickTarget').disabled = !needsTarget;
-  const targets = project.pages.filter(page => page.kind === (type === 'navigate' ? 'page' : 'popup'));
+  const kind = { navigate: 'page', openPopup: 'popup', showToast: 'toast' }[type];
+  const targets = project.pages.filter(page => page.kind === kind);
   $('propClickTarget').replaceChildren(new Option('请选择目标', ''), ...targets.map(page => new Option(page.name, page.id)));
   $('propClickTarget').value = targets.some(page => page.id === targetId) ? targetId : '';
-  $('interactionHelp').textContent = needsTarget && !targets.length ? '请先新建目标弹窗。' : '在预览和导出的 HTML 中点击组件执行动作。';
+  $('propToastDurationField').hidden = type !== 'showToast';
+  $('propToastDuration').disabled = type !== 'showToast';
+  $('propToastDuration').required = type === 'showToast';
+  $('propVisibilityFields').hidden = type !== 'visibility';
+  $('propVisibilityMode').disabled = type !== 'visibility';
+  const selected = selectedItem()?.interaction?.targetIds || [];
+  $('propVisibilityTargets').replaceChildren(...project.items.map(item => {
+    const label = document.createElement('label'); label.className = 'checkbox-field';
+    const input = document.createElement('input'); input.type = 'checkbox'; input.value = item.id;
+    input.checked = selected.includes(item.id); input.disabled = type !== 'visibility';
+    label.append(input, document.createTextNode(item.name)); return label;
+  }));
+  $('interactionHelp').textContent = needsTarget && !targets.length ? `请先在页面管理中新建${PAGE_KINDS[kind]}。` : type === 'visibility' ? '目标限于当前页面；多选元素可以一起展开或收起整个板块。' : '在预览和导出的 HTML 中点击组件执行动作。';
+}
+function readInteraction() {
+  return normalizeInteraction({ type: $('propClickAction').value, targetId: $('propClickTarget').value,
+    duration: $('propToastDuration').value, mode: $('propVisibilityMode').value,
+    targetIds: [...$('propVisibilityTargets').querySelectorAll('input:checked')].map(input => input.value) });
 }
 $('propClickAction').replaceChildren(...Object.entries(INTERACTIONS).map(([value, label]) => new Option(label, value)));
 $('propClickAction').addEventListener('change', () => renderInteractionTargets(''));
@@ -340,12 +362,12 @@ function renderPages() {
     const button = document.createElement('button');
     button.type = 'button'; button.className = `page-tab${page.id === project.activePageId ? ' active' : ''}`;
     button.dataset.pageId = page.id; button.setAttribute('aria-pressed', String(page.id === project.activePageId));
-    button.textContent = `${page.kind === 'popup' ? '弹窗 · ' : ''}${page.name}${page.id === project.startPageId ? ' · 首页' : ''}`;
+    button.textContent = `${page.kind !== 'page' ? `${PAGE_KINDS[page.kind]} · ` : ''}${page.name}${page.id === project.startPageId ? ' · 首页' : ''}`;
     return button;
   }));
   const page = activePage(project);
   $('artboardName').textContent = page.name;
-  $('pageSummary').textContent = `${project.pages.filter(page => page.kind === 'page').length} 页面 · ${project.pages.filter(page => page.kind === 'popup').length} 弹窗`;
+  $('pageSummary').textContent = Object.entries(PAGE_KINDS).map(([kind, label]) => `${project.pages.filter(page => page.kind === kind).length} ${label}`).join(' · ');
 }
 function applyPageChange(next, label) {
   project = next; selectedId = null; selectedIds.clear(); commit(label);
@@ -355,14 +377,14 @@ $('pageList').addEventListener('click', safeAction(event => {
   if (!button || button.dataset.pageId === project.activePageId) return;
   finishGesture(); applyPageChange(switchPage(project, button.dataset.pageId), '切换编辑页面');
 }));
-for (const [id, kind] of [['addPageBtn', 'page'], ['addPopupBtn', 'popup']]) $(id).addEventListener('click', safeAction(() => {
-  finishGesture(); applyPageChange(addPage(project, kind), kind === 'popup' ? '新增弹窗' : '新增页面');
+for (const [id, kind] of [['addPageBtn', 'page'], ['addPopupBtn', 'popup'], ['addToastBtn', 'toast']]) $(id).addEventListener('click', safeAction(() => {
+  finishGesture(); applyPageChange(addPage(project, kind), `新增${PAGE_KINDS[kind]}`);
 }));
 let managedPageId = null;
 $('managePageBtn').addEventListener('click', () => {
   finishGesture(); const page = activePage(project); managedPageId = page.id;
   $('pageName').value = page.name; $('pageError').textContent = '';
-  $('pageStart').checked = page.id === project.startPageId; $('pageStart').disabled = page.kind === 'popup';
+  $('pageStart').checked = page.id === project.startPageId; $('pageStart').disabled = page.kind !== 'page';
   $('deletePageBtn').disabled = page.kind === 'page' && project.pages.filter(page => page.kind === 'page').length === 1;
   $('pageDialog').showModal();
 });
@@ -390,7 +412,7 @@ function renderLayers() {
     button.setAttribute('aria-pressed', String(selectedIds.has(item.id)));
     button.dataset.itemId = item.id;
     const hidden = orientationPresentation(item, project.canvas).hidden;
-    button.innerHTML = `${icon(item.type === 'image' ? 'image' : item.type === 'svg' ? 'star' : 'layers')}<span>${escapeHTML(item.name)}${hidden ? ' · 当前方向隐藏' : ''}</span>`;
+    button.innerHTML = `${icon(item.type === 'image' ? 'image' : item.type === 'svg' ? 'star' : 'layers')}<span>${escapeHTML(item.name)}${hidden ? item.visible === false ? ' · 初始隐藏' : ' · 当前方向隐藏' : ''}</span>`;
     $('layerList').append(button);
   }
   $('layerCount').textContent = project.items.length;
@@ -578,7 +600,7 @@ function add(component, x = 40, y = 40, snap = false) {
 }
 function removeSelected() {
   if (!selectedItem()) return;
-  project.items = project.items.filter(item => !selectedIds.has(item.id));
+  project.items = cleanVisibilityTargets(project.items.filter(item => !selectedIds.has(item.id)));
   selectedId = null; selectedIds.clear(); commit('删除组件'); notify('已删除所选组件，可撤销恢复');
 }
 function duplicateSelected() {
@@ -586,7 +608,7 @@ function duplicateSelected() {
   if (!item) return;
   if (project.items.length + selectedIds.size > MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
   const moved = moveItems(project, selectionStarts(), 16, 16);
-  const copies = moved.items.filter(value => selectedIds.has(value.id)).map(value => normalizeItem({ ...clone(value), id: uid(), name: `${value.name} 副本` }, project.canvas, itemBounds(project)));
+  const copies = copyItems(moved.items.filter(value => selectedIds.has(value.id))).map(value => normalizeItem({ ...value, name: `${value.name} 副本` }, project.canvas, itemBounds(project)));
   project.items.push(...copies); selectedIds = new Set(copies.map(value => value.id)); selectedId = copies.at(-1).id; commit('复制组件'); notify('已复制所选组件');
 }
 function restore(direction) {
@@ -734,7 +756,7 @@ $('selectionProps').addEventListener('submit', safeAction(async event => {
   for (const [index, source] of pendingImages) content = updateImageContent({ ...item, content }, index, source);
   if (!contentSizeValid(content, item.type)) throw new Error('组件内容过大，请使用较小图片或独立图片组件');
   const geometryChanged = Object.entries({ propX: 'x', propY: 'y', propW: 'width', propH: 'height' }).some(([field, key]) => Number($(field).value) !== item[key]);
-  const next = normalizeItem({ ...item, content, appearance: readPropertyAppearance(), name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: readPropertySpacing('Padding'), margin: readPropertySpacing('Margin'), orientationResponse: readOrientationFields('prop'), interaction: normalizeInteraction({ type: $('propClickAction').value, targetId: $('propClickTarget').value }) }, project.canvas, geometryChanged ? placementBounds(project) : itemBounds(project));
+  const next = normalizeItem({ ...item, content, appearance: readPropertyAppearance(), name: $('propName').value.trim(), visible: $('propVisible').checked, x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: readPropertySpacing('Padding'), margin: readPropertySpacing('Margin'), orientationResponse: readOrientationFields('prop'), interaction: readInteraction() }, project.canvas, geometryChanged ? placementBounds(project) : itemBounds(project));
   for (const source of images) {
     const image = new Image(); image.src = source;
     try { await image.decode(); } catch { throw new Error('图片内容无效，无法读取'); }
@@ -747,6 +769,11 @@ $('deleteItemBtn').addEventListener('click', removeSelected);
 $('duplicateItemBtn').addEventListener('click', safeAction(duplicateSelected));
 $('undoBtn').addEventListener('click', () => restore('undo')); $('redoBtn').addEventListener('click', () => restore('redo'));
 $('zoomSelect').addEventListener('change', () => { finishGesture(); zoom = Number($('zoomSelect').value); updateZoom(); });
+attachViewportZoom($('canvasViewport'), $('canvasScaler'), {
+  getZoom: () => zoom,
+  setZoom: value => { zoom = value; updateZoom(); },
+  beforeZoom: () => finishGesture(true)
+});
 function fitCanvas() {
   const layout = frameLayout(project.canvas, project.frame);
   const viewport = $('canvasViewport');

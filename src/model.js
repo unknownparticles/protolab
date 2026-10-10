@@ -2,7 +2,7 @@ import { normalizeFrame } from './frames.js';
 import { normalizeAppearance } from './appearance.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { normalizeOrientationResponse } from './orientation.js';
-import { MAX_PAGES, normalizeInteraction, syncPages, pageBoard, validatePageLinks } from './pages.js';
+import { MAX_PAGES, PAGE_KINDS, normalizeInteraction, syncPages, pageBoard, validatePageLinks } from './pages.js';
 /** 与 DOM 无关的画布模型；坐标始终使用实际画布像素。 */
 export const PRESETS = Object.freeze({
   phone: { width: 375, height: 667, label: '手机' },
@@ -35,6 +35,7 @@ export function spacing(value = '0') {
   return tokens.join(' ');
 }
 export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) {
+  if (item.visible != null && typeof item.visible !== 'boolean') throw new Error('元素显示状态须为布尔值');
   const interaction = normalizeInteraction(item.interaction);
   const width = number(item.width, 100, 1, bounds.width);
   const height = number(item.height, 40, 1, bounds.height);
@@ -132,7 +133,7 @@ export function validateProject(raw, sanitize) {
     if (!Array.isArray(raw.pages) || !raw.pages.length || raw.pages.length > MAX_PAGES) throw new Error('页面与弹窗合计须为 1～30 个');
     const ids = new Set();
     project.pages = raw.pages.map(page => {
-      if (!page || typeof page.id !== 'string' || !page.id || page.id.length > 100 || ids.has(page.id) || !['page', 'popup'].includes(page.kind) || typeof page.name !== 'string' || !page.name.trim() || page.name.length > 40 || page.pages != null) throw new Error('页面格式不正确或标识重复');
+      if (!page || typeof page.id !== 'string' || !page.id || page.id.length > 100 || ids.has(page.id) || !Object.hasOwn(PAGE_KINDS, page.kind) || typeof page.name !== 'string' || !page.name.trim() || page.name.length > 40 || page.pages != null) throw new Error('页面格式不正确或标识重复');
       ids.add(page.id);
       const board = validateBoard({ ...page, version: 1 }, sanitize);
       return { id: page.id, name: page.name.trim(), kind: page.kind, ...pageBoard(board) };
