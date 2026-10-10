@@ -85,8 +85,8 @@ try {
   assert.equal(await page.locator('.editor-item').count(), 2);
   assert.equal((await current()).project.pages.length, beforePages + 1);
   assert.equal((await current()).project.pages[0].items.length, 2);
-  await page.locator('#aiCloseBtn').click(); await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#pageList button').count(), beforePages);
-  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#pageList button').count(), beforePages + 1);
+  await page.locator('#aiCloseBtn').click(); await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#pageList [data-page-id]').count(), beforePages);
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#pageList [data-page-id]').count(), beforePages + 1);
   await saved(); await page.reload(); assert.equal(await page.locator('#customList .component-item').count(), 1);
   console.log('通过：规范注入、组件预览复用、新增可编辑页面、撤销重做及刷新恢复');
 
