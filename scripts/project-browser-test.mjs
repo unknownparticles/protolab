@@ -19,6 +19,7 @@ try {
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(base); await page.locator('[data-comp-id="lib-btn"]').click();
+  const savedProject = () => page.evaluate(() => { const { savedAt, ...value } = JSON.parse(localStorage.getItem('protolab.project.v1')); return value; });
   const importFile = async (name, text, width = '600', height = '400') => {
     await page.locator('#importProjectBtn').click();
     await page.locator('#projectFileInput').setInputFiles({ name, mimeType: name.endsWith('.json') ? 'application/json' : 'text/html', buffer: Buffer.from(text) });
@@ -69,11 +70,11 @@ try {
   const htmlDownload = page.waitForEvent('download'); await page.locator('#exportHtmlBtn').click();
   const htmlFile = await htmlDownload; const html = await readFile(await htmlFile.path(), 'utf8');
   await importFile('project.json', json); await page.waitForFunction(() => !document.getElementById('projectDialog').open);
-  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')));
+  let saved = await savedProject();
   assert.deepEqual(saved, bundle.project);
   assert.equal(await page.locator('#customList .component-item').count(), 1);
   await importFile('prototype.html', html); await page.waitForFunction(() => !document.getElementById('projectDialog').open);
-  saved = await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')));
+  saved = await savedProject();
   assert.deepEqual(saved, bundle.project);
   await page.reload(); assert.equal(await page.locator('.editor-item').count(), count);
   console.log('通过：工程 JSON、HTML 往返及自定义组件库、草稿恢复');
@@ -83,7 +84,7 @@ try {
     await importFile(name, text);
     await page.waitForFunction(() => !document.getElementById('applyProjectImportBtn').disabled);
     assert.match(await page.locator('#projectError').textContent(), pattern);
-    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1'))), baseline);
+    assert.deepEqual(await savedProject(), baseline);
     await page.locator('#projectDialog [data-close]').first().click();
   }
   const requests = []; page.on('request', request => { if (request.url().includes('evil.example')) requests.push(request.url()); });
