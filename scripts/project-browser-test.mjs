@@ -63,7 +63,7 @@ try {
   console.log('通过：HTML 的组件识别、页面 CSS、变量、Flex/Grid、位置尺寸与独立编辑、撤销重做');
 
   // 工程包含自定义组件及设备设置，导出的 HTML 也可恢复精确模型。
-  await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('工程自定义组件');
+  await page.locator('#customTab').click(); await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('工程自定义组件');
   await page.locator('#customCode').fill('<div>工程片段</div>'); await page.locator('#componentForm button[type="submit"]').click();
   const jsonDownload = page.waitForEvent('download'); await clickAction(page, '#exportProjectBtn');
   const jsonFile = await jsonDownload; const json = await readFile(await jsonFile.path(), 'utf8');

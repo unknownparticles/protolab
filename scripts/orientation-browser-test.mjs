@@ -25,7 +25,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
   await page.locator('#snapComponents').uncheck();
-  await page.locator('#showStatusBar').check();
+  await page.locator('#canvasPropertiesTab').click(); await page.locator('#showStatusBar').check();
   await page.locator('#safeTop').fill('10'); await page.locator('#safeBottom').fill('10');
   await page.locator('#safeAreaEnabled').check();
   await page.locator('[data-comp-id="lib-btn"]').click();
@@ -49,7 +49,7 @@ try {
   await page.locator('#propOrientationEnabled').check();
   await page.locator('#propLandscapeAction').selectOption('rotate90');
   await page.locator('#selectionProps button[type="submit"]').click();
-  await page.locator('#addHtmlCompBtn').click();
+  await page.locator('#customTab').click(); await page.locator('#addHtmlCompBtn').click();
   await page.locator('#customName').fill('横屏隐藏卡片');
   await page.locator('#customOrientationEnabled').check();
   await page.locator('#customLandscapeAction').selectOption('hide');

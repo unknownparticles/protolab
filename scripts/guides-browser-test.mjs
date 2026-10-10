@@ -34,7 +34,7 @@ try {
   assert.equal(await page.locator('#rulerHorizontal').isVisible(), true);
   assert.equal(await page.locator('#canvasGrid').isVisible(), false);
   assert.equal(await page.locator('[data-align="center"]').isDisabled(), true);
-  await page.locator('#showGrid').check(); await page.locator('#gridSize').selectOption('10');
+  await page.locator('#showGrid').check(); await page.locator('#canvasPropertiesTab').click(); await page.locator('#gridSize').selectOption('10');
   assert.equal(await page.locator('#canvasGrid').evaluate(node => getComputedStyle(node).backgroundSize), '10px 10px, 10px 10px');
   await page.locator('#showRulers').uncheck();
   assert.equal(await page.locator('#rulerHorizontal').isVisible(), false);
@@ -104,7 +104,7 @@ try {
   await page.locator('#deleteItemBtn').click(); assert.equal(await page.locator('.editor-item').count(), 2);
   console.log('通过：画布及图层多选、七种互相对齐、缩放下整组拖动、边界微调、取消、整组复制删除');
 
-  await page.locator('#frameStyle').selectOption('classic');
+  await page.locator('#canvasPropertiesTab').click(); await page.locator('#frameStyle').selectOption('classic');
   const canvas = await page.locator('#canvas').boundingBox();
   const ruler = await page.locator('#rulerVertical').boundingBox(); assert.ok(Math.abs(canvas.y - ruler.y) <= 1);
   await page.locator('#showRulers').uncheck();

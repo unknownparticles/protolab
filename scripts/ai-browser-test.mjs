@@ -57,7 +57,7 @@ try {
   assert.equal(await page.locator('.editor-item').count(), 0);
   await page.locator('#historyList .version-row').first().locator('button').click();
   assert.equal(await page.locator('.editor-item').count(), 1);
-  await page.locator('[data-close="historyDialog"]').click();
+  await page.locator('#layersTab').click();
   await clickAction(page, '#saveBtn'); assert.equal(await versionCount(), 2);
   await page.locator('#componentSearch').focus(); await page.keyboard.press('Control+s'); assert.equal(await versionCount(), 3);
   await page.keyboard.press('Meta+s'); assert.equal(await versionCount(), 4);
@@ -114,23 +114,23 @@ try {
   console.log('通过：非法响应和取消请求不修改画布');
 
   await page.locator('#aiCloseBtn').click(); await page.locator('#versionsBtn').click();
-  const versionsBefore = await page.locator('.version-row').count();
+  const versionsBefore = await page.locator('#versionsList .version-row').count();
   assert.ok(versionsBefore >= 7);
-  await page.locator('.version-row').last().locator('button').click();
+  await page.locator('#versionsList .version-row').last().locator('button').click();
   assert.equal(await page.locator('.editor-item').count(), 0);
-  await page.locator('[data-close="versionsDialog"]').click();
+  await page.locator('#layersTab').click();
   await page.locator('[data-comp-id="lib-text"]').click();
   await page.waitForTimeout(350); await page.reload();
   assert.equal(await page.locator('.editor-item').count(), 1);
   await page.locator('#versionsBtn').click();
-  assert.equal(await page.locator('.version-row').count(), versionsBefore);
+  assert.equal(await page.locator('#versionsList .version-row').count(), versionsBefore);
   assert.ok(workspace.versions.entries.length > 1);
   const downloadPromise = page.waitForEvent('download'); await page.locator('#versionsExportBtn').click();
   const download = await downloadPromise; const archive = await readFile(await download.path(), 'utf8');
   assert.equal(archive.includes('mock-secret'), false);
   const data = JSON.parse(archive); assert.ok(data.versions.entries.some(entry => entry.mergeParent));
   await page.locator('#versionsFileInput').setInputFiles({ name: 'versions.json', mimeType: 'application/json', buffer: Buffer.from(archive) });
-  await page.waitForFunction(size => document.querySelectorAll('.version-row').length === size, data.versions.entries.length * 2);
+  await page.waitForFunction(size => document.querySelectorAll('#versionsList .version-row').length === size, data.versions.entries.length * 2);
   await page.waitForTimeout(350); await page.reload();
   assert.equal(await page.locator('.editor-item').count(), 1);
   await clickAction(page, '#aiToggleBtn');
@@ -156,7 +156,7 @@ try {
   assert.equal(await partial.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')).items.length), 2);
   await partial.reload(); assert.equal(await partial.locator('.editor-item').count(), 2);
   await partial.locator('#versionsBtn').click();
-  assert.match(await partial.locator('.version-row').first().textContent(), /初始版本/);
-  assert.equal(await partial.locator('.version-row').count(), 1);
+  assert.match(await partial.locator('#versionsList .version-row').first().textContent(), /初始版本/);
+  assert.equal(await partial.locator('#versionsList .version-row').count(), 1);
   console.log('通过：兼容版本缓存写入失败时，完整工程集合保留最新草稿且不额外生成版本');
 } finally { await browser?.close(); server?.kill(); }

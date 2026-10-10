@@ -70,6 +70,7 @@ try {
   assert.equal(await page.locator('#propY').inputValue(), '240');
   console.log('通过：缩放后的拖动与库组件放置');
 
+  await page.locator('#canvasPropertiesTab').click();
   await page.locator('#canvasWidthInput').fill('432'); await page.locator('#canvasHeightInput').fill('876');
   await page.locator('#applyCanvasSizeBtn').click(); await clickAction(page, '#rotateBtn');
   assert.equal(await page.locator('#canvasWidthInput').inputValue(), '876');
@@ -127,7 +128,7 @@ try {
   assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
   console.log('通过：各设备外框、系统栏、时间电量、自定义 HTML 清理、留白和撤销重做');
 
-  await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('欢迎卡片');
+  await page.locator('#customTab').click(); await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('欢迎卡片');
   await page.locator('#customCode').fill('<style>body{display:none}</style><div onclick="alert(1)" style="background:#eff6ff;width:100%;height:100%;padding:12px">欢迎<script>alert(1)</script></div>');
   await page.locator('#componentForm button[type="submit"]').click();
   assert.equal(await page.locator('#customList .component-item').count(), 1);
@@ -153,18 +154,18 @@ try {
   const libraryData = JSON.parse(await readFile(await libraryFile.path(), 'utf8'));
   assert.equal(libraryData.components.length, builtinCount + 3);
   await page.locator('#libFileInput').setInputFiles({ name: '旧版.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([{ id: 'legacy', name: '旧版组件', type: 'custom', html: '<div>兼容导入</div>', defaultWidth: 100, defaultHeight: 40 }])) });
-  await page.waitForFunction(() => document.getElementById('libCount').textContent === '24');
+  await page.waitForFunction(() => document.getElementById('libCount').textContent === '27');
   assert.equal(await page.locator('.editor-item').count(), 3);
   await page.locator('#libFileInput').setInputFiles({ name: '无效.json', mimeType: 'application/json', buffer: Buffer.from('[{"name":"无内容"}]') });
   await page.waitForFunction(() => document.getElementById('toast').classList.contains('error'));
-  assert.equal(await page.locator('.component-item').count(), builtinCount + 1);
+  assert.equal(await page.locator('.component-item').count(), builtinCount + 4);
   await page.locator('#libFileInput').setInputFiles({ name: '恢复.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(libraryData)) });
-  await page.waitForFunction(() => document.getElementById('libCount').textContent === '26');
-  console.log('通过：JSON 导出、旧版导入、无效文件不改变组件库');
+  await page.waitForFunction(() => document.getElementById('libCount').textContent === '27');
+  console.log('通过：JSON 导出、旧版合并导入、无效文件不改变组件库');
 
   await page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await page.reload(); await page.waitForSelector('.editor-item');
-  assert.equal(await page.locator('.editor-item').count(), 3); assert.equal(await page.locator('.component-item').count(), builtinCount + 3);
+  assert.equal(await page.locator('.editor-item').count(), 3); assert.equal(await page.locator('.component-item').count(), builtinCount + 4);
   assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
   assert.match(await page.locator('.device-status').textContent(), /13:20.*67%/);
   assert.equal(await page.locator('.device-gesture').count(), 1);
@@ -222,7 +223,7 @@ try {
   await stress.locator('[data-comp-id="lib-btn"]').click();
   assert.equal(await stress.locator('.editor-item').count(), 200);
   assert.match(await stress.locator('#toast').textContent(), /最多 200/);
-  await stress.locator('.layer-item').first().click();
+  await stress.locator('#layersTab').click(); await stress.locator('.layer-item').first().click();
   await stress.locator('#layerDownBtn').click();
   assert.equal(await stress.locator('#layerList .layer-item').nth(1).evaluate(element => element.classList.contains('selected')), true);
   console.log(`通过：200 组件加载与数量限制、图层排序（本机加载 ${renderTime} ms）`);
@@ -242,7 +243,7 @@ try {
   controls.on('pageerror', error => errors.push(error.message));
   await controls.goto(base);
   assert.equal(await controls.locator('.device-cutout.island').count(), 1);
-  await controls.locator('#showStatusBar').check();
+  await controls.locator('#canvasPropertiesTab').click(); await controls.locator('#showStatusBar').check();
   for (const camera of ['notch', 'island', 'punch-center', 'punch-left']) {
     await controls.locator('#cameraStyle').selectOption(camera);
     const mask = await controls.locator('.device-cutout').boundingBox();

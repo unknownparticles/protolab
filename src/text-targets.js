@@ -23,4 +23,3 @@ export function textTargets(fragment) {
   visit(fragment);
   return targets;
 }
-
