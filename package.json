@@ -10,6 +10,7 @@
     "check": "node scripts/check.mjs",
     "test:browser": "node scripts/browser-test.mjs",
     "test:properties": "node scripts/properties-browser-test.mjs",
+    "test:collapse": "node scripts/collapse-browser-test.mjs",
     "test:guides": "node scripts/guides-browser-test.mjs",
     "test:project": "node scripts/project-browser-test.mjs",
     "test:ai": "node scripts/ai-browser-test.mjs",
