@@ -2,6 +2,7 @@ import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE
 import { COMPONENTS } from './presets.js';
 import { icon, componentIcon } from './icons.js';
 import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
+import { renderComponentPreview, clearComponentPreview } from './component-preview.js';
 import { FRAME_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLayout } from './frames.js';
 import { LIBRARY_KEY, PROJECT_KEY, readStorage, writeStorage, download, readFile } from './storage.js';
 
@@ -70,6 +71,7 @@ const selectedItem = () => project.items.find(item => item.id === selectedId);
 
 function renderLibrary() {
   const query = $('componentSearch').value.trim().toLowerCase();
+  $('customList').querySelectorAll('.component-preview').forEach(clearComponentPreview);
   $('presetList').replaceChildren(); $('vectorList').replaceChildren(); $('customList').replaceChildren();
   const visible = library.filter(component => component.name.toLowerCase().includes(query));
   for (const component of visible) {
@@ -78,8 +80,14 @@ function renderLibrary() {
     button.dataset.compId = component.id;
     button.title = `添加${component.name}（${component.defaultWidth} × ${component.defaultHeight}）`;
     const symbol = component.builtin && component.type === 'svg' ? component.content : icon(componentIcon(component));
-    button.innerHTML = `<span class="component-symbol">${symbol}</span><span class="component-name">${escapeHTML(component.name)}</span><span class="drag-dots" aria-hidden="true">⠿</span>`;
+    if (component.builtin) {
+      button.innerHTML = `<span class="component-symbol">${symbol}</span><span class="component-name">${escapeHTML(component.name)}</span><span class="drag-dots" aria-hidden="true">⠿</span>`;
+    } else {
+      button.classList.add('custom-component');
+      button.innerHTML = `<span class="component-preview" aria-hidden="true"></span><span class="component-card-meta"><span class="component-name">${escapeHTML(component.name)}</span><span class="drag-dots" aria-hidden="true">⠿</span></span>`;
+    }
     $(component.builtin ? component.type === 'svg' ? 'vectorList' : 'presetList' : 'customList').append(button);
+    if (!component.builtin) renderComponentPreview(button.querySelector('.component-preview'), component);
   }
   const customCount = library.filter(component => !component.builtin).length;
   $('libCount').textContent = library.length;
@@ -348,6 +356,9 @@ $('libFileInput').addEventListener('change', safeAction(async event => {
 function openComponentDialog(type, data = null, name = '') {
   customType = type; imageData = data;
   $('componentForm').reset(); $('componentError').textContent = '';
+  $('componentPreviewSection').hidden = true;
+  clearComponentPreview($('componentPreview'));
+  $('previewComponentBtn').hidden = type === 'image';
   $('customName').value = name;
   $('dialogTitle').textContent = type === 'image' ? '导入图片组件' : `新建 ${type.toUpperCase()} 组件`;
   $('customWidth').value = type === 'svg' ? 60 : 200;
@@ -358,6 +369,34 @@ function openComponentDialog(type, data = null, name = '') {
 }
 $('addHtmlCompBtn').addEventListener('click', () => openComponentDialog('html'));
 $('addSvgCompBtn').addEventListener('click', () => openComponentDialog('svg'));
+function readCustomComponent(preview = false) {
+  for (const id of ['customWidth', 'customHeight']) {
+    if (!$(id).checkValidity()) throw new Error('默认宽度和高度请输入 1～2000 的整数');
+  }
+  const raw = customType === 'image' ? imageData : $('customCode').value;
+  if (customType !== 'image' && raw.length > MAX_CODE) throw new Error('组件代码不能超过 100000 字符');
+  return validateLibrary([{ id: uid(), name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value }], sanitizeContent)[0];
+}
+function previewCustomComponent() {
+  try {
+    const component = readCustomComponent(true);
+    $('componentError').textContent = '';
+    $('componentPreviewSection').hidden = false;
+    $('componentPreviewSize').textContent = `${component.defaultWidth} × ${component.defaultHeight} px`;
+    renderComponentPreview($('componentPreview'), component);
+  } catch (error) {
+    clearComponentPreview($('componentPreview'));
+    $('componentError').textContent = error.message;
+  }
+}
+$('previewComponentBtn').addEventListener('click', previewCustomComponent);
+for (const id of ['customCode', 'customWidth', 'customHeight']) $(id).addEventListener('input', () => {
+  if (!$('componentPreviewSection').hidden) previewCustomComponent();
+});
+$('componentDialog').addEventListener('close', () => {
+  clearComponentPreview($('componentPreview'));
+  $('componentPreviewSection').hidden = true;
+});
 $('importImgCompBtn').addEventListener('click', () => $('imgFileInput').click());
 $('imgFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
@@ -373,9 +412,7 @@ $('componentForm').addEventListener('submit', event => {
   event.preventDefault();
   try {
     if (library.length >= MAX_LIBRARY) throw new Error('组件库最多支持 200 个组件');
-    const raw = customType === 'image' ? imageData : $('customCode').value;
-    if (customType !== 'image' && raw.length > MAX_CODE) throw new Error('组件代码不能超过 100000 字符');
-    const component = validateLibrary([{ id: uid(), name: $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value }], sanitizeContent)[0];
+    const component = readCustomComponent();
     library = validateLibrary([...library, component], sanitizeContent); renderLibrary(); $('componentDialog').close();
     if (persistLibrary()) notify(`「${component.name}」已添加并保存到组件库`);
   } catch (error) { $('componentError').textContent = error.message; }

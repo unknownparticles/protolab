@@ -4,6 +4,8 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { COMPONENTS } from '../src/presets.js';
+const builtinCount = COMPONENTS.length;
 const moduleName = process.env.PROTOLAB_PLAYWRIGHT_MODULE;
 const { chromium } = await import(moduleName ? pathToFileURL(moduleName).href : 'playwright');
 const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4174';
@@ -24,7 +26,7 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.goto(base);
   await page.waitForSelector('.component-item');
-  assert.equal(await page.locator('.component-item').count(), 7);
+  assert.equal(await page.locator('.component-item').count(), builtinCount);
   await page.screenshot({ path: resolve(output, 'desktop-empty.png') });
   console.log('通过：基础组件及桌面首屏');
 
@@ -77,6 +79,52 @@ try {
   await page.locator('#zoomSelect').selectOption('1');
   console.log('通过：预设、自定义与旋转');
 
+  assert.equal(await page.locator('#presetList .component-item').count(), 14);
+  assert.equal(await page.locator('#vectorList .component-item').count(), 9);
+  await page.locator('#frameStyle').selectOption('classic');
+  assert.equal(await page.locator('.device-home').count(), 1);
+  await page.locator('#showStatusBar').check();
+  await page.locator('#statusTime').fill('13:20'); await page.locator('#statusTime').press('Tab');
+  await page.locator('#statusBattery').fill('67'); await page.locator('#statusBattery').press('Tab');
+  await page.locator('#navigationStyle').selectOption('buttons');
+  assert.match(await page.locator('.device-status').textContent(), /13:20.*67%/);
+  assert.equal(await page.locator('.device-navigation.buttons').count(), 1);
+  await page.locator('#undoBtn').click(); assert.equal(await page.locator('.device-navigation').count(), 0);
+  await page.locator('#redoBtn').click(); assert.equal(await page.locator('.device-navigation.buttons').count(), 1);
+  await page.locator('#navigationStyle').selectOption('gesture');
+  assert.equal(await page.locator('.device-gesture').count(), 1);
+  await page.locator('[data-preset="tablet"]').click();
+  for (const style of ['modern', 'classic']) {
+    await page.locator('#frameStyle').selectOption(style);
+    assert.equal(await page.locator(`#deviceShell.tablet-${style}`).count(), 1);
+    assert.equal(await page.locator('.device-status').count(), 1);
+  }
+  await page.locator('[data-preset="pc"]').click();
+  for (const style of ['monitor', 'laptop', 'browser']) {
+    await page.locator('#frameStyle').selectOption(style);
+    assert.equal(await page.locator(`#deviceShell.pc-${style}`).count(), 1);
+    assert.equal(await page.locator('.device-status,.device-navigation').count(), 0);
+  }
+  await page.locator('[data-preset="phone"]').click();
+  await page.locator('#frameStyle').selectOption('none');
+  assert.equal(await page.locator('#deviceShell').evaluate(element => element.clientWidth), 375);
+  await page.locator('#frameStyle').selectOption('custom');
+  await page.locator('#frameCode').fill('<script>alert(1)</script>');
+  await page.locator('#frameForm button[type="submit"]').click();
+  assert.match(await page.locator('#frameError').textContent(), /可用/);
+  await page.locator('#frameCode').fill('<style>body{display:none}</style><div onclick="alert(1)" style="width:100%;height:100%;background:#17324d;border-radius:24px"><span style="position:absolute;bottom:2px;left:32px;color:white;font-size:12px">自定义外框</span><script>alert(1)</script></div>');
+  for (const [id, value] of Object.entries({ frameTop: '10', frameRight: '16', frameBottom: '24', frameLeft: '18' })) await page.locator(`#${id}`).fill(value);
+  await page.locator('#frameForm button[type="submit"]').click();
+  assert.equal(await page.locator('#deviceShell').evaluate(element => element.clientWidth), 409);
+  assert.equal(await page.locator('#deviceShell').evaluate(element => element.clientHeight), 701);
+  assert.equal(await page.locator('#deviceShell script,#deviceShell style,#deviceShell [onclick]').count(), 0);
+  assert.match(await page.locator('.device-decoration').textContent(), /自定义外框/);
+  await page.locator('#undoBtn').click(); assert.equal(await page.locator('#frameStyle').inputValue(), 'none');
+  await page.locator('#redoBtn').click(); assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
+  await page.locator('#editFrameBtn').click(); await page.locator('[data-close="frameDialog"]').first().click();
+  assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
+  console.log('通过：各设备外框、系统栏、时间电量、自定义 HTML 清理、留白和撤销重做');
+
   await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('欢迎卡片');
   await page.locator('#customCode').fill('<style>body{display:none}</style><div onclick="alert(1)" style="background:#eff6ff;width:100%;height:100%;padding:12px">欢迎<script>alert(1)</script></div>');
   await page.locator('#componentForm button[type="submit"]').click();
@@ -87,7 +135,7 @@ try {
   await page.locator('#addSvgCompBtn').click(); await page.locator('#customName').fill('圆形');
   await page.locator('#componentForm button[type="submit"]').click();
   assert.equal(await page.locator('#customList .component-item').count(), 2);
-  await page.locator('#componentSearch').fill('圆形'); assert.equal(await page.locator('.component-item').count(), 1);
+  await page.locator('#componentSearch').fill('圆形'); assert.equal(await page.locator('.component-item').count(), builtinCount + 1);
   await page.locator('#componentSearch').fill('');
   console.log('通过：HTML、SVG 创建、内容清理与搜索');
 
@@ -101,20 +149,23 @@ try {
   const libraryDownload = page.waitForEvent('download'); await page.locator('#exportLibBtn').click();
   const libraryFile = await libraryDownload;
   const libraryData = JSON.parse(await readFile(await libraryFile.path(), 'utf8'));
-  assert.equal(libraryData.components.length, 10);
+  assert.equal(libraryData.components.length, builtinCount + 3);
   await page.locator('#libFileInput').setInputFiles({ name: '旧版.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([{ id: 'legacy', name: '旧版组件', type: 'custom', html: '<div>兼容导入</div>', defaultWidth: 100, defaultHeight: 40 }])) });
-  await page.waitForFunction(() => document.getElementById('libCount').textContent === '1');
+  await page.waitForFunction(() => document.getElementById('libCount').textContent === '24');
   assert.equal(await page.locator('.editor-item').count(), 3);
   await page.locator('#libFileInput').setInputFiles({ name: '无效.json', mimeType: 'application/json', buffer: Buffer.from('[{"name":"无内容"}]') });
   await page.waitForFunction(() => document.getElementById('toast').classList.contains('error'));
-  assert.equal(await page.locator('.component-item').count(), 1);
+  assert.equal(await page.locator('.component-item').count(), builtinCount + 1);
   await page.locator('#libFileInput').setInputFiles({ name: '恢复.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(libraryData)) });
-  await page.waitForFunction(() => document.getElementById('libCount').textContent === '10');
+  await page.waitForFunction(() => document.getElementById('libCount').textContent === '26');
   console.log('通过：JSON 导出、旧版导入、无效文件不改变组件库');
 
   await page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await page.reload(); await page.waitForSelector('.editor-item');
-  assert.equal(await page.locator('.editor-item').count(), 3); assert.equal(await page.locator('.component-item').count(), 10);
+  assert.equal(await page.locator('.editor-item').count(), 3); assert.equal(await page.locator('.component-item').count(), builtinCount + 3);
+  assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
+  assert.match(await page.locator('.device-status').textContent(), /13:20.*67%/);
+  assert.equal(await page.locator('.device-gesture').count(), 1);
   console.log('通过：组件库与草稿刷新恢复');
 
   await page.locator('#previewBtn').click();
@@ -122,6 +173,8 @@ try {
   await preview.locator('.prototype').waitFor();
   assert.equal(await preview.locator('.prototype').evaluate(element => element.clientHeight), 667);
   assert.equal(await preview.locator('.prototype-item').count(), 3);
+  assert.match(await preview.locator('.device-status').textContent(), /13:20.*67%/);
+  assert.equal(await preview.locator('.device-shell').evaluate(element => element.clientWidth), 409);
   await page.locator('[data-close="previewDialog"]').click();
   const prototypeDownload = page.waitForEvent('download'); await page.locator('#exportHtmlBtn').click();
   const prototypeFile = await prototypeDownload;
@@ -129,6 +182,8 @@ try {
   const exported = await context.newPage(); await exported.setContent(prototype);
   assert.equal(await exported.locator('.prototype').evaluate(element => element.clientHeight), 667);
   assert.equal(await exported.locator('.prototype').evaluate(element => element.clientWidth), 375);
+  assert.match(await exported.locator('.device-decoration').textContent(), /自定义外框/);
+  assert.equal(await exported.locator('.device-shell').evaluate(element => element.clientHeight), 701);
   assert.equal(await exported.locator('.prototype-item').first().getAttribute('data-name'), '按钮 "测试" <名称>');
   const properties = ['width','height','padding','margin','borderRadius','backgroundColor','display','boxShadow'];
   const editorStyles = await page.locator('.editor-item > .prototype-item').evaluateAll((elements, properties) => elements.map(element => Object.fromEntries(properties.map(property => [property, getComputedStyle(element)[property]]))), properties);
@@ -174,7 +229,7 @@ try {
   const damaged = await damagedContext.newPage();
   await damaged.addInitScript(() => { localStorage.setItem('protolab.project.v1', '{broken'); localStorage.setItem('protolab.library.v1', '{broken'); });
   await damaged.goto(base); await damaged.waitForSelector('.component-item');
-  assert.equal(await damaged.locator('.component-item').count(), 7);
+  assert.equal(await damaged.locator('.component-item').count(), builtinCount);
   assert.equal(await damaged.locator('.editor-item').count(), 0);
   assert.match(await damaged.locator('#toast').textContent(), /读取失败/);
   console.log('通过：损坏存储回退且保留原始数据');
