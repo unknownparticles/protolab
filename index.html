@@ -81,6 +81,11 @@
       <div class="panel-heading"><h1>组件库</h1><span class="badge" id="libCount">23</span></div>
       <p class="panel-description">拖拽到画布，或点击快速添加</p>
       <label class="search-box"><span data-icon="search"></span><input id="componentSearch" type="search" placeholder="搜索组件…" aria-label="搜索组件"></label>
+      <div class="library-tabs toolbox-tabs" role="tablist" aria-label="素材分类">
+        <button id="componentsTab" role="tab" type="button" data-toolbox-tab="components" aria-controls="componentsPanel" aria-selected="true">组件</button>
+        <button id="containersTab" role="tab" type="button" data-toolbox-tab="containers" aria-controls="containersPanel" aria-selected="false" tabindex="-1">容器</button>
+      </div>
+      <div id="componentsPanel" class="toolbox-panel" role="tabpanel" aria-labelledby="componentsTab">
       <div class="library-tabs" role="tablist" aria-label="组件分类">
         <button id="basicTab" role="tab" type="button" data-library-tab="basic" aria-controls="basicPanel" aria-selected="true">基础<span id="basicCount">14</span></button>
         <button id="vectorTab" role="tab" type="button" data-library-tab="vector" aria-controls="vectorPanel" aria-selected="false" tabindex="-1">矢量<span id="vectorCount">9</span></button>
@@ -104,6 +109,12 @@
         </section>
         <p class="custom-empty" id="libraryEmpty" hidden>当前分类没有匹配的组件</p>
       </div>
+      </div>
+      <section id="containersPanel" class="library-scroll" role="tabpanel" aria-labelledby="containersTab" hidden>
+        <div class="section-label">布局容器</div><div id="containerList" class="component-list vector-list"></div>
+        <p class="field-help">拖入组件自动排列；选中容器后点击组件也可添加。已有组件可在属性中选择所属容器。</p>
+        <p class="custom-empty" id="containerEmpty" hidden>没有匹配的容器</p>
+      </section>
       <div class="library-footer" data-collapsible="library-management">
         <div class="section-label">组件库管理</div>
         <div class="lib-actions">
@@ -149,11 +160,18 @@
           <form id="selectionProps" hidden>
             <p class="field-help" id="selectionDetail"></p>
             <label class="field">组件名称<input id="propName" maxlength="80" required></label>
+            <label class="field" id="parentContainerField">所属容器<select id="propParentContainer"></select></label>
+            <fieldset class="property-group" id="containerProperties" hidden><legend>容器布局</legend>
+              <label class="field">布局方式<select id="propContainerMode"><option value="vertical">纵向布局</option><option value="horizontal">横向布局</option><option value="grid">网格布局</option></select></label>
+              <div class="field-grid"><label class="field">组件间距 · px<input id="propContainerGap" type="number" min="0" max="200" value="12" required></label><label class="field" id="containerColumnsField">网格列数<input id="propContainerColumns" type="number" min="1" max="12" value="2" required></label></div>
+              <p class="field-help">内部组件自动排列；空间不足时缩小适配。内边距控制容器留白。</p>
+            </fieldset>
+            <p class="field-help" id="containerChildHelp" hidden>位置由容器自动计算；选择画布可移出容器。</p>
             <label class="checkbox-field"><input id="propVisible" type="checkbox">初始显示元素</label>
             <label class="checkbox-field"><input id="propCollapseSpace" type="checkbox" checked>隐藏时收起布局空间</label>
             <p class="field-help">取消后可从图层选中并编辑；通过点击动作显示隐藏的内容。</p>
-            <div class="field-grid"><label class="field">X<input id="propX" type="number" min="0" required></label><label class="field">Y<input id="propY" type="number" min="0" required></label></div>
-            <div class="field-grid"><label class="field">宽度<input id="propW" type="number" min="1" max="2000" required></label><label class="field">高度<input id="propH" type="number" min="1" max="2000" required></label></div>
+            <div class="field-grid"><label class="field">X<input id="propX" type="number" step="any" min="0" required></label><label class="field">Y<input id="propY" type="number" step="any" min="0" required></label></div>
+            <div class="field-grid"><label class="field">宽度<input id="propW" type="number" step="any" min="1" max="2000" required></label><label class="field">高度<input id="propH" type="number" step="any" min="1" max="2000" required></label></div>
             <label class="field">圆角 <span class="unit">px</span><input id="propRadius" type="number" min="0" max="50" required></label>
             <fieldset class="property-group" data-collapsible="padding"><legend>内边距 padding · px</legend><div class="spacing-grid"><label class="field">上<input id="propPaddingTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propPaddingRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propPaddingBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propPaddingLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>
             <fieldset class="property-group" data-collapsible="margin"><legend>外边距 margin · px</legend><div class="spacing-grid"><label class="field">上<input id="propMarginTop" type="number" min="0" max="200" step="0.1" required></label><label class="field">右<input id="propMarginRight" type="number" min="0" max="200" step="0.1" required></label><label class="field">下<input id="propMarginBottom" type="number" min="0" max="200" step="0.1" required></label><label class="field">左<input id="propMarginLeft" type="number" min="0" max="200" step="0.1" required></label></div></fieldset>

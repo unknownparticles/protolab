@@ -74,8 +74,9 @@ export function itemHTML(item, canvas, position = item) {
   const { hidden, angle } = orientationPresentation(item, canvas);
   const orientationHidden = orientationPresentation({ ...item, visible: true }, canvas).hidden;
   const action = normalizeInteraction(item.interaction);
+  const layoutData = `${item.container ? ` data-container="${escapeHTML(JSON.stringify(item.container))}" data-padding="${escapeHTML(item.padding)}"` : ''}${item.parentId ? ` data-parent-id="${escapeHTML(item.parentId)}" data-layout-basis="${escapeHTML(JSON.stringify(item.layoutBasis || { width: item.width, height: item.height }))}"` : ''}`;
   const interaction = action ? ` data-action="${escapeHTML(action.type)}"${action.targetId ? ` data-target="${escapeHTML(action.targetId)}"` : ''}${action.targetIds ? ` data-targets="${escapeHTML(JSON.stringify(action.targetIds))}" data-mode="${action.mode}"` : ''}${action.duration ? ` data-duration="${action.duration}"` : ''} role="button" tabindex="0" aria-label="${escapeHTML(item.name)}"` : '';
-  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}${appearance.classes ? ` ${appearance.classes}` : ''}" data-element-id="${escapeHTML(item.id || '')}" data-layout-y="${item.y}" data-visible="${item.visible !== false}" data-collapse-space="${item.collapseSpace !== false}" data-initial-visible="${item.visible !== false}"${orientationHidden ? ' data-orientation-hidden="true"' : ''}${hidden ? ' hidden' : ''} data-name="${escapeHTML(item.name)}"${interaction} style="left:${item.x}px;top:${position.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${appearance.style ? `;${escapeHTML(appearance.style)}` : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
+  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.container ? ' layout-container' : ''}${item.imported ? ' imported-item' : ''}${appearance.classes ? ` ${appearance.classes}` : ''}" data-element-id="${escapeHTML(item.id || '')}"${layoutData} data-layout-y="${item.y}" data-visible="${item.visible !== false}" data-collapse-space="${item.collapseSpace !== false}" data-initial-visible="${item.visible !== false}"${orientationHidden ? ' data-orientation-hidden="true"' : ''}${hidden ? ' hidden' : ''} data-name="${escapeHTML(item.name)}"${interaction} style="left:${position.x}px;top:${position.y}px;width:${position.width}px;height:${position.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${appearance.style ? `;${escapeHTML(appearance.style)}` : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
 }
 export const PROTOTYPE_CSS = `
 ${APPEARANCE_CSS}
@@ -86,6 +87,7 @@ ${APPEARANCE_CSS}
 .prototype-content p,.prototype-content h1,.prototype-content h2,.prototype-content h3{margin:0}
 .prototype-content input,.prototype-content textarea,.prototype-content button{font-family:inherit}
 .prototype-item.vector-item{background:transparent;box-shadow:none}
+.prototype-item.layout-container{box-shadow:none;background:#f8fafc}
 .prototype-item.imported-item{background:transparent;box-shadow:none;overflow:visible}
 .imported-item>.prototype-content{display:block;overflow:visible}
 .device-shell{position:relative;flex-shrink:0;isolation:isolate;font-family:system-ui,-apple-system,sans-serif}

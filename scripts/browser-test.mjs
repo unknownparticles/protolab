@@ -28,7 +28,7 @@ try {
   await page.goto(base);
   await page.locator('#snapComponents').uncheck();
   await page.waitForSelector('.component-item');
-  assert.equal(await page.locator('.component-item').count(), builtinCount);
+  assert.equal(await page.locator('#componentsPanel .component-item').count(), builtinCount);
   await page.screenshot({ path: resolve(output, 'desktop-empty.png') });
   console.log('通过：基础组件及桌面首屏');
 
@@ -138,7 +138,7 @@ try {
   await page.locator('#addSvgCompBtn').click(); await page.locator('#customName').fill('圆形');
   await page.locator('#componentForm button[type="submit"]').click();
   assert.equal(await page.locator('#customList .component-item').count(), 2);
-  await page.locator('#componentSearch').fill('圆形'); assert.equal(await page.locator('.component-item').count(), 2);
+  await page.locator('#componentSearch').fill('圆形'); assert.equal(await page.locator('#componentsPanel .component-item').count(), 2);
   await page.locator('#componentSearch').fill('');
   console.log('通过：HTML、SVG 创建、内容清理与搜索');
 
@@ -158,14 +158,14 @@ try {
   assert.equal(await page.locator('.editor-item').count(), 3);
   await page.locator('#libFileInput').setInputFiles({ name: '无效.json', mimeType: 'application/json', buffer: Buffer.from('[{"name":"无内容"}]') });
   await page.waitForFunction(() => document.getElementById('toast').classList.contains('error'));
-  assert.equal(await page.locator('.component-item').count(), builtinCount + 4);
+  assert.equal(await page.locator('#componentsPanel .component-item').count(), builtinCount + 4);
   await page.locator('#libFileInput').setInputFiles({ name: '恢复.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(libraryData)) });
   await page.waitForFunction(() => document.getElementById('libCount').textContent === '27');
   console.log('通过：JSON 导出、旧版合并导入、无效文件不改变组件库');
 
   await page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await page.reload(); await page.waitForSelector('.editor-item');
-  assert.equal(await page.locator('.editor-item').count(), 3); assert.equal(await page.locator('.component-item').count(), builtinCount + 4);
+  assert.equal(await page.locator('.editor-item').count(), 3); assert.equal(await page.locator('#componentsPanel .component-item').count(), builtinCount + 4);
   assert.equal(await page.locator('#frameStyle').inputValue(), 'custom');
   assert.match(await page.locator('.device-status').textContent(), /13:20.*67%/);
   assert.equal(await page.locator('.device-gesture').count(), 1);
@@ -232,7 +232,7 @@ try {
   const damaged = await damagedContext.newPage();
   await damaged.addInitScript(() => { localStorage.setItem('protolab.project.v1', '{broken'); localStorage.setItem('protolab.library.v1', '{broken'); });
   await damaged.goto(base); await damaged.waitForSelector('.component-item');
-  assert.equal(await damaged.locator('.component-item').count(), builtinCount);
+  assert.equal(await damaged.locator('#componentsPanel .component-item').count(), builtinCount);
   assert.equal(await damaged.locator('.editor-item').count(), 0);
   assert.match(await damaged.locator('#toast').textContent(), /读取失败/);
   console.log('通过：损坏存储回退且保留原始数据');

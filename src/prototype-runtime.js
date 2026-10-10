@@ -1,6 +1,7 @@
 import { visibilityLayout } from './visibility.js';
+import { containerLayout } from './containers.js';
 /** 固定的原型交互脚本；组件代码仍只允许静态内容。 */
-function runPrototype(layoutItems) {
+function runPrototype(layoutItems, layoutContainers) {
   const pages = [...document.querySelectorAll('[data-prototype-page]')];
   const popups = [...document.querySelectorAll('dialog[data-prototype-popup]')];
   const body = document.body;
@@ -60,8 +61,13 @@ function runPrototype(layoutItems) {
   function updateLayout() {
     for (const board of document.querySelectorAll('.prototype')) {
       const nodes = [...board.children].filter(node => node.classList.contains('prototype-item'));
-      const items = nodes.map(node => ({ id: node.dataset.elementId, x: parseFloat(node.style.left), y: Number(node.dataset.layoutY), width: parseFloat(node.style.width), height: parseFloat(node.style.height), visible: node.dataset.visible !== 'false', collapseSpace: node.dataset.collapseSpace !== 'false' }));
-      layoutItems(items).forEach((item, index) => { nodes[index].style.top = `${item.y}px`; });
+      const items = nodes.map(node => ({ id: node.dataset.elementId, x: parseFloat(node.style.left), y: Number(node.dataset.layoutY), width: parseFloat(node.style.width), height: parseFloat(node.style.height), visible: node.dataset.visible !== 'false', collapseSpace: node.dataset.collapseSpace !== 'false', ...(node.dataset.container ? { container: JSON.parse(node.dataset.container), padding: node.dataset.padding } : {}), ...(node.dataset.parentId ? { parentId: node.dataset.parentId, layoutBasis: JSON.parse(node.dataset.layoutBasis) } : {}) }));
+      layoutItems(items, layoutContainers).forEach((item, index) => {
+        const node = nodes[index];
+        Object.assign(node.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` });
+        const parent = item.parentId && nodes.find(value => value.dataset.elementId === item.parentId);
+        node.hidden = item.visible === false || node.dataset.orientationHidden === 'true' || !!parent && parent.hidden;
+      });
     }
   }
   document.addEventListener('prototype-layout', updateLayout);
@@ -103,7 +109,7 @@ function runPrototype(layoutItems) {
   if (body.dataset.initialPopup) openPopup(body.dataset.initialPopup);
   if (body.dataset.initialToast) showToast(body.dataset.initialToast, 2500, true);
 }
-export const PROTOTYPE_RUNTIME = `(${runPrototype.toString()})(${visibilityLayout.toString()});`;
+export const PROTOTYPE_RUNTIME = `(${runPrototype.toString()})(${visibilityLayout.toString()},${containerLayout.toString()});`;
 export const INTERACTION_CSS = `
 [hidden]{display:none!important}
 .prototype-item[data-action]{cursor:pointer}.prototype-item[data-action]:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}

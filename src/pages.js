@@ -95,6 +95,7 @@ export function copyItems(items) {
   const ids = new Map(items.map(item => [item.id, globalThis.crypto.randomUUID()]));
   return items.map(item => {
     const value = { ...copy(item), id: ids.get(item.id) };
+    if (value.parentId && ids.has(value.parentId)) value.parentId = ids.get(value.parentId);
     if (value.interaction?.type === 'visibility') value.interaction.targetIds = value.interaction.targetIds.map(id => ids.get(id) || id);
     return value;
   });

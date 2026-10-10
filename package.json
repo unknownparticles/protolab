@@ -19,6 +19,7 @@
     "test:menus": "node scripts/menus-browser-test.mjs",
     "test:properties": "node scripts/properties-browser-test.mjs",
     "test:library": "node scripts/library-browser-test.mjs",
+    "test:containers": "node scripts/containers-browser-test.mjs",
     "test:collapse": "node scripts/collapse-browser-test.mjs",
     "test:guides": "node scripts/guides-browser-test.mjs",
     "test:project": "node scripts/project-browser-test.mjs",

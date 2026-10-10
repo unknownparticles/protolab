@@ -73,6 +73,9 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     selected?.overlay?.remove(); if (selected) selected.overlay = null;
     selected = entry;
     if (!entry) return;
+    // 容器重排可能移动其余组件，选择时读取当前呈现尺寸。
+    Object.assign(entry.item, { x: parseFloat(entry.node.style.left), width: parseFloat(entry.node.style.width), height: parseFloat(entry.node.style.height) });
+    entry.item.y = Number(entry.node.dataset.layoutY);
     entry.offsetY = entry.item.y - parseFloat(entry.node.style.top);
     const overlay = document.createElement('div'); overlay.className = 'preview-selection';
     for (const direction of ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']) {
@@ -168,7 +171,8 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
     node.dataset.visible = entry.node.dataset.visible; node.hidden = entry.node.hidden;
     entry.node.replaceWith(node); entry.node = node;
     document.dispatchEvent(new Event('prototype-layout'));
-    entry.offsetY = entry.item.y - parseFloat(node.style.top); position(entry);
+    entry.offsetY = entry.item.y - parseFloat(node.style.top);
+    if (entry.overlay) entry.overlay.style.cssText = `left:${node.style.left};top:${node.style.top};width:${node.style.width};height:${node.style.height};transform:rotate(${entry.item.angle}deg)`;
     hint.textContent = t('修改已同步 · 双击文字编辑 · 拖动控制点调整尺寸');
   });
   // 弹窗关闭或页面跳转后清理选框，防止编辑状态停留在不可见页面。

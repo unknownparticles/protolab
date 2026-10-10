@@ -1,4 +1,7 @@
 const paths = {
+  grid: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/>',
+  layoutVertical: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h10"/>',
+  layoutHorizontal: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7v10M12 7v10M16 7v10"/>',
   logo: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 7h8v4H8zM8 15h8M8 18h5"/><path d="m14 13 3 2-3 4z" fill="currentColor" stroke="none"/>',
   globe: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 6h14M5 18h14"/>',
   button: '<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 12h8"/>',

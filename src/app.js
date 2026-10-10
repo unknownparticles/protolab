@@ -2,6 +2,7 @@ import { t, translate, getLocale, bindStaticTranslations, initializeLanguage } f
 import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, contentSizeValid, uid, clone, normalizeItem, constrainProject, resizeProject, rotateProject, itemBounds, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
 import { ORIENTATION_ACTIONS, normalizeOrientationResponse, orientationPresentation } from './orientation.js';
 import { COMPONENTS } from './presets.js';
+import { CONTAINERS, normalizeContainer } from './containers.js';
 import { IMAGE_FITS, BLEND_MODES, normalizeAppearance, spacingSides } from './appearance.js';
 import { editableContent, updateTextContent, updateImageContent } from './content-editor.js';
 import { icon, componentIcon } from './icons.js';
@@ -49,6 +50,7 @@ initializeMenus(document.querySelector('.app-menubar'));
 initializeMenus($('pageAddMenu'));
 const setPropertiesTab = initializeTabs(document.querySelector('[aria-label="属性分类"]'), 'data-properties-tab');
 initializeTabs(document.querySelector('[aria-label="设计记录"]'), 'data-activity-tab');
+const setToolboxTab = initializeTabs(document.querySelector('[aria-label="素材分类"]'), 'data-toolbox-tab');
 const sharedStyles = document.createElement('style');
 sharedStyles.textContent = PROTOTYPE_CSS;
 document.head.append(sharedStyles);
@@ -151,7 +153,7 @@ const assistant = createAssistant({
       let next = addPage(project);
       const pageId = next.activePageId;
       const board = pageBoard(result.project);
-      board.items = board.items.map(item => ({ ...item, id: uid() }));
+      board.items = copyItems(board.items);
       next = { ...next, ...board, pages: next.pages.map(page => page.id === pageId ? { ...page, name: result.name, ...board } : page) };
       project = validateProject(next, sanitizeContent); selectedId = null; selectedIds.clear(); commit(t`AI 生成页面：${result.name}`); fitCanvas();
     }
@@ -288,7 +290,8 @@ try { guides = readStorage(GUIDES_KEY, normalizeGuides) || guides; }
 catch { startupWarnings.push(t('辅助线设置读取失败，已使用默认设置')); }
 const itemNodes = new Map();
 const selectedItem = () => project.items.find(item => item.id === selectedId);
-const selectionStarts = () => new Map(project.items.filter(item => selectedIds.has(item.id)).map(item => [item.id, { x: item.x, y: item.y }]));
+const selectionGroup = () => project.items.filter(item => selectedIds.has(item.id) || selectedIds.has(item.parentId));
+const selectionStarts = () => new Map(selectionGroup().map(item => [item.id, { x: item.x, y: item.y }]));
 
 function renderLibrary() {
   const query = $('componentSearch').value.trim().toLowerCase();
@@ -298,6 +301,13 @@ function renderLibrary() {
   $('manageGroupBtn').disabled = !libraryGroups.some(group => group.id === groupFilter);
   $('customList').querySelectorAll('.component-preview').forEach(clearComponentPreview);
   $('presetList').replaceChildren(); $('vectorList').replaceChildren(); $('customList').replaceChildren();
+  $('containerList').replaceChildren(...CONTAINERS.filter(component => [component.name, t(component.name), translate(component.name, [], 'en')].some(name => name.toLowerCase().includes(query))).map(component => {
+    const button = document.createElement('button'); button.type = 'button'; button.draggable = true;
+    button.className = 'component-item'; button.dataset.compId = component.id;
+    button.innerHTML = `<span class="component-symbol">${icon(component.container.mode === 'grid' ? 'grid' : component.container.mode === 'vertical' ? 'layoutVertical' : 'layoutHorizontal')}</span><span class="component-name">${escapeHTML(t(component.name))}</span><span class="drag-dots" aria-hidden="true">⠿</span>`;
+    return button;
+  }));
+  $('containerEmpty').hidden = $('containerList').childElementCount > 0;
   const displayName = component => component.builtin ? t(component.name) : component.name;
   const visible = library.filter(component => [component.name, displayName(component), component.builtin ? translate(component.name, [], 'en') : ''].some(name => name.toLowerCase().includes(query)) && (component.builtin || groupFilter === 'all' || (libraryGroups.some(group => group.id === component.groupId) ? component.groupId : '') === groupFilter));
   for (const component of visible) {
@@ -339,6 +349,7 @@ function renderLibrary() {
 }
 function libraryCategory(component) { return !component.builtin ? 'custom' : component.type === 'svg' ? 'vector' : 'basic'; }
 function setLibraryTab(category, focus = false) {
+  setToolboxTab('components');
   libraryTab = category; renderLibrary();
   if (focus) $(`${category}Tab`).focus();
 }
@@ -346,13 +357,23 @@ function renderProperties() {
   const item = selectedItem();
   $('menuDuplicateBtn').disabled = !item;
   $('menuDeleteBtn').disabled = !item;
-  $('saveSelectionComponentBtn').disabled = !item;
+  $('saveSelectionComponentBtn').disabled = !item || !!item.container;
   $('noSelectionMsg').hidden = !!item;
   $('selectionProps').hidden = !item;
   $('selectionCount').textContent = selectedIds.size ? t`已选 ${selectedIds.size} 个` : t('未选中');
   const disabled = !selectedIds.size || $('alignReference').value === 'selection' && selectedIds.size < 2;
   $('alignmentActions').querySelectorAll('button').forEach(button => { button.disabled = disabled; });
   if (!item) return;
+  $('parentContainerField').hidden = !!item.container;
+  $('propParentContainer').replaceChildren(new Option(t('画布'), ''), ...project.items.filter(value => value.container).map(value => new Option(value.name, value.id)));
+  $('propParentContainer').value = item.parentId || '';
+  $('containerProperties').hidden = !item.container;
+  $('containerChildHelp').hidden = !item.parentId;
+  $('propX').readOnly = $('propY').readOnly = !!item.parentId;
+  $('propContainerMode').value = item.container?.mode || 'vertical';
+  $('propContainerGap').value = item.container?.gap ?? 12;
+  $('propContainerColumns').value = item.container?.columns ?? 2;
+  $('containerColumnsField').hidden = item.container?.mode !== 'grid';
   $('selectionDetail').textContent = selectedIds.size > 1 ? t`已选 ${selectedIds.size} 个组件，以下属性仅编辑「${item.name}」；拖动、复制、删除作用于全部所选组件。` : t('按住 Shift 点击组件可多选并对齐。');
   for (const [field, key] of Object.entries({ propName: 'name', propX: 'x', propY: 'y', propW: 'width', propH: 'height', propRadius: 'radius' })) $(field).value = item[key];
   $('propY').value = visibilityLayout(project.items).find(value => value.id === item.id).y;
@@ -545,7 +566,7 @@ function renderLayers() {
   $('layerList').replaceChildren();
   for (const item of [...project.items].reverse()) {
     const button = document.createElement('button');
-    button.className = `layer-item${selectedIds.has(item.id) ? ' selected' : ''}`;
+    button.className = `layer-item${item.parentId ? ' container-child' : ''}${selectedIds.has(item.id) ? ' selected' : ''}`;
     button.setAttribute('aria-pressed', String(selectedIds.has(item.id)));
     button.dataset.itemId = item.id;
     const hidden = orientationPresentation(item, project.canvas).hidden;
@@ -686,10 +707,11 @@ function renderCanvas() {
   for (const item of project.items) {
     let node = itemNodes.get(item.id);
     if (!node) { node = document.createElement('div'); node.dataset.itemId = item.id; itemNodes.set(item.id, node); }
-    node.className = `editor-item${selectedIds.has(item.id) ? ' selected' : ''}`;
-    Object.assign(node.style, { left: `${item.x}px`, top: `${displayed.find(value => value.id === item.id).y}px`, width: `${item.width}px`, height: `${item.height}px`, borderRadius: `${item.radius}px` });
+    node.className = `editor-item${item.container ? ' container-item' : ''}${selectedIds.has(item.id) ? ' selected' : ''}`;
+    const position = displayed.find(value => value.id === item.id);
+    Object.assign(node.style, { left: `${position.x}px`, top: `${position.y}px`, width: `${position.width}px`, height: `${position.height}px`, borderRadius: `${item.radius}px` });
     const presentation = orientationPresentation(item, canvas);
-    node.hidden = presentation.hidden;
+    node.hidden = presentation.hidden || !!item.parentId && orientationPresentation(project.items.find(parent => parent.id === item.parentId), canvas).hidden;
     node.style.transform = presentation.angle ? `rotate(${presentation.angle}deg)` : '';
     const html = itemHTML(item);
     if (node.contentHTML !== html) {
@@ -734,25 +756,31 @@ function renderHistory() {
     button.addEventListener('click', () => restore(index)); info.append(title, meta); row.append(info, button); return row;
   }).toReversed());
 }
-function add(component, x = 40, y = 40, snap = false) {
+function add(component, x = 40, y = 40, snap = false, parentId = '') {
   if (project.items.length >= MAX_ITEMS) throw new Error(t('单个画布最多 200 个组件'));
   const item = createItem(component, project.canvas, x, y, placementBounds(project));
+  if (parentId && !item.container) { item.parentId = parentId; item.layoutBasis = { width: item.width, height: item.height }; }
   project.items.push(item); selectedId = item.id; selectedIds = new Set([item.id]);
   setPropertiesTab('component');
   if (snap) project = snapItems(project, new Map([[item.id, { x: item.x, y: item.y }]]), 0, 0, zoom).project;
   commit(t`添加组件：${item.name}`); notify(t`已添加「${item.name}」`);
 }
+function containerAt(x, y, excluded = new Set()) {
+  return [...visibilityLayout(project.items)].reverse().find(item => item.container && !excluded.has(item.id) && !orientationPresentation(item, project.canvas).hidden && x >= item.x && y >= item.y && x <= item.x + item.width && y <= item.y + item.height);
+}
 function removeSelected() {
   if (!selectedItem()) return;
-  project.items = cleanVisibilityTargets(project.items.filter(item => !selectedIds.has(item.id)));
+  const deleted = new Set(selectionGroup().map(item => item.id));
+  project.items = cleanVisibilityTargets(project.items.filter(item => !deleted.has(item.id)));
   selectedId = null; selectedIds.clear(); commit(t('删除组件')); notify(t('已删除所选组件，可撤销恢复'));
 }
 function duplicateSelected() {
   const item = selectedItem();
   if (!item) return;
-  if (project.items.length + selectedIds.size > MAX_ITEMS) throw new Error(t('单个画布最多 200 个组件'));
+  const ids = new Set(selectionGroup().map(item => item.id));
+  if (project.items.length + ids.size > MAX_ITEMS) throw new Error(t('单个画布最多 200 个组件'));
   const moved = moveItems(project, selectionStarts(), 16, 16);
-  const copies = copyItems(moved.items.filter(value => selectedIds.has(value.id))).map(value => normalizeItem({ ...value, name: t`${value.name} 副本` }, project.canvas, itemBounds(project)));
+  const copies = copyItems(moved.items.filter(value => ids.has(value.id))).map(value => normalizeItem({ ...value, name: t`${value.name} 副本` }, project.canvas, itemBounds(project)));
   project.items.push(...copies); selectedIds = new Set(copies.map(value => value.id)); selectedId = copies.at(-1).id; commit(t('复制组件')); notify(t('已复制所选组件'));
 }
 function restore(direction) {
@@ -769,7 +797,20 @@ function finishGesture(cancel = false) {
   const old = gesture; gesture = null;
   const changed = project.items.some(item => old.starts.has(item.id) && (item.x !== old.starts.get(item.id).x || item.y !== old.starts.get(item.id).y));
   if (cancel) { project = moveItems(project, old.starts, 0, 0); renderCanvas(); }
-  else if (changed) commit(t('移动组件'));
+  else if (changed) {
+    for (const item of project.items.filter(item => selectedIds.has(item.id) && !selectedIds.has(item.parentId) && !item.container)) {
+      // 指针位置决定落入容器，避免大组件的中心仍落在旧容器中。
+      const point = old.point || { x: item.x + item.width / 2, y: item.y + item.height / 2 };
+      const parent = containerAt(point.x, point.y, selectedIds);
+      if (parent) {
+        if (!item.parentId) item.layoutBasis = { width: item.width, height: item.height };
+        item.parentId = parent.id;
+      } else if (item.parentId) {
+        delete item.parentId; delete item.layoutBasis;
+      }
+    }
+    commit(t('移动组件'));
+  }
   if (old.node.hasPointerCapture(old.pointerId)) old.node.releasePointerCapture(old.pointerId);
 }
 // 使用事件委托及指针捕获；选中时保留节点，避免原稿中拖拽引用失效。
@@ -787,6 +828,7 @@ $('canvas').addEventListener('pointerdown', event => {
 });
 $('canvas').addEventListener('pointermove', event => {
   if (!gesture || event.pointerId !== gesture.pointerId) return;
+  gesture.point = clientToCanvas(event.clientX, event.clientY, $('canvas').getBoundingClientRect(), zoom);
   const snapped = snapItems(project, gesture.starts, (event.clientX - gesture.clientX) / zoom, (event.clientY - gesture.clientY) / zoom, zoom, guides.snap && !event.altKey);
   project = snapped.project; renderSnapGuides(snapped.guides);
   for (const item of project.items) if (gesture.starts.has(item.id)) {
@@ -807,23 +849,24 @@ $('libraryPanel').addEventListener('dragstart', event => {
 $('libraryPanel').addEventListener('dragend', () => $('canvas').classList.remove('drag-over'));
 $('libraryPanel').addEventListener('click', safeAction(event => {
   const button = event.target.closest('[data-comp-id]');
-  const component = button && library.find(value => value.id === button.dataset.compId);
-  if (component) add(component, 32 + project.items.length % 8 * 12, 32 + project.items.length % 8 * 12);
+  const component = button && [...library, ...CONTAINERS].find(value => value.id === button.dataset.compId);
+  const selected = selectedItem();
+  if (component) add(component, 32 + project.items.length % 8 * 12, 32 + project.items.length % 8 * 12, false, selected?.container ? selected.id : selected?.parentId);
 }));
 $('canvas').addEventListener('dragover', event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; $('canvas').classList.add('drag-over'); });
 $('canvas').addEventListener('dragleave', event => { if (!$('canvas').contains(event.relatedTarget)) $('canvas').classList.remove('drag-over'); });
 $('canvas').addEventListener('drop', safeAction(event => {
   event.preventDefault(); $('canvas').classList.remove('drag-over');
-  const component = library.find(value => value.id === event.dataTransfer.getData('text/plain'));
+  const component = [...library, ...CONTAINERS].find(value => value.id === event.dataTransfer.getData('text/plain'));
   if (!component) return;
   const point = clientToCanvas(event.clientX, event.clientY, $('canvas').getBoundingClientRect(), zoom);
-  add(component, point.x, point.y, guides.snap && !event.altKey);
+  add(component, point.x, point.y, guides.snap && !event.altKey, containerAt(point.x, point.y)?.id);
 }));
 $('componentSearch').addEventListener('input', renderLibrary);
-document.querySelector('.library-tabs').addEventListener('click', event => {
+document.querySelector('[aria-label="组件分类"]').addEventListener('click', event => {
   const tab = event.target.closest('[data-library-tab]'); if (tab) setLibraryTab(tab.dataset.libraryTab);
 });
-document.querySelector('.library-tabs').addEventListener('keydown', event => {
+document.querySelector('[aria-label="组件分类"]').addEventListener('keydown', event => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
   event.preventDefault();
   const categories = ['basic', 'vector', 'custom'];
@@ -893,6 +936,7 @@ $('statusTime').addEventListener('change', safeAction(() => {
   updateFrame({ time });
 }));
 $('statusBattery').addEventListener('change', () => updateFrame({ battery: $('statusBattery').value }));
+$('propContainerMode').addEventListener('change', () => { $('containerColumnsField').hidden = $('propContainerMode').value !== 'grid'; });
 $('selectionProps').addEventListener('submit', safeAction(async event => {
   event.preventDefault(); const item = selectedItem(); if (!item) return;
   const session = projectSession, images = [...pendingImages.values()];
@@ -903,6 +947,17 @@ $('selectionProps').addEventListener('submit', safeAction(async event => {
   const geometryChanged = Object.entries({ propX: 'x', propY: 'y', propW: 'width', propH: 'height' }).some(([field, key]) => Number($(field).value) !== displayed[key]);
   const y = Number($('propY').value) === displayed.y ? item.y : expandedY(project.items, item.id, Number($('propY').value));
   const next = normalizeItem({ ...item, content, appearance: readPropertyAppearance(), name: $('propName').value.trim(), visible: $('propVisible').checked, collapseSpace: $('propCollapseSpace').checked, x: $('propX').value, y, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: readPropertySpacing('Padding'), margin: readPropertySpacing('Margin'), orientationResponse: readOrientationFields('prop'), interaction: readInteraction() }, project.canvas, geometryChanged && !project.items.some(value => value.visible === false) ? placementBounds(project) : itemBounds(project));
+  if (item.container) next.container = normalizeContainer({ mode: $('propContainerMode').value, gap: $('propContainerGap').value, columns: $('propContainerColumns').value });
+  else {
+    const parentId = $('propParentContainer').value;
+    if (parentId) {
+      next.parentId = parentId;
+      next.layoutBasis = {
+        width: Number($('propW').value) !== item.width ? next.width : item.layoutBasis?.width || next.width,
+        height: Number($('propH').value) !== item.height ? next.height : item.layoutBasis?.height || next.height,
+      };
+    } else { delete next.parentId; delete next.layoutBasis; }
+  }
   for (const source of images) {
     const image = new Image(); image.src = source;
     try { await image.decode(); } catch { throw new Error(t('图片内容无效，无法读取')); }
@@ -1183,9 +1238,11 @@ window.addEventListener('message', event => {
       const keys = ['x', 'y', 'width', 'height'];
       if (!message.geometry || keys.some(key => !Number.isFinite(message.geometry[key]))) throw new Error(t('组件尺寸无效'));
       item = normalizeItem({ ...original, ...Object.fromEntries(keys.map(key => [key, message.geometry[key]])) }, page.canvas, itemBounds(page));
+      if (item.parentId) item.layoutBasis = { width: item.width, height: item.height };
     } else return;
     if (JSON.stringify(item) !== JSON.stringify(original)) {
-      const items = page.items.map(value => value.id === item.id ? item : value);
+      const items = constrainProject({ ...page, items: page.items.map(value => value.id === item.id ? item : value) }).items;
+      item = items.find(value => value.id === item.id);
       project = { ...snapshot, pages: snapshot.pages.map(value => value.id === page.id ? { ...value, items } : value), ...(page.id === snapshot.activePageId ? { items } : {}) };
       commit(message.kind === 'text' ? t('预览修改文字') : t('预览调整尺寸'));
     }

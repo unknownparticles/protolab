@@ -3,6 +3,7 @@ import { normalizeAppearance } from './appearance.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { normalizeOrientationResponse } from './orientation.js';
 import { visibilityBounds } from './visibility.js';
+import { normalizeContainer, containerLayout, containerOrder, validateContainerLinks } from './containers.js';
 import { MAX_PAGES, PAGE_KINDS, normalizeInteraction, syncPages, pageBoard, validatePageLinks } from './pages.js';
 /** 与 DOM 无关的画布模型；坐标始终使用实际画布像素。 */
 export const PRESETS = Object.freeze({
@@ -51,6 +52,8 @@ export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) 
   if (interaction) result.interaction = interaction;
   else delete result.interaction;
   if (item.appearance != null) result.appearance = normalizeAppearance(item.appearance);
+  if (item.container != null) result.container = normalizeContainer(item.container);
+  if (item.layoutBasis != null) result.layoutBasis = { width: number(item.layoutBasis.width, width, 1, 2000), height: number(item.layoutBasis.height, height, 1, 2000) };
   return result;
 }
 export function resizeProject(project, width, height, preset = 'custom') {
@@ -73,7 +76,9 @@ export function constrainProject(project, fitToCanvas = false) {
   const next = { ...project, safeArea: normalizeSafeArea(project.safeArea, project.canvas, project.frame) };
   if (fitToCanvas) { next.canvas = { ...next.canvas }; delete next.canvas.layoutSize; }
   const bounds = itemBounds(next);
-  return syncPages({ ...next, items: next.items.map(item => normalizeItem(item, next.canvas, bounds)) });
+  const items = next.items.map(item => normalizeItem(item, next.canvas, bounds));
+  validateContainerLinks(items);
+  return syncPages({ ...next, items: containerOrder(containerLayout(items)) });
 }
 export function createItem(component, canvas, x = 40, y = 40, bounds) {
   return normalizeItem({
@@ -81,6 +86,7 @@ export function createItem(component, canvas, x = 40, y = 40, bounds) {
     content: component.content, x, y, width: component.defaultWidth,
     height: component.defaultHeight, radius: component.defaultRadius ?? (component.type === 'svg' ? 0 : 8), padding: component.padding ?? '0', margin: component.margin ?? '0',
     orientationResponse: component.orientationResponse,
+    ...(component.container ? { container: component.container } : {}),
     ...(component.imageSlot ? { imageSlot: true } : {}),
     ...(component.appearance ? { appearance: component.appearance } : {}),
   }, canvas, bounds);
@@ -131,6 +137,8 @@ function validateBoard(raw, sanitize) {
     ids.add(id);
     return normalizeItem({ ...item, id, imported: item.imported === true, content: sanitize(item.content, item.type) }, project.canvas, itemBounds({ ...project, items: raw.items.filter(value => value && Number.isFinite(value.height)) }));
   });
+  validateContainerLinks(project.items);
+  project.items = containerOrder(containerLayout(project.items));
   return project;
 }
 export function validateProject(raw, sanitize) {
