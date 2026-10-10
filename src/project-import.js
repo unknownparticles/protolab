@@ -1,9 +1,10 @@
 import { MAX_ITEMS, MAX_CODE, uid, validateProject, validateLibrary } from './model.js';
 import { sanitizeContent, STYLES } from './content.js';
+import { projectDetails } from './projects.js';
 
 export const MAX_PROJECT_BYTES = 32 * 1024 * 1024;
-export function projectFile(project, library) {
-  const value = { format: 'protolab-project', version: 1, project, components: library.filter(item => !item.builtin) };
+export function projectFile(project, library, details) {
+  const value = { format: 'protolab-project', version: 1, project, components: library.filter(item => !item.builtin), ...(details ? { details: projectDetails(details) } : {}) };
   const json = JSON.stringify(value, null, 2);
   if (new TextEncoder().encode(json).byteLength > MAX_PROJECT_BYTES) throw new Error('工程文件不能超过 32 MB');
   return json;
@@ -11,7 +12,7 @@ export function projectFile(project, library) {
 export function parseProjectJSON(raw) {
   if (raw?.format === 'protolab-project') {
     if (raw.version !== 1) throw new Error('不支持此工程版本');
-    return { project: validateProject(raw.project, sanitizeContent), components: validateLibrary(raw.components, sanitizeContent), warnings: [] };
+    return { project: validateProject(raw.project, sanitizeContent), components: validateLibrary(raw.components, sanitizeContent), warnings: [], ...(raw.details ? { details: projectDetails(raw.details) } : {}) };
   }
   return { project: validateProject(raw, sanitizeContent), warnings: [] };
 }

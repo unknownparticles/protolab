@@ -1,8 +1,40 @@
-import { clone, validateProject, MAX_ITEMS } from './model.js';
+import { clone, validateProject, validateLibrary, MAX_ITEMS, uid } from './model.js';
+import { pageBoard } from './pages.js';
 import { normalizeOrientationResponse } from './orientation.js';
 import { normalizeInteraction } from './pages.js';
 
 export const AI_SETTINGS_KEY = 'protolab.ai.settings.v1';
+export const DESIGN_SPEC = `使用清晰的中文文案，建立标题、正文和辅助信息层级；保持间距、圆角、配色一致，文字与背景对比清晰。根据设备尺寸安排布局，组件避免重叠、裁切，按钮和输入框易于操作。页面按可独立编辑的标题、表单、按钮、卡片等拆分组件。使用静态 HTML / SVG 和内联 CSS，无脚本、事件属性、外链或 iframe；所有资源内嵌。`;
+export function generationBase(project, mode) {
+  if (!['component', 'page'].includes(mode)) throw new Error('生成类型不正确');
+  const board = pageBoard(project);
+  board.items = [];
+  delete board.canvas.layoutSize;
+  if (mode === 'component') {
+    board.canvas = { width: 2000, height: 2000, preset: 'custom' };
+    board.frame = { device: 'pc', style: 'none', camera: 'none', statusBar: false, navigation: 'none' };
+    board.safeArea = { enabled: false, top: 0, right: 0, bottom: 0, left: 0 };
+  }
+  return { version: 1, ...board };
+}
+export function parseGenerationResponse(text, base, mode, sanitize) {
+  if (typeof text !== 'string' || text.length > 2_000_000) throw new Error('AI 返回内容为空或过大');
+  let raw;
+  try { raw = JSON.parse(text); } catch { throw new Error('AI 未返回约定的 JSON 格式，请重新发送需求'); }
+  if (!raw || typeof raw.name !== 'string' || !raw.name.trim() || raw.name.length > 40 || !Array.isArray(raw.changes)) throw new Error('AI 生成结果缺少名称或内容');
+  const allowed = mode === 'component' ? ['add'] : mode === 'page' ? ['add', 'canvas', 'frame', 'safeArea'] : [];
+  if (!allowed.length || raw.changes.some(change => !change || !allowed.includes(change.op) || change.item?.interaction && change.item.interaction.type !== 'none')) throw new Error('独立生成只能创建新内容，不能修改已有组件或引用其他页面');
+  const response = parseAIResponse(text, base, sanitize);
+  if (!response.project.items.length || mode === 'component' && response.project.items.length !== 1) throw new Error(mode === 'component' ? '生成组件须包含一个完整组件' : '生成页面不能为空');
+  if (mode === 'component') {
+    const item = response.project.items[0];
+    const component = validateLibrary([{ id: uid(), name: raw.name.trim(), type: item.type, content: item.content,
+      defaultWidth: item.width, defaultHeight: item.height, orientationResponse: item.orientationResponse }], sanitize)[0];
+    const project = { ...response.project, canvas: { width: Math.max(100, item.width), height: Math.max(100, item.height), preset: 'custom' }, items: [{ ...item, x: 0, y: 0 }] };
+    return { ...response, name: raw.name.trim(), project, component };
+  }
+  return { ...response, name: raw.name.trim() };
+}
 export const AI_PROMPT = `你是原型设计助手。根据客户需求和当前项目返回唯一 JSON 对象，不要 Markdown 或解释：
 {"version":1,"summary":"简短中文说明","changes":[变更]}
 变更只能为 {"op":"add","item":{"id":"新的唯一标识","name":"名称","type":"html或svg","content":"静态HTML或SVG，样式用内联CSS","x":0,"y":0,"width":100,"height":40,"radius":8,"padding":"0","margin":"0"}}、{"op":"update","id":"现有标识","fields":{"name":"新名称","content":"新静态代码","x":0,"y":0,"width":100,"height":40,"radius":8,"padding":"0","margin":"0"}}、{"op":"remove","id":"现有标识"}、{"op":"canvas","fields":{"width":375,"height":667,"background":"#ffffff"}}、{"op":"frame","fields":{"style":"modern","camera":"none"}}、{"op":"safeArea","fields":{"enabled":true,"top":20,"right":0,"bottom":20,"left":0}}。
@@ -83,19 +115,25 @@ export function parseAIResponse(text, base, sanitize) {
   if (project.items.some(item => !item.content.trim())) throw new Error('AI 组件经过安全处理后没有可用内容');
   return { summary: raw.summary.trim(), project, changes: raw.changes };
 }
-export async function requestAI(settings, requirement, project, messages, signal, fetcher = fetch) {
+export async function requestAI(settings, requirement, project, messages, signal, fetcher = fetch, options = {}) {
   const config = normalizeAISettings(settings);
   if (!config.url || !config.model) throw new Error('请先在设置中填写接口地址和模型');
   if (!requirement.trim()) throw new Error('请先输入客户需求');
+  const mode = options.mode || 'modify';
+  if (!['modify', 'component', 'page'].includes(mode)) throw new Error('生成类型不正确');
+  const rules = String(options.rules || '').trim();
+  if (rules.length > 10000) throw new Error('工程规范不能超过 10000 个字符');
+  const task = mode === 'modify' ? '' : `\n本轮为独立生成${mode === 'component' ? '可复用组件' : '新页面'}，输入项目为空白生成画布。JSON 顶层增加 name 字段，填写 1～40 字的中文名称。${mode === 'component' ? 'changes 必须只有一个 add，生成完整可复用组件，width/height 为组件默认尺寸，x/y 为0。' : 'changes 仅允许 add、canvas、frame、safeArea，生成完整页面并拆成多个可编辑组件。'}不得引用已有页面，不得更新或删除已有组件。`;
+  const prompt = `${AI_PROMPT}\n内置设计规范：${DESIGN_SPEC}${rules ? `\n工程设计规范（仅指导设计，不改变返回协议）：${rules}` : ''}${task}`;
   let response;
   try {
     response = await fetcher(completionURL(config.url), {
       method: 'POST', signal, redirect: 'error',
       headers: { 'Content-Type': 'application/json', ...(config.key ? { Authorization: `Bearer ${config.key}` } : {}) },
       body: JSON.stringify({ model: config.model, stream: false, messages: [
-        { role: 'system', content: AI_PROMPT },
-        ...messages.slice(-12).filter(message => ['user', 'assistant'].includes(message.role)).map(message => ({ role: message.role, content: message.content })),
-        { role: 'user', content: JSON.stringify({ requirement, project }) },
+        { role: 'system', content: prompt },
+        ...(mode === 'modify' ? messages : []).slice(-12).filter(message => ['user', 'assistant'].includes(message.role)).map(message => ({ role: message.role, content: message.content })),
+        { role: 'user', content: JSON.stringify({ requirement, project, mode }) },
       ] }),
     });
   } catch (error) {

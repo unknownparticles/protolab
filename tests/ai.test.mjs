@@ -42,7 +42,8 @@ test('多轮请求带固定系统规范、客户需求、项目和历史，支�
   });
   assert.equal(sent.headers.Authorization, 'Bearer test-key');
   assert.equal(sent.redirect, 'error');
-  assert.equal(sent.body.messages[0].content, AI_PROMPT);
+  assert.ok(sent.body.messages[0].content.startsWith(AI_PROMPT));
+  assert.match(sent.body.messages[0].content, /内置设计规范/);
   assert.equal(sent.body.messages.length, 4);
   assert.equal(JSON.parse(sent.body.messages.at(-1).content).requirement, '放大按钮');
   assert.equal(content, reply([]));

@@ -12,7 +12,8 @@ import { projectFile, importProjectFile } from './project-import.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { snapItems } from './snapping.js';
 import { createAssistant } from './assistant.js';
-import { INTERACTIONS, activePage, withPages, switchPage, addPage, deletePage, normalizeInteraction } from './pages.js';
+import { INTERACTIONS, activePage, withPages, switchPage, addPage, deletePage, normalizeInteraction, pageBoard } from './pages.js';
+import { PROJECTS_KEY, emptyProject, projectRecord, projectDetails, validateProjects, saveActiveProject, activateProject, appendProject } from './projects.js';
 
 const $ = id => document.getElementById(id);
 for (const prefix of ['prop', 'custom']) {
@@ -45,6 +46,9 @@ let customType = 'html';
 let imageData = null;
 let startupWarnings = [];
 let initialSavedAt = null;
+let catalog = null;
+let catalogReadable = true;
+const currentRecord = () => catalog?.entries.find(entry => entry.id === catalog.activeId);
 function completeLibrary(values) {
   const ids = new Set(COMPONENTS.map(component => component.id));
   return validateLibrary([...COMPONENTS, ...values.filter(component => !ids.has(component.id))], sanitizeContent);
@@ -66,10 +70,16 @@ function persistProject() {
   saveTimer = null;
   const savedAt = new Date().toISOString();
   let saved = true;
+  try {
+    if (!catalogReadable) throw new Error('工程列表读取失败');
+    const next = saveActiveProject(catalog, { project, library, workspace: { ...assistant.snapshot(), savedAt } });
+    writeStorage(PROJECTS_KEY, next); catalog = next;
+  } catch { saved = false; }
   try { assistant.persist(savedAt); } catch { saved = false; }
   try { writeStorage(PROJECT_KEY, { ...project, savedAt }); } catch { saved = false; }
   $('saveState').textContent = saved ? '已自动保存' : '草稿未保存';
   if (!saved) notify('草稿或版本未保存成功，浏览器存储不可用或已满，请导出版本备份保留设计与历史。', true);
+  return saved;
 }
 function scheduleSave() {
   $('saveState').textContent = '正在保存…';
@@ -77,7 +87,7 @@ function scheduleSave() {
   saveTimer = setTimeout(persistProject, 300);
 }
 function persistLibrary() {
-  try { writeStorage(LIBRARY_KEY, { version: 1, components: library }); return true; }
+  try { writeStorage(LIBRARY_KEY, { version: 1, components: library }); return persistProject(); }
   catch { notify('组件库保存在内存中，浏览器存储不可用或已满。请导出 JSON 备份。', true); return false; }
 }
 // 恢复失败不覆盖损坏的数据，以便用户仍可手动备份。
@@ -94,13 +104,88 @@ try {
   if (saved) project = withPages(saved);
 } catch { startupWarnings.push('草稿读取失败，已打开空画布'); }
 library = completeLibrary(library);
+try {
+  catalog = readStorage(PROJECTS_KEY, value => validateProjects(value, sanitizeContent));
+  if (catalog) { project = currentRecord().project; library = completeLibrary(currentRecord().library); initialSavedAt = null; }
+} catch { catalogReadable = false; startupWarnings.push('工程列表读取失败，原始数据已保留；请备份本地数据后恢复，暂不允许新建或切换工程'); }
 const assistant = createAssistant({
-  initial: project, initialSavedAt, getProject: () => project, finishGesture, notify, scheduleSave,
+  initial: project, initialSavedAt, initialWorkspace: currentRecord()?.workspace, getProject: () => project, getRules: () => currentRecord()?.rules || '', finishGesture, notify, scheduleSave,
   restoreInitial(value) { project = withPages(value); },
   applyProject(value, label) { finishGesture(); project = withPages(value); selectedId = null; selectedIds.clear(); commit(label); },
+  applyGeneration(result) {
+    finishGesture();
+    if (result.mode === 'component') {
+      const nextLibrary = validateLibrary([...library, { ...result.component, id: uid(), name: result.name }], sanitizeContent);
+      library = nextLibrary; renderLibrary(); persistLibrary();
+    } else {
+      let next = addPage(project);
+      const pageId = next.activePageId;
+      const board = pageBoard(result.project);
+      board.items = board.items.map(item => ({ ...item, id: uid() }));
+      next = { ...next, ...board, pages: next.pages.map(page => page.id === pageId ? { ...page, name: result.name, ...board } : page) };
+      project = validateProject(next, sanitizeContent); selectedId = null; selectedIds.clear(); commit(`AI 生成页面：${result.name}`); fitCanvas();
+    }
+  },
   startupWarning(message) { startupWarnings.push(message); },
 });
-const history = createHistory(project);
+if (!catalog) {
+  const entry = projectRecord({ name: '未命名工程' }, project, library, assistant.snapshot());
+  catalog = { version: 1, activeId: entry.id, entries: [entry] };
+}
+let history = createHistory(project);
+function renderProjects() {
+  $('projectSelect').replaceChildren(...catalog.entries.map(entry => new Option(entry.name, entry.id)));
+  $('projectSelect').value = catalog.activeId;
+  assistant.refreshRules();
+}
+function openProjectDetails(create) {
+  $('engineeringForm').reset(); $('engineeringError').textContent = '';
+  $('engineeringTitle').textContent = create ? '新建工程' : '工程设置';
+  $('engineeringForm').dataset.create = String(create);
+  $('engineeringName').value = create ? '' : currentRecord().name;
+  $('engineeringRules').value = create ? '' : currentRecord().rules;
+  $('engineeringPresetField').hidden = !create;
+  $('engineeringSubmitBtn').textContent = create ? '创建并切换' : '保存设置';
+  $('engineeringDialog').showModal(); $('engineeringName').focus();
+}
+function installProject(next) {
+  // 先原子写入完整工程集合，再切换内存；写入失败保留当前工程。
+  writeStorage(PROJECTS_KEY, next);
+  catalog = next;
+  const entry = currentRecord();
+  project = withPages(entry.project); library = completeLibrary(entry.library);
+  assistant.activate(project, entry.workspace);
+  selectedId = null; selectedIds.clear(); history = createHistory(project);
+  for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+  $('componentSearch').value = ''; renderProjects(); renderLibrary(); renderCanvas(); fitCanvas(); persistProject();
+  notify(`已切换到「${entry.name}」${entry.workspace.pending ? '，有 AI 版本等待合并' : ''}`);
+}
+$('newProjectBtn').addEventListener('click', () => openProjectDetails(true));
+$('engineeringSettingsBtn').addEventListener('click', () => openProjectDetails(false));
+$('projectSelect').addEventListener('change', safeAction(() => {
+  const id = $('projectSelect').value;
+  if (id === catalog.activeId) return;
+  try {
+    finishGesture();
+    if (!persistProject()) throw new Error('当前工程保存失败，已保留当前工程，请先导出备份');
+    installProject(activateProject(catalog, id));
+  } finally { $('projectSelect').value = catalog.activeId; }
+}));
+$('engineeringForm').addEventListener('submit', event => {
+  event.preventDefault();
+  try {
+    const details = projectDetails({ name: $('engineeringName').value, rules: $('engineeringRules').value });
+    finishGesture();
+    if (!persistProject()) throw new Error('当前工程保存失败，请先导出备份，再新建或更改工程设置');
+    if ($('engineeringForm').dataset.create === 'true') {
+      const entry = projectRecord(details, emptyProject($('engineeringPreset').value), clone(COMPONENTS));
+      installProject(appendProject(catalog, entry));
+    } else {
+      const next = saveActiveProject(catalog, details);
+      writeStorage(PROJECTS_KEY, next); catalog = next; renderProjects(); $('engineeringDialog').close(); notify('工程名称和 AI 设计规范已保存');
+    }
+  } catch (error) { $('engineeringError').textContent = error.message; }
+});
 try { guides = readStorage(GUIDES_KEY, normalizeGuides) || guides; }
 catch { startupWarnings.push('辅助线设置读取失败，已使用默认设置'); }
 const itemNodes = new Map();
@@ -554,7 +639,7 @@ $('fitBtn').addEventListener('click', fitCanvas);
 $('saveLibBtn').addEventListener('click', () => { if (persistLibrary()) notify('组件库已保存到当前浏览器'); });
 $('exportLibBtn').addEventListener('click', () => { download(JSON.stringify({ version: 1, components: library }, null, 2), 'protolab-library.json', 'application/json'); notify('组件库 JSON 已导出'); });
 $('exportProjectBtn').addEventListener('click', safeAction(() => {
-  finishGesture(); download(projectFile(project, library), 'protolab-project.json', 'application/json'); notify('工程已导出，包含画布、设备设置和自定义组件');
+  finishGesture(); download(projectFile(project, library, projectDetails(currentRecord())), 'protolab-project.json', 'application/json'); notify('工程已导出，包含画布、设备设置、自定义组件及工程规范');
 }));
 $('importProjectBtn').addEventListener('click', () => {
   $('projectForm').reset(); $('projectError').textContent = ''; $('projectDialog').showModal();
@@ -563,11 +648,14 @@ $('projectForm').addEventListener('submit', async event => {
   event.preventDefault();
   const file = $('projectFileInput').files[0]; if (!file || $('applyProjectImportBtn').disabled) return;
   const button = $('applyProjectImportBtn'); button.disabled = true; button.textContent = '正在识别组件…'; $('projectError').textContent = '';
+  const sourceId = catalog.activeId;
   try {
     const imported = await importProjectFile(file, { width: Number($('importWidth').value), height: Number($('importHeight').value) }, readFile);
+    if (sourceId !== catalog.activeId) throw new Error('工程已切换，请在目标工程重新导入');
     const nextLibrary = imported.components ? completeLibrary(imported.components) : library;
     finishGesture(); project = imported.project; library = nextLibrary;
     selectedId = null; selectedIds.clear(); commit(); renderLibrary();
+    if (imported.details) { catalog = saveActiveProject(catalog, imported.details); renderProjects(); }
     if (imported.components) persistLibrary();
     persistProject(); fitCanvas(); $('projectDialog').close();
     notify(`工程已导入，识别 ${project.items.length} 个组件${imported.warnings.length ? `；${imported.warnings.join('；')}` : ''}`);
@@ -578,7 +666,9 @@ $('importLibBtn').addEventListener('click', () => $('libFileInput').click());
 $('libFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
   if (file.size > MAX_LIBRARY_BYTES) throw new Error('组件库文件不能超过 12 MB');
+  const sourceId = catalog.activeId;
   const imported = completeLibrary(validateLibrary(JSON.parse(await readFile(file)), sanitizeContent));
+  if (sourceId !== catalog.activeId) throw new Error('工程已切换，请重新导入组件库');
   if (!confirm(`导入后组件库共 ${imported.length} 个组件，替换当前自定义组件，保留内置组件。画布中的组件会保留。建议先导出当前库。`)) return;
   library = imported; renderLibrary(); if (persistLibrary()) notify(`已导入 ${library.length} 个组件`);
 }));
@@ -632,9 +722,11 @@ $('imgFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
   if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'].includes(file.type)) throw new Error('请选择 PNG、JPEG、GIF、WebP 或 AVIF 图片');
   if (file.size > MAX_IMAGE) throw new Error('图片不能超过 3 MB');
+  const sourceId = catalog.activeId;
   const data = await readFile(file, 'dataURL');
   const image = new Image(); image.src = data;
   try { await image.decode(); } catch { throw new Error('图片内容无效，无法读取'); }
+  if (sourceId !== catalog.activeId) throw new Error('工程已切换，请重新导入图片');
   openComponentDialog('image', data, file.name.replace(/\.[^.]+$/, ''));
   $('customWidth').value = Math.min(image.naturalWidth, 320); $('customHeight').value = Math.max(1, Math.round(Math.min(image.naturalWidth, 320) * image.naturalHeight / image.naturalWidth));
 }));
@@ -674,7 +766,7 @@ document.addEventListener('keydown', safeAction(event => {
 }));
 window.addEventListener('pagehide', () => { finishGesture(); if (saveTimer) persistProject(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && saveTimer) persistProject(); });
-renderLibrary(); renderCanvas();
+renderProjects(); renderLibrary(); renderCanvas();
 if (window.innerWidth < 900) requestAnimationFrame(fitCanvas);
 if (startupWarnings.length) notify(startupWarnings.join('；'), true);
 else if (project.items.length) { $('saveState').textContent = '已恢复本地草稿'; $('statusMessage').textContent = '已恢复上次设计 · 所有修改将自动保存'; }

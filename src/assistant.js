@@ -1,14 +1,14 @@
 import { clone, validateProject } from './model.js';
 import { sanitizeContent, exportHTML } from './content.js';
 import { readStorage, writeStorage, download, readFile } from './storage.js';
-import { AI_SETTINGS_KEY, normalizeAISettings, parseAIResponse, requestAI } from './ai.js';
+import { AI_SETTINGS_KEY, DESIGN_SPEC, normalizeAISettings, parseAIResponse, requestAI, generationBase, parseGenerationResponse } from './ai.js';
 import { WORKSPACE_KEY, createVersions, validateWorkspace, mergeProjects } from './versions.js';
 
 const $ = id => document.getElementById(id);
 const validate = value => validateProject(value, sanitizeContent);
-export function createAssistant({ initial, initialSavedAt, getProject, restoreInitial, applyProject, finishGesture, notify, scheduleSave, startupWarning }) {
-  let saved;
-  try { saved = readStorage(WORKSPACE_KEY, value => validateWorkspace(value, validate)); }
+export function createAssistant({ initial, initialSavedAt, initialWorkspace, getProject, getRules, restoreInitial, applyProject, applyGeneration, finishGesture, notify, scheduleSave, startupWarning }) {
+  let saved = initialWorkspace;
+  try { if (initialWorkspace === undefined) saved = readStorage(WORKSPACE_KEY, value => validateWorkspace(value, validate)); }
   catch { startupWarning('版本或对话记录读取失败，已使用本地草稿'); }
   let versions = createVersions(initial, saved?.versions);
   if (saved && Date.parse(initialSavedAt) > Date.parse(saved.savedAt || '1970-01-01')) versions.add(initial, '恢复较新的本地草稿');
@@ -20,6 +20,8 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
   try { settings = readStorage(AI_SETTINGS_KEY, normalizeAISettings) || settings; rememberKey = !!settings.key; }
   catch { startupWarning('AI 设置读取失败，请重新配置'); }
   let controller = null;
+  let session = 0;
+  let generated = null;
   let choices = {};
   let mergeHead = null;
   const serialize = () => ({ version: 1, versions: versions.serialize(), messages: clone(messages), pending: clone(pending) });
@@ -41,6 +43,9 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
     $('aiPendingSummary').textContent = pending?.summary || '';
     $('aiSendBtn').disabled = !!controller || !!pending;
     $('aiCancelBtn').hidden = !controller;
+    $('aiMode').disabled = !!controller || !!pending || !!generated;
+    $('aiGenerated').hidden = !generated;
+    $('aiSendBtn').disabled ||= !!generated;
   }
   function addMessage(role, content) { messages.push({ role, content }); renderMessages(); scheduleSave(); }
   function renderVersions() {
@@ -116,6 +121,8 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
     if (!$('mergeDialog').open) $('mergeDialog').showModal();
   }
   $('aiToggleBtn').addEventListener('click', () => setPanel($('aiPanel').hidden));
+  $('generateComponentBtn').addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'component'; renderMode(); } $('aiRequirement').focus(); });
+  $('generatePageBtn').addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'page'; renderMode(); } $('aiRequirement').focus(); });
   $('aiCloseBtn').addEventListener('click', () => setPanel(false));
   $('settingsBtn').addEventListener('click', () => {
     $('aiURL').value = settings.url; $('aiKey').value = settings.key; $('aiModel').value = settings.model;
@@ -132,12 +139,14 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
   });
   $('aiForm').addEventListener('submit', async event => {
     event.preventDefault();
-    if (controller || pending) return;
+    if (controller || pending || generated) return;
     const requirement = $('aiRequirement').value.trim();
     if (!requirement) return;
     if (!settings.url || !settings.model) { notify('请先设置 AI 接口地址和模型', true); $('settingsBtn').click(); return; }
     finishGesture();
-    const base = clone(getProject()); const baseId = versions.head;
+    const mode = $('aiMode').value;
+    const currentSession = session;
+    const base = mode === 'modify' ? clone(getProject()) : generationBase(getProject(), mode); const baseId = versions.head;
     const context = clone(messages);
     controller = new AbortController(); const active = controller;
     let timedOut = false;
@@ -145,8 +154,17 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
     addMessage('user', requirement); $('aiRequirement').value = '';
     $('aiStatus').textContent = 'AI 正在生成…可以继续编辑画布。';
     try {
-      const text = await requestAI(settings, requirement, base, context, active.signal);
+      const text = await requestAI(settings, requirement, base, context, active.signal, fetch, { mode, rules: getRules() });
+      if (currentSession !== session) return;
       if (active.signal.aborted) throw new Error('请求已取消');
+      if (mode !== 'modify') {
+        generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent), mode };
+        addMessage('assistant', generated.summary);
+        $('aiGeneratedSummary').textContent = `${generated.name} · ${generated.summary}`;
+        $('aiStatus').textContent = '生成完成，请预览并确认保存。';
+        showGenerated();
+        return;
+      }
       const response = parseAIResponse(text, base, sanitizeContent);
       finishGesture();
       const aiId = versions.add(response.project, `AI：${response.summary}`, { parent: baseId, branch: true });
@@ -161,11 +179,44 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
       }
       $('aiStatus').textContent = pending ? '请先处理待合并版本，再发送下一条需求。' : '完成，可以继续提出修改需求。';
     } catch (error) {
+      if (currentSession !== session) return;
       const message = active.signal.aborted ? timedOut ? 'AI 请求超时，请重试' : 'AI 请求已取消' : error.message;
       $('aiStatus').textContent = message; addMessage('system', message); notify(message, !active.signal.aborted);
       if (!$('aiRequirement').value) $('aiRequirement').value = requirement;
-    } finally { clearTimeout(timeout); controller = null; renderMessages(); renderVersions(); scheduleSave(); }
+    } finally { clearTimeout(timeout); if (currentSession === session) { controller = null; renderMessages(); renderVersions(); scheduleSave(); } }
   });
+  function showGenerated() {
+    if (!generated) return;
+    $('generationName').value = generated.name;
+    $('generationSummary').textContent = generated.summary;
+    $('generationApplyBtn').textContent = generated.mode === 'component' ? '保存到组件库' : '添加为新页面';
+    $('generationPreview').srcdoc = exportHTML(generated.project, { preview: true });
+    $('generationError').textContent = '';
+    if (!$('generationDialog').open) $('generationDialog').showModal();
+  }
+  $('aiGeneratedOpenBtn').addEventListener('click', showGenerated);
+  $('generationForm').addEventListener('submit', event => {
+    event.preventDefault();
+    if (!generated) return;
+    try {
+      const name = $('generationName').value.trim();
+      if (!name || name.length > 40) throw new Error('名称请输入 1～40 个字符');
+      applyGeneration({ ...generated, name });
+      const label = generated.mode === 'component' ? '组件已保存到当前工程组件库，可点击或拖拽使用。' : '新页面已添加到当前工程，可继续编辑。';
+      generated = null; $('generationDialog').close(); addMessage('system', label); notify(label);
+      $('aiStatus').textContent = '已保存，可以继续提出需求。'; renderMessages();
+    } catch (error) { $('generationError').textContent = error.message; }
+  });
+  $('discardGenerationBtn').addEventListener('click', () => { generated = null; $('generationDialog').close(); renderMessages(); $('aiStatus').textContent = '已放弃生成结果，可以重新发送需求。'; });
+  $('generationDialog').addEventListener('close', () => $('generationPreview').removeAttribute('srcdoc'));
+  $('aiMode').addEventListener('change', renderMode);
+  function renderMode() {
+    const mode = $('aiMode').value;
+    $('aiModeHelp').textContent = mode === 'modify' ? '发送当前工程和最近对话，修改当前页。' : mode === 'component' ? '根据提示词和规范独立生成组件，预览后保存到当前工程组件库。' : '根据提示词和规范独立生成页面，预览后添加为新页面。';
+    $('aiSendBtn').textContent = mode === 'modify' ? '发送需求' : mode === 'component' ? '生成组件' : '生成页面';
+    $('aiRulesSummary').textContent = `自动注入内置设计规范${getRules() ? '及当前工程规范' : ''}，可在「工程设置」中查看和编辑。`;
+    $('aiBuiltinRules').textContent = DESIGN_SPEC;
+  }
   $('aiCancelBtn').addEventListener('click', () => controller?.abort());
   $('mergeOpenBtn').addEventListener('click', openMerge);
   $('discardAIBtn').addEventListener('click', () => { pending = null; addMessage('system', '已放弃应用 AI 修改，AI 版本仍保留在版本记录中。'); $('aiStatus').textContent = '可以继续发送需求。'; });
@@ -188,9 +239,11 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
   $('versionsFileInput').addEventListener('change', async event => {
     const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
     try {
+      const currentSession = session;
       if (controller || pending) throw new Error('请先取消请求或处理待合并版本，再导入备份');
       if (file.size > 50 * 1024 * 1024) throw new Error('版本备份不能超过 50 MB');
       const imported = validateWorkspace(JSON.parse(await readFile(file)), validate);
+      if (currentSession !== session) return;
       // 导入图作为独立分支追加，避免覆盖已有记录或产生标识碰撞。
       finishGesture();
       const mapping = new Map(imported.versions.entries.map(entry => [entry.id, crypto.randomUUID()]));
@@ -204,7 +257,17 @@ export function createAssistant({ initial, initialSavedAt, getProject, restoreIn
     } catch (error) { notify(error.message || '版本备份导入失败', true); }
   });
   renderMessages();
+  renderMode();
   return {
+    snapshot: serialize,
+    refreshRules: renderMode,
+    activate(project, workspace) {
+      session++; controller?.abort(); controller = null;
+      versions = createVersions(project, workspace.versions);
+      messages = clone(workspace.messages); pending = clone(workspace.pending); generated = null; choices = {}; mergeHead = null;
+      for (const id of ['mergeDialog', 'versionsDialog', 'generationDialog']) if ($(id).open) $(id).close();
+      $('aiRequirement').value = ''; $('aiStatus').textContent = ''; $('aiMode').value = 'modify'; renderMode(); renderMessages();
+    },
     persist(savedAt) { writeStorage(WORKSPACE_KEY, { ...serialize(), savedAt }); },
     record(project, label) { versions.add(project, label || '手动修改'); if ($('versionsDialog').open) renderVersions(); },
   };
