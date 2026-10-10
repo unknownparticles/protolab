@@ -33,6 +33,7 @@ function checkFields(value, allowed) {
     if (['x', 'y', 'width', 'height', 'radius', 'top', 'right', 'bottom', 'left', 'battery'].includes(key) && (typeof entry !== 'number' || !Number.isFinite(entry))) throw new Error(`AI 字段 ${key} 必须为数字`);
     if (['name', 'type', 'content', 'padding', 'margin', 'background', 'preset', 'device', 'style', 'camera', 'time', 'navigation', 'html'].includes(key) && typeof entry !== 'string') throw new Error(`AI 字段 ${key} 必须为字符串`);
     if (['enabled', 'statusBar'].includes(key) && typeof entry !== 'boolean') throw new Error(`AI 字段 ${key} 必须为布尔值`);
+    if (key === 'insets') checkFields(entry, fields.safeArea.filter(field => field !== 'enabled'));
   }
 }
 export function parseAIResponse(text, base, sanitize) {
@@ -43,6 +44,8 @@ export function parseAIResponse(text, base, sanitize) {
   const next = clone(base);
   for (const change of raw.changes) {
     if (!object(change)) throw new Error('AI 变更格式不正确');
+    const allowed = change.op === 'add' ? ['op', 'item'] : change.op === 'remove' ? ['op', 'id'] : change.op === 'update' ? ['op', 'id', 'fields'] : ['op', 'fields'];
+    if (Object.keys(change).some(key => !allowed.includes(key))) throw new Error('AI 变更包含不支持的操作字段');
     if (change.op === 'add') {
       const item = change.item;
       if (!object(item) || typeof item.id !== 'string' || !item.id || item.id.length > 100 || next.items.some(value => value.id === item.id)) throw new Error('AI 新组件标识为空或重复');
@@ -58,6 +61,8 @@ export function parseAIResponse(text, base, sanitize) {
     } else if (['canvas', 'frame', 'safeArea'].includes(change.op)) {
       checkFields(change.fields, fields[change.op]);
       next[change.op] = { ...next[change.op], ...change.fields };
+      if (change.op === 'canvas' && ('width' in change.fields || 'height' in change.fields) && !('preset' in change.fields)) next.canvas.preset = 'custom';
+      if (change.op === 'frame' && 'device' in change.fields) next.canvas.preset = 'custom';
     } else throw new Error('AI 返回了未知的变更操作');
     if (next.items.length > MAX_ITEMS) throw new Error('AI 项目超过组件数量上限');
   }

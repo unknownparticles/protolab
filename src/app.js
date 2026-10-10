@@ -29,6 +29,7 @@ let toastTimer;
 let customType = 'html';
 let imageData = null;
 let startupWarnings = [];
+let initialSavedAt = null;
 function completeLibrary(values) {
   const ids = new Set(COMPONENTS.map(component => component.id));
   return validateLibrary([...COMPONENTS, ...values.filter(component => !ids.has(component.id))], sanitizeContent);
@@ -48,8 +49,12 @@ function safeAction(action) {
 function persistProject() {
   clearTimeout(saveTimer);
   saveTimer = null;
-  try { assistant.persist(); writeStorage(PROJECT_KEY, project); $('saveState').textContent = '已自动保存'; }
-  catch { $('saveState').textContent = '草稿或版本未保存'; notify('浏览器存储不可用或已满，请导出版本备份保留设计与历史。', true); }
+  const savedAt = new Date().toISOString();
+  let saved = true;
+  try { assistant.persist(savedAt); } catch { saved = false; }
+  try { writeStorage(PROJECT_KEY, { ...project, savedAt }); } catch { saved = false; }
+  $('saveState').textContent = saved ? '已自动保存' : '草稿未保存';
+  if (!saved) notify('草稿或版本未保存成功，浏览器存储不可用或已满，请导出版本备份保留设计与历史。', true);
 }
 function scheduleSave() {
   $('saveState').textContent = '正在保存…';
@@ -70,11 +75,11 @@ try {
   }
 } catch { startupWarnings.push('组件库读取失败，已使用基础组件'); }
 try {
-  const saved = readStorage(PROJECT_KEY, value => validateProject(value, sanitizeContent));
+  const saved = readStorage(PROJECT_KEY, value => { initialSavedAt = value.savedAt || null; return validateProject(value, sanitizeContent); });
   if (saved) project = saved;
 } catch { startupWarnings.push('草稿读取失败，已打开空画布'); }
 const assistant = createAssistant({
-  initial: project, getProject: () => project, finishGesture, notify, scheduleSave,
+  initial: project, initialSavedAt, getProject: () => project, finishGesture, notify, scheduleSave,
   restoreInitial(value) { project = value; },
   applyProject(value, label) { finishGesture(); project = value; selectedId = null; selectedIds.clear(); commit(label); },
   startupWarning(message) { startupWarnings.push(message); },

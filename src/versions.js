@@ -43,7 +43,7 @@ export function validateWorkspace(raw, validate) {
     if (!ids.has(raw.pending.baseId) || !ids.has(raw.pending.aiId) || typeof raw.pending.summary !== 'string') throw new Error('待合并版本损坏');
     pending = { baseId: raw.pending.baseId, aiId: raw.pending.aiId, summary: raw.pending.summary };
   }
-  return { version: 1, versions: { head: raw.versions.head, entries }, messages, pending };
+  return { version: 1, savedAt: raw.savedAt, versions: { head: raw.versions.head, entries }, messages, pending };
 }
 
 /** 三方合并：组件以稳定标识匹配；同一组件的不同字段可自动合并。 */

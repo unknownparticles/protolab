@@ -22,6 +22,14 @@ test('错误协议、未知操作、非法字段、重复标识均被拒绝', ()
     assert.throws(() => parseAIResponse(text, base(), clean));
   }
 });
+test('AI 可调整自定义画布和设备外框，非法留白不能通过协议', () => {
+  const result = parseAIResponse(reply([{ op: 'canvas', fields: { width: 800, height: 600 } }, { op: 'frame', fields: { device: 'pc', style: 'browser', insets: { top: 20 } } }]), base(), clean);
+  assert.equal(result.project.canvas.preset, 'custom');
+  assert.equal(result.project.frame.device, 'pc');
+  assert.equal(result.project.frame.style, 'browser');
+  assert.equal(result.project.frame.insets.top, 20);
+  assert.throws(() => parseAIResponse(reply([{ op: 'frame', fields: { insets: 'invalid' } }]), base(), clean));
+});
 test('多轮请求带固定系统规范、客户需求、项目和历史，支持完整与基础地址', async () => {
   assert.equal(completionURL('https://example.com/v1/'), 'https://example.com/v1/chat/completions');
   assert.equal(completionURL('https://example.com/v1/chat/completions?api-version=1'), 'https://example.com/v1/chat/completions?api-version=1');

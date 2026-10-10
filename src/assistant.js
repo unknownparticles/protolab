@@ -6,11 +6,12 @@ import { WORKSPACE_KEY, createVersions, validateWorkspace, mergeProjects } from 
 
 const $ = id => document.getElementById(id);
 const validate = value => validateProject(value, sanitizeContent);
-export function createAssistant({ initial, getProject, restoreInitial, applyProject, finishGesture, notify, scheduleSave, startupWarning }) {
+export function createAssistant({ initial, initialSavedAt, getProject, restoreInitial, applyProject, finishGesture, notify, scheduleSave, startupWarning }) {
   let saved;
   try { saved = readStorage(WORKSPACE_KEY, value => validateWorkspace(value, validate)); }
   catch { startupWarning('版本或对话记录读取失败，已使用本地草稿'); }
   let versions = createVersions(initial, saved?.versions);
+  if (saved && Date.parse(initialSavedAt) > Date.parse(saved.savedAt || '1970-01-01')) versions.add(initial, '恢复较新的本地草稿');
   if (saved) restoreInitial(versions.current);
   let messages = saved?.messages || [];
   let pending = saved?.pending || null;
@@ -70,21 +71,26 @@ export function createAssistant({ initial, getProject, restoreInitial, applyProj
     return mergeProjects(base, getProject(), remote, choices);
   }
   const valueText = value => value === undefined ? '（已删除 / 不存在）' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  const fieldNames = { canvas: '画布', frame: '设备外框', safeArea: '安全区', name: '名称', type: '组件类型', content: '组件内容', x: '横向位置', y: '纵向位置', width: '宽度', height: '高度', radius: '圆角', padding: '内边距', margin: '外边距', background: '背景', preset: '尺寸预设', device: '设备类型', style: '外框样式', camera: '摄像头', statusBar: '顶部系统栏', time: '时间', battery: '电量', navigation: '底部导航', html: '外框内容', insets: '外框留白', enabled: '启用限制', top: '上侧留白', right: '右侧留白', bottom: '下侧留白', left: '左侧留白' };
   function renderMerge() {
     if (!pending) return;
     const result = pendingMerge();
     mergeHead = versions.head;
     $('mergeSummary').textContent = `${pending.summary} · ${result.conflicts.length ? `${result.conflicts.length} 项冲突需要选择` : '没有字段冲突，确认后应用合并结果'}`;
     $('mergeConflicts').replaceChildren();
+    const entries = versions.entries;
+    const sourceItems = [...getProject().items, ...entries.find(entry => entry.id === pending.aiId).project.items, ...entries.find(entry => entry.id === pending.baseId).project.items];
     for (const conflict of result.conflicts) {
       const row = document.createElement('section'); row.className = 'merge-conflict';
-      const title = document.createElement('strong'); title.textContent = conflict.path.join(' / ');
+      const path = conflict.path[0] === 'items' ? [`组件「${sourceItems.find(item => item.id === conflict.path[1])?.name || '未命名'}」`, ...conflict.path.slice(2)] : conflict.path;
+      const titleText = path.map(part => fieldNames[part] || part).join(' / ');
+      const title = document.createElement('strong'); title.textContent = titleText;
       const values = document.createElement('div'); values.className = 'merge-values';
       for (const [label, value] of [['请求时基准', conflict.base], ['当前本地', conflict.local], ['AI 修改', conflict.remote]]) {
         const column = document.createElement('div'); const heading = document.createElement('strong'); heading.textContent = label;
         const pre = document.createElement('pre'); pre.textContent = valueText(value); column.append(heading, pre); values.append(column);
       }
-      const select = document.createElement('select'); select.setAttribute('aria-label', `${conflict.path.join(' / ')} 的合并选择`); select.dataset.conflict = conflict.key;
+      const select = document.createElement('select'); select.setAttribute('aria-label', `${titleText}的合并选择`); select.dataset.conflict = conflict.key;
       for (const [value, text] of [['', '请选择保留内容'], ['local', '保留当前本地'], ['ai', '采用 AI 修改']]) { const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
       select.value = choices[conflict.key] || '';
       select.addEventListener('change', () => { choices[conflict.key] = select.value; updateMergePreview(); });
@@ -192,7 +198,7 @@ export function createAssistant({ initial, getProject, restoreInitial, applyProj
   });
   renderMessages();
   return {
-    persist() { writeStorage(WORKSPACE_KEY, serialize()); },
+    persist(savedAt) { writeStorage(WORKSPACE_KEY, { ...serialize(), savedAt }); },
     record(project, label) { versions.add(project, label || '手动修改'); if ($('versionsDialog').open) renderVersions(); },
   };
 }

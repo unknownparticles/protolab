@@ -72,7 +72,12 @@ try {
   await send('等待后修改名称'); await page.locator('#aiCloseBtn').click();
   await page.locator('[data-item-id="ai-heading"].editor-item').click();
   await page.locator('#propName').fill('本地名称'); await page.locator('#selectionProps button[type=submit]').click();
-  release(); await waitDone(); await page.locator('#mergeOpenBtn').click();
+  release(); await waitDone();
+  await page.locator('#settingsBtn').click(); await page.locator('#aiRememberKey').check(); await page.locator('#aiSettingsForm button[type=submit]').click();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('protolab.workspace.v1'))?.pending);
+  await page.reload(); await page.locator('#aiToggleBtn').click();
+  assert.equal(await page.locator('#aiPending').isVisible(), true);
+  await page.locator('#mergeOpenBtn').click();
   assert.equal(await page.locator('.merge-conflict').count(), 1);
   await page.locator('#mergeApplyBtn').click(); assert.match(await page.locator('#mergeError').textContent(), /每项冲突/);
   await page.locator('.merge-conflict select').selectOption('ai');
@@ -117,4 +122,22 @@ try {
   await page.screenshot({ path: resolve(output, 'ai-mobile.png') });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []); console.log('通过：窄屏对话及无浏览器错误');
+
+  const partial = await browser.newPage();
+  await partial.goto(base); await partial.locator('[data-comp-id="lib-btn"]').click();
+  await partial.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
+  await partial.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'protolab.workspace.v1') throw new DOMException('版本存储配额不足', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await partial.locator('[data-comp-id="lib-text"]').click();
+  await partial.waitForFunction(() => document.getElementById('saveState').textContent === '草稿未保存');
+  assert.equal(await partial.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')).items.length), 2);
+  await partial.reload(); assert.equal(await partial.locator('.editor-item').count(), 2);
+  await partial.locator('#versionsBtn').click();
+  assert.match(await partial.locator('.version-row').first().textContent(), /较新的本地草稿/);
+  console.log('通过：版本写入失败时保留较新草稿，刷新不会恢复旧画布');
 } finally { await browser?.close(); server?.kill(); }
