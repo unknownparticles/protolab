@@ -20,6 +20,8 @@ npm run dev
 - 手机和平板可选时间电量栏、手势横条或三键导航；时间与电量可编辑。外框和系统栏支持自动保存、撤销重做、预览及 HTML 导出。
 - 位置、尺寸、0～50 px 圆角、内外边距；缩小画布时自动约束尺寸和位置。
 - 25%～200% 缩放和适应窗口；放置与移动按实际画布像素计算。
+- 可独立开关的像素标尺与画布网格；网格间距 5～100 px，显示设置在本地保存。
+- Shift 多选、整组移动、复制和删除；相对画布或所选组件进行四边对齐、水平居中、垂直居中和整体居中，支持撤销重做。
 - HTML、SVG 和图片自定义组件；搜索；组件库本地保存、JSON 导入导出；兼容原稿的旧格式。
 - 草稿自动恢复、撤销重做、图层选中与排序。
 - 预览与 HTML 导出共用结构和样式；导出无外部 CDN 依赖。
@@ -28,6 +30,10 @@ npm run dev
 ## 操作说明
 
 点击或拖拽左侧组件到画布，右侧输入属性后点击「应用属性」。画布上的组件按住可移动，点击空白取消选中。自定义组件保存后会自动写入当前浏览器，组件库的「导出」生成 `protolab-library.json`，「导入」校验整个文件后确认替换自定义组件，内置组件和画布内容保留。读取旧组件库时自动补齐内置组件。
+
+画布顶部的「标尺」「网格」可分别显示或隐藏，在右侧「画布设置」调整网格间距。标尺原点对应实际画布左上角，缩放和设备外框不会改变像素坐标。辅助线设置独立保存，预览和 HTML 导出只呈现原型。
+
+按住 Shift 点击画布上的组件或右侧图层可增减选择。在「对齐与居中」选择参照：参照「画布」时，各组件分别对齐到画布边缘或中心；参照「所选组件」时，至少选择两个组件，以所选组件的包围框对齐。整体居中同时调整两个方向。多选后拖动或使用方向键会整组移动，触碰画布边界时保留组件相对位置。多选时属性表单只编辑最后点击的组件，复制和删除作用于所有所选组件。
 
 在右侧「设备外框」中选择样式。点击「编辑自定义 HTML 外框」可绘制装饰并设置四边留白（各 0～200 px），HTML 的 100% 宽高对应整个外框，画布按留白嵌入其中。支持静态 HTML / SVG 与内联样式。设备类型可独立于自定义画布尺寸选择。
 
@@ -53,6 +59,8 @@ index.html                语义化编辑器界面与弹窗
 styles/app.css            设计变量、布局、交互及响应式样式
 src/app.js                界面绑定、渲染与指针交互
 src/model.js              画布模型、边界约束、校验与历史
+src/layout.js             多选包围框、对齐和整组移动
+src/guides.js             辅助线设置和像素标尺刻度
 src/presets.js            普通组件和矢量图形库
 src/frames.js             设备外框配置与几何尺寸
 src/icons.js              离线 SVG 界面图标
@@ -61,6 +69,7 @@ src/storage.js            浏览器存储、文件读取与下载
 scripts/serve.mjs         无依赖本地静态服务器
 scripts/check.mjs         语法与页面绑定检查
 scripts/browser-test.mjs  浏览器验收脚本
+scripts/guides-browser-test.mjs 辅助线、多选和对齐验收
 tests/                    模型回归测试
 docs/design-requirements.md 原始需求
 docs/implementation-plan.md 模块拆解、验收与后续计划
@@ -81,6 +90,7 @@ npm run check
 npm install --no-save --package-lock=false playwright
 npx playwright install chromium
 npm run test:browser
+npm run test:guides
 ```
 
 验收脚本自动启动临时服务，覆盖拖拽、缩放、属性、历史、文件导入导出、草稿恢复、窄屏面板和存储异常；截图写入不参与提交的 `test-results/`。已有 Playwright 可通过 `PROTOLAB_PLAYWRIGHT_MODULE` 指定其 `index.mjs`，通过 `PROTOLAB_BROWSER_EXECUTABLE` 指定浏览器执行文件，或用 `PROTOLAB_TEST_URL` 测试已启动服务。
