@@ -4,6 +4,7 @@ import { sanitizeContent, exportHTML } from './content.js';
 import { readStorage, writeStorage, download, readFile } from './storage.js';
 import { AI_SETTINGS_KEY, DESIGN_SPEC, normalizeAISettings, parseAIResponse, requestAI, generationBase, parseGenerationResponse } from './ai.js';
 import { WORKSPACE_KEY, createVersions, validateWorkspace, mergeProjects } from './versions.js';
+import { MAX_REFERENCE_IMAGE, IMAGE_UI_REQUIREMENT, imageCanvasSize } from './image-ui.js';
 
 const $ = id => document.getElementById(id);
 const validate = value => validateProject(value, sanitizeContent);
@@ -22,6 +23,9 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   let controller = null;
   let session = 0;
   let generated = null;
+  let referenceImage = null;
+  let imageRead = 0;
+  let imageLoading = false;
   let choices = {};
   let mergeHead = null;
   let mergeProject = null;
@@ -47,6 +51,8 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiMode').disabled = !!controller || !!pending || !!generated;
     $('aiGenerated').hidden = !generated;
     $('aiSendBtn').disabled ||= !!generated;
+    $('aiSendBtn').disabled ||= imageLoading;
+    for (const id of ['aiImageFile', 'aiImageRemoveBtn']) $(id).disabled = !!controller || !!generated || imageLoading;
   }
   function addMessage(role, content) { messages.push({ role, content }); renderMessages(); scheduleSave(); }
   function renderVersions() {
@@ -125,6 +131,34 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   $('aiToggleBtn').addEventListener('click', () => setPanel($('aiPanel').hidden));
   $('generateComponentBtn').addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'component'; renderMode(); } $('aiRequirement').focus(); });
   $('generatePageBtn').addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'page'; renderMode(); } $('aiRequirement').focus(); });
+  for (const id of ['generateImageBtn', 'imageUIBtn']) $(id).addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'image'; renderMode(); $('aiImageFile').focus(); } });
+  function renderImage() {
+    $('aiImagePreview').hidden = !referenceImage;
+    if (referenceImage) $('aiImagePreview').src = referenceImage.dataURL;
+    else $('aiImagePreview').removeAttribute('src');
+    $('aiImageRemoveBtn').hidden = !referenceImage;
+    $('aiImageInfo').textContent = referenceImage ? t`画布 ${referenceImage.width} × ${referenceImage.height} px · 自动命名组件` : '';
+  }
+  function clearImage() {
+    imageRead++; imageLoading = false; referenceImage = null; $('aiImageFile').value = ''; renderImage(); renderMessages();
+  }
+  $('aiImageRemoveBtn').addEventListener('click', clearImage);
+  $('aiImageFile').addEventListener('change', async event => {
+    const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
+    const token = ++imageRead, currentSession = session;
+    imageLoading = true; renderMessages(); $('aiStatus').textContent = t('正在读取参考图片…');
+    try {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('请选择 PNG、JPEG 或 WebP 界面图片');
+      if (file.size > MAX_REFERENCE_IMAGE) throw new Error('参考图片不能超过 3 MB');
+      const dataURL = await readFile(file, 'dataURL');
+      const image = new Image(); image.src = dataURL;
+      try { await image.decode(); } catch { throw new Error('图片内容无效，无法读取'); }
+      const size = imageCanvasSize(image.naturalWidth, image.naturalHeight);
+      if (token !== imageRead || currentSession !== session) return;
+      referenceImage = { dataURL, ...size }; renderImage(); $('aiStatus').textContent = '';
+    } catch (error) { if (token === imageRead && currentSession === session) { $('aiStatus').textContent = t(error.message); notify(t(error.message), true); } }
+    finally { if (token === imageRead && currentSession === session) { imageLoading = false; renderMessages(); } }
+  });
   $('aiCloseBtn').addEventListener('click', () => setPanel(false));
   $('settingsBtn').addEventListener('click', () => {
     $('aiURL').value = settings.url; $('aiKey').value = settings.key; $('aiModel').value = settings.model;
@@ -149,18 +183,20 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   });
   $('aiForm').addEventListener('submit', async event => {
     event.preventDefault();
-    if (controller || pending || generated) return;
-    const requirement = $('aiRequirement').value.trim();
+    if (controller || pending || generated || imageLoading) return;
+    const mode = $('aiMode').value;
+    if (mode === 'image' && !referenceImage) { $('aiStatus').textContent = t('请先上传参考图片'); $('aiImageFile').focus(); return; }
+    const requirement = $('aiRequirement').value.trim() || (mode === 'image' ? IMAGE_UI_REQUIREMENT : '');
     if (!requirement) return;
     if (!settings.url || !settings.model) { notify(t('请先设置 AI 接口地址和模型'), true); $('settingsBtn').click(); return; }
     finishGesture();
-    const mode = $('aiMode').value;
     const currentSession = session;
     const requestProject = clone(getProject());
     const assets = getDesignAssets ? clone(getDesignAssets()) : {};
     const designOptions = { designContext: assets.context, library: assets.library };
     const baseId = versions.add(requestProject, t('AI 生成前'), { force: true });
-    const base = mode === 'modify' ? requestProject : generationBase(requestProject, mode, assets.context);
+    const image = mode === 'image' ? clone(referenceImage) : null;
+    const base = mode === 'modify' ? requestProject : generationBase(requestProject, mode, assets.context, image);
     const context = clone(messages);
     controller = new AbortController(); const active = controller;
     let timedOut = false;
@@ -168,12 +204,12 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     addMessage('user', requirement); $('aiRequirement').value = '';
     $('aiStatus').textContent = t('AI 正在生成…可以继续编辑画布。');
     try {
-      const text = await requestAI(settings, requirement, base, context, active.signal, fetch, { mode, rules: getRules(), ...designOptions });
+      const text = await requestAI(settings, requirement, base, context, active.signal, fetch, { mode, rules: getRules(), ...designOptions, referenceImage: image });
       if (currentSession !== session) return;
       if (active.signal.aborted) throw new Error(t('请求已取消'));
       finishGesture();
       if (mode !== 'modify') {
-        generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent, designOptions), mode };
+        generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent, designOptions), mode, referenceImage: image };
         versions.add(getProject(), t`AI 生成后（待确认）：${generated.summary}`, { force: true });
         addMessage('assistant', generated.summary);
         $('aiGeneratedSummary').textContent = `${generated.name} · ${generated.summary}`;
@@ -205,7 +241,20 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('generationName').value = generated.name;
     $('generationSummary').textContent = generated.summary;
     $('generationApplyBtn').textContent = generated.mode === 'component' ? t('保存到组件库') : t('添加为新页面');
-    $('generationPreview').srcdoc = exportHTML(generated.project, { preview: true });
+    let preview = exportHTML(generated.project, { preview: true });
+    if (generated.mode === 'image') {
+      preview = preview.replace('</head>', '<style>html,body{height:100%;min-height:0;overflow:hidden}body{padding:0}.prototype-page{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}.device-shell{transform-origin:center}</style></head>');
+      preview = preview.replace('</body>', `<script>const shell=document.querySelector('.device-shell');const fit=()=>{shell.style.transform='scale('+Math.min(1,(innerWidth-24)/shell.offsetWidth,(innerHeight-24)/shell.offsetHeight)+')';};new ResizeObserver(fit).observe(document.documentElement);fit();</script></body>`);
+    }
+    $('generationPreview').srcdoc = preview;
+    $('generationComparison').classList.toggle('with-reference', generated.mode === 'image');
+    $('generationReference').hidden = generated.mode !== 'image';
+    if (generated.referenceImage) $('generationReferenceImage').src = generated.referenceImage.dataURL;
+    else $('generationReferenceImage').removeAttribute('src');
+    $('generationComponents').hidden = generated.mode !== 'image';
+    $('generationComponentList').replaceChildren(...(generated.mode === 'image' ? generated.project.items : []).map(item => {
+      const entry = document.createElement('li'); entry.textContent = item.name; return entry;
+    }));
     $('generationError').textContent = '';
     if (!$('generationDialog').open) $('generationDialog').showModal();
   }
@@ -226,14 +275,16 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     } catch (error) { $('generationError').textContent = t(error.message); }
   });
   $('discardGenerationBtn').addEventListener('click', () => { generated = null; $('generationDialog').close(); renderMessages(); $('aiStatus').textContent = t('已放弃生成结果，可以重新发送需求。'); });
-  $('generationDialog').addEventListener('close', () => $('generationPreview').removeAttribute('srcdoc'));
+  $('generationDialog').addEventListener('close', () => { $('generationPreview').removeAttribute('srcdoc'); $('generationReferenceImage').removeAttribute('src'); });
   $('aiMode').addEventListener('change', renderMode);
   function renderMode() {
     const mode = $('aiMode').value;
-    $('aiModeHelp').textContent = mode === 'modify' ? t('发送当前工程和最近对话，修改当前页。') : mode === 'component' ? t('根据提示词和规范独立生成组件，预览后保存到当前工程组件库。') : t('根据提示词和规范独立生成页面，预览后添加为新页面。');
-    $('aiSendBtn').textContent = mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : t('生成页面');
+    $('aiImageFields').hidden = mode !== 'image';
+    $('aiRequirement').required = mode !== 'image';
+    $('aiModeHelp').textContent = mode === 'image' ? t('上传界面图片，AI 还原布局和文案，拆分可编辑组件并自动命名，预览后添加为新页面。') : mode === 'modify' ? t('发送当前工程和最近对话，修改当前页。') : mode === 'component' ? t('根据提示词和规范独立生成组件，预览后保存到当前工程组件库。') : t('根据提示词和规范独立生成页面，预览后添加为新页面。');
+    $('aiSendBtn').textContent = mode === 'image' ? t('根据图片生成 UI') : mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : t('生成页面');
     const design = getDesignAssets?.().context;
-    $('aiRulesSummary').textContent = t`自动使用内置规范${getRules() ? t('、工程规范') : ''}${design?.palette ? t`、${design.palette.name}配色` : ''}${design ? t`、${design.library.components.length} 个关联组件及安全区信息` : ''}，可在「工程设置」中编辑。`;
+    $('aiRulesSummary').textContent = mode === 'image' ? t('优先还原图片的布局、颜色和原文案；提示词可留空，也可填写额外要求。') : t`自动使用内置规范${getRules() ? t('、工程规范') : ''}${design?.palette ? t`、${design.palette.name}配色` : ''}${design ? t`、${design.library.components.length} 个关联组件及安全区信息` : ''}，可在「工程设置」中编辑。`;
     $('aiBuiltinRules').textContent = t(DESIGN_SPEC);
   }
   $('aiCancelBtn').addEventListener('click', () => controller?.abort());
@@ -282,9 +333,10 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     snapshot: serialize,
     isBusy: () => !!controller || !!pending || !!generated,
     refreshRules: renderMode,
-    refreshLocale() { renderMessages(); renderVersions(); renderMode(); if ($('mergeDialog').open) renderMerge(); },
+    refreshLocale() { renderMessages(); renderVersions(); renderMode(); renderImage(); if ($('mergeDialog').open) renderMerge(); },
     activate(project, workspace) {
       session++; controller?.abort(); controller = null;
+      clearImage();
       versions = createVersions(project, workspace.versions);
       messages = clone(workspace.messages); pending = clone(workspace.pending); generated = null; choices = {}; mergeHead = null;
       for (const id of ['mergeDialog', 'generationDialog']) if ($(id).open) $(id).close();

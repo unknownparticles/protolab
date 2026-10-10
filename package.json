@@ -23,6 +23,7 @@
     "test:guides": "node scripts/guides-browser-test.mjs",
     "test:project": "node scripts/project-browser-test.mjs",
     "test:ai": "node scripts/ai-browser-test.mjs",
+    "test:image-ui": "node scripts/image-ui-browser-test.mjs",
     "test:orientation": "node scripts/orientation-browser-test.mjs",
     "test:pages": "node scripts/pages-browser-test.mjs",
     "test:interactions": "node scripts/interactions-browser-test.mjs",

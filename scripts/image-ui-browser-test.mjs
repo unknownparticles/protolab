@@ -1,0 +1,113 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdir, readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { clickAction } from './browser-actions.mjs';
+const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
+const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4191';
+const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4191' }, stdio: 'pipe' });
+const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
+await mkdir(output, { recursive: true });
+let browser;
+try {
+  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
+  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const fixture = await browser.newPage({ viewport: { width: 375, height: 667 } });
+  await fixture.setContent('<body style="margin:0;background:#f8fafc;font-family:sans-serif"><h1 style="position:absolute;left:24px;top:64px;margin:0;font-size:28px">欢迎登录</h1><input placeholder="请输入手机号" style="position:absolute;left:24px;top:140px;width:327px;height:48px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:12px"><button style="position:absolute;left:24px;top:208px;width:327px;height:48px;border:0;border-radius:8px;background:#2563eb;color:white">登录</button><p style="position:absolute;left:24px;top:276px;font-size:12px;color:#64748b;margin:0">登录即表示同意用户协议</p></body>');
+  const png = await fixture.screenshot({ path: resolve(output, 'image-ui-reference.png') }); await fixture.close();
+  const upload = () => page.locator('#aiImageFile').setInputFiles({ name: '登录界面.png', mimeType: 'image/png', buffer: png });
+  const saved = () => page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
+  const current = () => page.evaluate(() => { const catalog = JSON.parse(localStorage.getItem('protolab.projects.v1')); return catalog.entries.find(entry => entry.id === catalog.activeId); });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const items = [
+    { id: 'heading', name: '登录页标题', type: 'html', content: '<h1 style="font-size:28px;font-weight:700;font-family:sans-serif;margin:0">欢迎登录</h1>', x: 24, y: 64, width: 327, height: 40 },
+    { id: 'phone', name: '手机号输入框', type: 'html', content: '<input placeholder="请输入手机号" style="width:100%;height:100%;border:1px solid #cbd5e1;border-radius:8px;padding:12px">', x: 24, y: 140, width: 327, height: 48 },
+    { id: 'button', name: '登录按钮', type: 'html', content: '<button style="width:100%;height:100%;border:0;border-radius:8px;background:#2563eb;color:white">登录</button>', x: 24, y: 208, width: 327, height: 48 },
+    { id: 'terms', name: '', type: 'html', content: '<p style="font-size:12px;font-family:sans-serif;color:#64748b;margin:0">登录即表示同意用户协议</p>', x: 24, y: 276, width: 327, height: 20 },
+  ];
+  let responseMode = 'valid', sent, release;
+  await page.route('https://vision.example.test/**', async route => {
+    sent = route.request().postDataJSON();
+    if (responseMode === 'wait') await new Promise(resolve => { release = resolve; });
+    if (responseMode === 'unsupported') { await route.fulfill({ status: 400, body: '{}' }); return; }
+    const changes = [{ op: 'canvas', fields: { background: '#f8fafc' } }, ...items.map(item => ({ op: 'add', item }))];
+    const content = responseMode === 'invalid' ? '无法识别' : JSON.stringify({ version: 1, name: '图片登录页', summary: '已识别并命名四个可编辑组件', changes });
+    await route.fulfill({ json: { choices: [{ message: { content } }] } });
+  });
+  await page.goto(base); await page.locator('[data-comp-id="lib-btn"]').click(); await saved();
+  const original = (await current()).project;
+  await clickAction(page, '#settingsBtn'); await page.locator('#aiURL').fill('https://vision.example.test/v1'); await page.locator('#aiModel').fill('vision-model'); await page.locator('#aiSettingsForm button[type=submit]').click();
+  await clickAction(page, '#imageUIBtn');
+  assert.equal(await page.locator('#aiMode').inputValue(), 'image');
+  await page.locator('#aiSendBtn').click(); assert.match(await page.locator('#aiStatus').textContent(), /先上传/);
+  await upload(); await page.locator('#aiImagePreview').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#aiImageInfo').textContent(), /375 × 667/);
+  await page.locator('#aiImageFile').setInputFiles({ name: '无效.png', mimeType: 'image/png', buffer: Buffer.from('invalid') });
+  await page.waitForFunction(() => document.getElementById('aiStatus').textContent.includes('图片内容无效'));
+  assert.equal(await page.locator('#aiImagePreview').isVisible(), true);
+  await page.locator('#aiImageFile').setInputFiles({ name: '过大.png', mimeType: 'image/png', buffer: Buffer.alloc(3 * 1024 * 1024 + 1) });
+  await page.waitForFunction(() => document.getElementById('aiStatus').textContent.includes('3 MB'));
+  await page.locator('#aiImageRemoveBtn').click(); assert.equal(await page.locator('#aiImagePreview').isVisible(), false);
+  await upload(); await page.locator('#aiImagePreview').waitFor({ state: 'visible' });
+  await page.locator('#aiSendBtn').click(); await page.locator('#generationDialog').waitFor({ state: 'visible' });
+  assert.equal(sent.messages.length, 2); const task = JSON.parse(sent.messages[1].content[0].text);
+  assert.equal(task.mode, 'image'); assert.equal(task.project.items.length, 0); assert.ok(task.requirement.length);
+  assert.equal(sent.messages[1].content[1].image_url.url, 'data:image/png;base64,' + png.toString('base64'));
+  assert.equal(await page.locator('#generationComponentList li').count(), 4);
+  assert.equal(await page.locator('#generationReferenceImage').isVisible(), true);
+  assert.equal(await page.frameLocator('#generationPreview').locator('.prototype-item').count(), 4);
+  const renderedTitle = page.frameLocator('#generationPreview').locator('.prototype-item').first();
+  assert.deepEqual(await renderedTitle.evaluate(node => [getComputedStyle(node).backgroundColor, getComputedStyle(node).boxShadow, getComputedStyle(node.firstElementChild).display]), ['rgba(0, 0, 0, 0)', 'none', 'block']);
+  await page.locator('#generationComponents').evaluate(node => { node.open = true; });
+  await page.screenshot({ path: resolve(output, 'image-ui-comparison.png') });
+  await saved(); assert.deepEqual((await current()).project, original);
+  await page.locator('#generationApplyBtn').click(); await saved();
+  const generated = (await current()).project;
+  assert.equal(generated.pages.length, original.pages.length + 1); assert.equal(generated.items.length, 4);
+  assert.equal(generated.canvas.width, 375); assert.equal(generated.canvas.height, 667); assert.equal(generated.frame.style, 'none');
+  assert.equal(generated.items[3].name, '登录即表示同意用户协议 · 文本');
+  await page.locator('#aiCloseBtn').click(); await page.locator('#layersTab').click();
+  await page.locator('.layer-item').filter({ hasText: '登录按钮' }).click();
+  await page.locator('#propName').fill('确认登录按钮'); await page.locator('#propW').fill('300'); await page.locator('[data-text-index="0"]').fill('立即登录');
+  await page.locator('#selectionProps button[type=submit]').click(); await saved();
+  let edited = (await current()).project.items.find(item => item.name === '确认登录按钮');
+  assert.equal(edited.width, 300); assert.match(edited.content, /立即登录/);
+  await clickAction(page, '#undoBtn'); await saved(); assert.equal((await current()).project.items[2].name, '登录按钮');
+  await clickAction(page, '#redoBtn'); await saved();
+  const downloadPromise = page.waitForEvent('download'); await clickAction(page, '#exportProjectBtn');
+  const exported = JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'));
+  assert.ok(JSON.stringify(exported).includes('确认登录按钮')); assert.equal(JSON.stringify(exported).includes(png.toString('base64')), false);
+  await page.reload(); await page.locator('.editor-item').first().waitFor();
+  assert.equal(await page.locator('.editor-item').count(), 4); await clickAction(page, '#imageUIBtn');
+  assert.equal(await page.locator('#aiImagePreview').isVisible(), false);
+  const beforeFailure = (await current()).project;
+  await upload(); await page.locator('#aiImagePreview').waitFor({ state: 'visible' }); responseMode = 'invalid';
+  await page.locator('#aiSendBtn').click(); await page.waitForFunction(() => document.getElementById('aiStatus').textContent.includes('JSON')); await saved();
+  assert.deepEqual((await current()).project, beforeFailure);
+  responseMode = 'unsupported'; await page.locator('#aiSendBtn').click();
+  await page.waitForFunction(() => document.getElementById('aiStatus').textContent.includes('视觉模型')); await saved();
+  assert.deepEqual((await current()).project, beforeFailure);
+  responseMode = 'wait'; await page.locator('#aiSendBtn').click(); await page.waitForFunction(() => !document.getElementById('aiCancelBtn').hidden);
+  await page.locator('#aiCancelBtn').click(); release(); await page.waitForFunction(() => document.getElementById('aiStatus').textContent.includes('取消')); await saved();
+  assert.deepEqual((await current()).project, beforeFailure);
+  await page.locator('#languageSelect').selectOption('en'); assert.equal(await page.locator('#aiSendBtn').textContent(), 'Generate UI from image');
+  await page.locator('#languageSelect').selectOption('zh');
+  await page.setViewportSize({ width: 390, height: 844 }); await page.screenshot({ path: resolve(output, 'image-ui-mobile.png') });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  release = null; responseMode = 'wait'; await page.locator('#aiSendBtn').click();
+  for (let attempt = 0; !release && attempt < 40; attempt++) await page.waitForTimeout(25);
+  assert.ok(release);
+  await page.locator('#aiCloseBtn').click();
+  await clickAction(page, '#newProjectBtn'); await page.locator('#engineeringName').fill('独立工程'); await page.locator('#engineeringSubmitBtn').click();
+  release();
+  await saved();
+  await clickAction(page, '#imageUIBtn'); assert.equal(await page.locator('#aiImagePreview').isVisible(), false);
+  assert.equal(await page.locator('.editor-item').count(), 0);
+  assert.equal(await page.locator('#generationDialog').isVisible(), false);
+  assert.equal(await page.locator('#aiGenerated').isVisible(), false);
+  assert.deepEqual(errors, []);
+  console.log('通过：真实图片上传与格式体积校验、多模态请求、对照预览、组件命名和编辑、撤销重做、刷新导出、失败取消保护、工程隔离及双语窄屏');
+} finally { await browser?.close(); server?.kill(); }
