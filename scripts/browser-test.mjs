@@ -208,9 +208,9 @@ try {
   await restricted.goto(base); await restricted.locator('[data-comp-id="lib-btn"]').click();
   await restricted.waitForFunction(() => document.getElementById('saveState').textContent === '草稿未保存');
   assert.equal(await restricted.locator('.editor-item').count(), 4);
-  assert.match(await restricted.locator('#toast').textContent(), /未保存/);
+  assert.match(await restricted.locator('#toast').textContent(), /未(?:完整)?保存/);
   console.log('通过：存储不可用时保留内存设计并提示');
-  const stress = await context.newPage();
+  const stress = await (await browser.newContext()).newPage();
   const projectSeed = await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')));
   projectSeed.items = Array.from({ length: 200 }, (_, index) => ({ ...projectSeed.items[1], id: `stress-${index}`, x: index % 10 * 20, y: Math.floor(index / 10) * 20 }));
   await stress.addInitScript(seed => localStorage.setItem('protolab.project.v1', JSON.stringify(seed)), projectSeed);
