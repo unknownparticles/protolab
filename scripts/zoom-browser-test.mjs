@@ -42,7 +42,7 @@ try {
   };
   await page.locator('#zoomSelect').selectOption('1');
   await pinch(canvas, async () => Number(await page.locator('#zoomSelect').inputValue()));
-  assert.equal(await page.locator('#propX').inputValue(), '32', '捏合不会移动组件');
+  assert.equal(await page.locator('.editor-item').evaluate(node => node.style.left), '32px', '捏合不会移动组件');
   await page.locator('#zoomSelect').selectOption('1');
   await page.locator('#previewBtn').click();
   const preview = page.frameLocator('#previewFrame'), viewport = preview.locator('.preview-viewport').first();
@@ -63,8 +63,8 @@ try {
   const original = await preview.locator('[data-preview-item]').first().evaluate(node => ({ width: parseFloat(node.style.width), height: parseFloat(node.style.height) }));
   await page.mouse.move(hbox.x + hbox.width / 2, hbox.y + hbox.height / 2); await page.mouse.down();
   await page.mouse.move(hbox.x + hbox.width / 2 + 40, hbox.y + hbox.height / 2 + 20, { steps: 5 }); await page.mouse.up();
-  await page.waitForFunction(width => Number(document.querySelector('#propW').value) === width, original.width + 20);
-  assert.equal(await page.locator('#propH').inputValue(), String(original.height + 10));
+  await page.waitForFunction(width => parseFloat(document.querySelector('.editor-item').style.width) === width, original.width + 20);
+  assert.equal(await page.locator('.editor-item').evaluate(node => parseFloat(node.style.height)), original.height + 10);
   await preview.locator('[data-preview-item] button').first().dblclick();
   await preview.getByRole('textbox').fill('缩放后文字');
   await preview.getByRole('button', { name: '保存文字', exact: true }).click();

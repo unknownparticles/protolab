@@ -1,6 +1,6 @@
 /** 布局操作始终以画布像素计算，与缩放和设备外框无关。 */
 import { placementBounds } from './safe-area.js';
-import { visibilityLayout, expandedY } from './visibility.js';
+import { visibilityLayout, expandedY, visibilityBounds } from './visibility.js';
 export function selectionBounds(items) {
   if (!items.length) return null;
   const x = Math.min(...items.map(item => item.x));
@@ -32,7 +32,7 @@ export function moveItems(project, starts, dx, dy) {
   const selected = project.items.filter(item => starts.has(item.id)).map(item => ({ ...item, ...starts.get(item.id) }));
   const bounds = selectionBounds(selected);
   if (!bounds) return project;
-  const available = placementBounds(project);
+  const available = visibilityBounds(placementBounds(project), project.items);
   dx = Math.round(Math.max(available.x - bounds.x, Math.min(available.x + available.width - bounds.x - bounds.width, dx)));
   dy = Math.round(Math.max(available.y - bounds.y, Math.min(available.y + available.height - bounds.y - bounds.height, dy)));
   return { ...project, items: project.items.map(item => starts.has(item.id) ? { ...item, x: starts.get(item.id).x + dx, y: starts.get(item.id).y + dy } : item) };

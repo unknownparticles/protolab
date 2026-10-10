@@ -22,7 +22,8 @@ export function visibilityLayout(items) {
 
 /** 将属性或对齐指定的显示坐标换回展开坐标。 */
 export function expandedY(items, id, displayedY) {
-  let y = displayedY;
+  const original = items.find(item => item.id === id);
+  let y = displayedY + original.y - visibilityLayout(items).find(item => item.id === id).y;
   for (let step = 0; step <= items.length; step++) {
     const values = items.map(item => item.id === id ? { ...item, y } : item);
     const projected = visibilityLayout(values).find(item => item.id === id);

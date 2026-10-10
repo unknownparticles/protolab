@@ -13,26 +13,54 @@
 <body>
   <header class="toolbar">
     <a class="brand" href="./" aria-label="Protolab 首页"><span class="brand-symbol" data-icon="logo"></span><span>Protolab<small>原型实验室</small></span></a>
-    <div class="toolbar-divider"></div>
-    <div class="project-controls" role="group" aria-label="工程管理"><select id="projectSelect" aria-label="切换工程"></select><button class="btn btn-sm" id="newProjectBtn">新建工程</button><button class="btn btn-sm" id="engineeringSettingsBtn">工程设置</button></div>
-    <div class="toolbar-group presets" aria-label="画布预设">
-      <button class="btn btn-sm" data-preset="phone"><span data-icon="phone"></span>手机</button>
-      <button class="btn btn-sm" data-preset="tablet"><span data-icon="tablet"></span>平板</button>
-      <button class="btn btn-sm" data-preset="pc"><span data-icon="pc"></span>PC</button>
-    </div>
-    <button class="btn btn-icon" id="rotateBtn" title="横竖屏切换" aria-label="横竖屏切换"><span data-icon="rotate"></span></button>
-    <div class="toolbar-divider"></div>
-    <button class="btn btn-icon" id="undoBtn" title="撤销（Ctrl / ⌘ Z）" aria-label="撤销" disabled><span data-icon="undo"></span></button>
-    <button class="btn btn-icon" id="redoBtn" title="重做（Ctrl / ⌘ Shift Z）" aria-label="重做" disabled><span data-icon="redo"></span></button>
-    <span class="save-state" id="saveState">本地草稿</span>
+    <nav class="app-menubar" role="menubar" aria-label="应用菜单">
+      <div class="app-menu" role="none">
+        <button class="menu-trigger" id="fileMenuBtn" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="fileMenu" tabindex="0">文件</button>
+        <div class="menu-dropdown" id="fileMenu" role="menu" aria-labelledby="fileMenuBtn" hidden>
+          <button id="newProjectBtn" type="button" role="menuitem" tabindex="-1">新建工程</button>
+          <button id="engineeringSettingsBtn" type="button" role="menuitem" tabindex="-1">工程设置</button>
+          <div class="menu-separator" role="separator"></div>
+          <button id="saveBtn" type="button" role="menuitem" tabindex="-1" aria-keyshortcuts="Control+s Meta+s"><span data-icon="save"></span><span>保存版本</span><span class="menu-shortcut" data-shortcut="S"></span></button>
+          <button id="importProjectBtn" type="button" role="menuitem" tabindex="-1"><span data-icon="upload"></span>导入工程</button>
+          <div class="menu-separator" role="separator"></div>
+          <button id="exportProjectBtn" type="button" role="menuitem" tabindex="-1"><span data-icon="download"></span>导出工程</button>
+          <button id="exportHtmlBtn" type="button" role="menuitem" tabindex="-1"><span data-icon="code"></span>导出 HTML</button>
+        </div>
+      </div>
+      <div class="app-menu" role="none">
+        <button class="menu-trigger" id="editMenuBtn" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="editMenu" tabindex="-1">编辑</button>
+        <div class="menu-dropdown" id="editMenu" role="menu" aria-labelledby="editMenuBtn" hidden>
+          <button id="undoBtn" type="button" role="menuitem" tabindex="-1" aria-keyshortcuts="Control+z Meta+z" disabled><span data-icon="undo"></span><span>撤销</span><span class="menu-shortcut" data-shortcut="Z"></span></button>
+          <button id="redoBtn" type="button" role="menuitem" tabindex="-1" aria-keyshortcuts="Control+Shift+z Meta+Shift+z" disabled><span data-icon="redo"></span><span>重做</span><span class="menu-shortcut" data-shortcut="⇧ Z"></span></button>
+          <div class="menu-separator" role="separator"></div>
+          <button id="menuDuplicateBtn" type="button" role="menuitem" tabindex="-1" aria-keyshortcuts="Control+d Meta+d" disabled><span data-icon="copy"></span><span>复制所选组件</span><span class="menu-shortcut" data-shortcut="D"></span></button>
+          <button id="menuDeleteBtn" type="button" role="menuitem" tabindex="-1" aria-keyshortcuts="Delete Backspace" disabled><span data-icon="trash"></span><span>删除所选组件</span><span class="menu-shortcut">⌫ / Del</span></button>
+        </div>
+      </div>
+      <div class="app-menu" role="none">
+        <button class="menu-trigger" id="canvasMenuBtn" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="canvasMenu" tabindex="-1">画布</button>
+        <div class="menu-dropdown" id="canvasMenu" role="menu" aria-labelledby="canvasMenuBtn" hidden>
+          <div class="menu-label" role="presentation">画布预设</div>
+          <button type="button" role="menuitemradio" tabindex="-1" aria-checked="true" data-preset="phone"><span data-icon="phone"></span>手机</button>
+          <button type="button" role="menuitemradio" tabindex="-1" aria-checked="false" data-preset="tablet"><span data-icon="tablet"></span>平板</button>
+          <button type="button" role="menuitemradio" tabindex="-1" aria-checked="false" data-preset="pc"><span data-icon="pc"></span>PC</button>
+          <div class="menu-separator" role="separator"></div>
+          <button id="rotateBtn" type="button" role="menuitem" tabindex="-1"><span data-icon="rotate"></span>横竖屏切换</button>
+          <button id="menuFitBtn" type="button" role="menuitem" tabindex="-1"><span data-icon="eye"></span>适应窗口</button>
+        </div>
+      </div>
+      <div class="app-menu" role="none">
+        <button class="menu-trigger" id="toolsMenuBtn" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="toolsMenu" tabindex="-1">工具</button>
+        <div class="menu-dropdown" id="toolsMenu" role="menu" aria-labelledby="toolsMenuBtn" hidden>
+          <button id="aiToggleBtn" type="button" role="menuitem" tabindex="-1" aria-expanded="false" aria-controls="aiPanel">AI 对话</button>
+          <button id="settingsBtn" type="button" role="menuitem" tabindex="-1">AI 设置</button>
+        </div>
+      </div>
+    </nav>
+    <div class="project-controls" role="group" aria-label="工程管理"><select id="projectSelect" aria-label="切换工程"></select></div>
     <div class="toolbar-end">
-      <button class="btn" id="aiToggleBtn" aria-expanded="false" aria-controls="aiPanel">AI 对话</button>
-      <button class="btn" id="saveBtn" title="保存并生成版本（Ctrl / ⌘ S）"><span data-icon="save"></span>保存</button>
-      <button class="btn" id="settingsBtn">设置</button>
-      <button class="btn" id="importProjectBtn"><span data-icon="upload"></span>导入工程</button>
-      <button class="btn" id="exportProjectBtn"><span data-icon="download"></span>导出工程</button>
-      <button class="btn" id="previewBtn"><span data-icon="eye"></span>预览</button>
-      <button class="btn btn-primary" id="exportHtmlBtn"><span data-icon="download"></span>导出 HTML</button>
+      <span class="save-state" id="saveState" role="status">本地草稿</span>
+      <button class="btn btn-primary" id="previewBtn"><span data-icon="eye"></span>预览</button>
     </div>
   </header>
   <nav class="mobile-tabs" aria-label="工作区面板">

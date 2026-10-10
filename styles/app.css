@@ -131,3 +131,36 @@
 .ai-history.section-collapsed{flex:0 0 auto}
 .ai-composer.section-collapsed{overflow:visible}
 .visibility-targets{max-height:200px;overflow:auto;display:grid;gap:6px}.visibility-targets .checkbox-field{margin:0;overflow-wrap:anywhere}
+
+/* 属性和设计记录各自滚动，图层入口始终保留。 */
+.inspector-column{width:280px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;background:white;border-left:1px solid var(--border)}
+.inspector-column .properties{width:100%;flex:1;min-height:0;border-left:0}
+.inspector-column .properties.panel-collapsed{width:100%;flex:0 0 auto}
+.inspector-column .properties.panel-collapsed>.panel-heading{justify-content:space-between;padding:10px 16px}
+.inspector-column .properties.panel-collapsed>.panel-heading>h2{display:block}
+.inspector-column .properties.panel-collapsed .panel-toggle-label{display:none}
+.panel-tabs{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:white}
+.panel-tabs [role=tab]{flex:1;min-width:0;padding:9px 4px;border:1px solid transparent;border-radius:8px;background:#f8fafc;color:var(--muted);font-size:12px;white-space:nowrap}
+.panel-tabs [aria-selected=true]{color:var(--brand);background:#eff6ff;border-color:#bfdbfe;font-weight:600}
+.panel-tabs [role=tab]:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.activity-panel{display:flex;flex-direction:column;flex:0 0 34%;min-height:180px;max-height:46%;border-top:1px solid var(--border)}
+.activity-scroll{overflow:auto;min-height:0;flex:1;padding:12px}
+.activity-scroll .prop-section{padding:0;border:0}
+.activity-scroll .version-row{flex-direction:column;align-items:stretch;gap:8px;padding:10px}
+.activity-scroll .version-row .btn{align-self:flex-start;font-size:10px;padding:5px 8px}
+.activity-scroll .version-row strong{font-size:11px}
+.activity-scroll .version-tools{gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.custom-library-tools{margin-bottom:12px}
+.custom-library-tools .field{margin-bottom:8px}
+.group-tools{display:flex;gap:6px}.group-tools .btn{flex:1;font-size:11px;border-radius:7px}
+.custom-entry{border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:0}
+.custom-entry>.component-item{border:0;border-radius:0}
+.custom-entry-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;background:#f8fafc;font-size:10px;color:var(--muted)}
+.custom-entry-footer>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.custom-entry-footer .btn{font-size:10px;padding:3px 7px;border-radius:6px}
+@media(min-width:900px) and (max-width:1199px){.inspector-column{width:250px}}
+@media(max-width:899px){
+  .inspector-column{display:none;position:absolute;inset:0 0 0 auto;width:290px;max-width:100%;z-index:8;box-shadow:-8px 0 24px #0f172a15}
+  .inspector-column.open{display:flex}
+  .inspector-column .properties{position:static;inset:auto;display:flex;box-shadow:none}
+}
