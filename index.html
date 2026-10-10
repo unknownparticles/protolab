@@ -262,8 +262,15 @@
   <input type="file" id="versionsFileInput" hidden accept=".json,application/json">
   <dialog id="mcpDialog" aria-labelledby="mcpTitle">
     <div class="dialog-heading"><h2 id="mcpTitle">MCP 接入</h2><button class="btn btn-icon" type="button" data-close="mcpDialog" aria-label="关闭">×</button></div>
-    <p class="dialog-description">让 Codex、Cursor、Claude Code、OpenCode 和 Antigravity 读取工程、修改组件、创建页面与导出原型。修改支持撤销和版本回退。</p>
-    <p class="field-help">先在本地运行 npm run dev，打开本地易设并连接当前标签页，再把下方配置合并到客户端配置文件，重新加载客户端。调用期间保持标签页打开。</p>
+    <p class="dialog-description" id="mcpDescription">启动小外挂，即可让 AI 编程工具操作当前线上工程，无需迁移设计数据。</p>
+    <div id="mcpSidecarHelp">
+      <p class="field-help">下载外挂，在电脑上用 Node.js 运行下面的命令。保持外挂运行，再点击连接；浏览器询问时允许访问本机。</p>
+      <a class="btn" href="downloads/protolab-mcp.mjs" download="protolab-mcp.mjs">下载小外挂</a>
+      <pre class="engineering-manifest" data-i18n-ignore>node protolab-mcp.mjs</pre>
+      <p class="field-help">在下载目录执行。需要 Node.js 20.11 或更高版本，无需安装其他依赖。</p>
+    </div>
+    <p class="field-help">连接后，选择 Codex、Cursor、Claude Code、OpenCode 或 Antigravity，复制配置并合并到客户端配置文件，再重新加载客户端。调用期间保持标签页打开。</p>
+    <label class="field" id="mcpBridgeField">外挂地址<input id="mcpBridgeURL" type="url" value="http://127.0.0.1:4174" spellcheck="false" autocomplete="off"></label>
     <p id="mcpStatus" class="field-help" role="status">尚未连接</p>
     <button id="mcpConnectBtn" class="btn btn-primary" type="button">连接当前标签页</button>
     <p id="mcpSessionId" class="field-help" data-i18n-ignore></p>

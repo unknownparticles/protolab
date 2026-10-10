@@ -5,7 +5,7 @@ import { emptyProject } from '../src/projects.js';
 import { addPage, switchPage } from '../src/pages.js';
 import { designAssets } from '../src/project-design.js';
 import { COMPONENTS } from '../src/presets.js';
-import { MCP_CLIENTS, mcpConfig } from '../src/mcp-config.js';
+import { MCP_CLIENTS, mcpConfig, bridgeURL } from '../src/mcp-config.js';
 
 const item = { id: 'mcp-title', name: '标题', type: 'html', content: '<h1>欢迎</h1><script>bad()</script>', x: 20, y: 80, width: 240, height: 60 };
 const sessionId = 'test-tab';
@@ -31,6 +31,15 @@ test('五种客户端配置支持绝对路径、空格和自定义端口', () =>
       else assert.deepEqual(value.mcpServers.protolab, { command: config.command, args: [config.script, '--url', config.url] });
     }
   }
+});
+test('外挂配置通过同一单文件启动标准输入输出，地址限定为本机', () => {
+  const config = { command: '/opt/node', script: '/Downloads/易设 外挂.mjs', url: 'http://127.0.0.1:4174', stdio: true };
+  for (const name of Object.keys(MCP_CLIENTS)) {
+    const text = mcpConfig(name, config);
+    assert.ok(text.includes('--stdio')); assert.ok(text.includes(config.url));
+  }
+  assert.equal(bridgeURL('http://localhost:4174/'), 'http://localhost:4174');
+  for (const url of ['https://example.com', 'http://192.168.1.1:4174', 'http://127.0.0.1:4174/path', 'http://a:b@127.0.0.1:4174', 'http://127.0.0.1:4174/?token=secret']) assert.throws(() => bridgeURL(url), /本机/);
 });
 test('工程读取提供规范与关联清单，变更清理内容并一次应用', () => {
   const f = fixture(); const before = f.read();

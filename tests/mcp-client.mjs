@@ -3,8 +3,8 @@ import { createInterface } from 'node:readline';
 import { resolve } from 'node:path';
 
 /** 验收使用真实标准输入输出，禁止开发日志混入 MCP 响应。 */
-export function startMCPClient(url) {
-  const child = spawn(process.execPath, [resolve(import.meta.dirname, '../scripts/mcp-server.mjs'), '--url', url], { stdio: ['pipe', 'pipe', 'pipe'] });
+export function startMCPClient(url, { script = resolve(import.meta.dirname, '../scripts/mcp-server.mjs'), stdio = false } = {}) {
+  const child = spawn(process.execPath, [script, ...(stdio ? ['--stdio'] : []), '--url', url], { stdio: ['pipe', 'pipe', 'pipe'] });
   const pending = new Map();
   let sequence = 0, stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk; });

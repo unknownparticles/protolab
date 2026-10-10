@@ -3,13 +3,15 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 const root = resolve(import.meta.dirname, '..');
 let failed = false;
-for (const directory of ['src', 'scripts', 'tests']) {
+for (const directory of ['src', 'scripts', 'tests', 'downloads']) {
   for (const name of await readdir(resolve(root, directory))) {
     if (!/\.(?:js|mjs)$/.test(name)) continue;
     const result = spawnSync(process.execPath, ['--check', resolve(root, directory, name)], { encoding: 'utf8' });
     if (result.status !== 0) { console.error(result.stderr); failed = true; }
   }
 }
+const bundleCheck = spawnSync(process.execPath, [resolve(root, 'scripts/build-mcp.mjs'), '--check'], { encoding: 'utf8' });
+if (bundleCheck.status !== 0) { console.error(bundleCheck.stderr); failed = true; }
 const html = await readFile(resolve(root, 'index.html'), 'utf8');
 const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 if (new Set(ids).size !== ids.length) { console.error('页面存在重复标识'); failed = true; }

@@ -63,3 +63,27 @@ test('未执行请求超时后移除，恢复轮询不会应用过期操作', as
   assert.match((await response.json()).error, /未及时响应/);
   assert.equal((await f.poll()).command, null);
 });
+test('外挂仅允许指定站点跨域连接，预检与本机网络请求可用，不允许通配来源', async t => {
+  const origin = 'https://alunapp.cn';
+  const f = await fixture(t, { allowedOrigins: [origin], stdio: true });
+  const response = await f.request('config', null, { Origin: origin, 'Sec-Fetch-Site': 'cross-site' });
+  assert.equal(response.status, 200); assert.equal(response.headers.get('access-control-allow-origin'), origin);
+  const config = await response.json(); assert.equal(config.stdio, true);
+  assert.equal((await f.request('config', null, { Origin: 'https://alunapp.cn.evil.example', 'Sec-Fetch-Site': 'cross-site' })).status, 403);
+  assert.equal((await f.request('config', null, { Origin: 'null' })).status, 403);
+  const preflight = headers => fetch(`${f.url}/__protolab/poll`, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,x-protolab-token', 'Access-Control-Request-Private-Network': 'true', ...headers } });
+  const valid = await preflight({}); assert.equal(valid.status, 204);
+  assert.equal(valid.headers.get('access-control-allow-origin'), origin);
+  assert.equal(valid.headers.get('access-control-allow-private-network'), 'true');
+  assert.equal((await preflight({ Origin: 'https://evil.example' })).status, 403);
+  assert.equal((await preflight({ 'Access-Control-Request-Method': 'DELETE' })).status, 403);
+  assert.equal((await preflight({ 'Access-Control-Request-Headers': 'authorization' })).status, 403);
+  const poll = await f.request('poll', { sessionId: 'online-tab', metadata: { projectId: 'online-project', name: '线上工程' } }, { Origin: origin, 'Sec-Fetch-Site': 'cross-site' });
+  assert.equal(poll.status, 200);
+  assert.equal((await (await f.request('sessions')).json()).sessions[0].sessionId, 'online-tab');
+  assert.equal((await f.request('sessions', null, { Origin: origin, 'X-Protolab-Token': 'wrong' })).status, 403);
+  const beacon = token => fetch(`${f.url}/__protolab/disconnect`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ sessionId: 'online-tab', token }) });
+  assert.equal((await beacon('wrong')).status, 403);
+  assert.equal((await beacon(config.token)).status, 200);
+  assert.equal((await (await f.request('sessions')).json()).sessions.length, 0);
+});

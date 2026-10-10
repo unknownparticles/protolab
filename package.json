@@ -6,6 +6,9 @@
   "description": "浏览器里的轻量级原型设计工具",
   "scripts": {
     "dev": "node scripts/serve.mjs",
+    "bridge": "node scripts/mcp-sidecar.mjs",
+    "build:mcp": "node scripts/build-mcp.mjs",
+    "test:sidecar": "node scripts/mcp-sidecar-browser-test.mjs",
     "mcp": "node scripts/mcp-server.mjs",
     "mcp:config": "node scripts/mcp-config.mjs",
     "test:mcp": "node scripts/mcp-browser-test.mjs",

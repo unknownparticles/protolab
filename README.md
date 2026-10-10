@@ -2,7 +2,7 @@
 
 浏览器里的轻量原型设计器：从组件库拖拽搭建界面，编辑尺寸与布局，导出可独立打开的 HTML。纯静态 HTML、CSS、原生 JavaScript，无框架、无后端、无运行时依赖。
 
-可通过可选的本地 MCP 桥，让 Codex、Cursor、Claude Code、OpenCode 和 Antigravity 读取工程、修改组件、新建页面及导出原型。运行 `npm run dev` 后，从「工具 → MCP 接入」连接标签页并复制对应客户端配置。修改支持撤销与版本回退；当前 MCP 功能需要本地服务。详见 [MCP 接入说明](docs/mcp.md)。
+可让 Codex、Cursor、Claude Code、OpenCode 和 Antigravity 通过 MCP 读取工程、修改组件、新建页面及导出原型。线上页面从「工具 → MCP 接入」下载约 21 KB 的小外挂，用 `node protolab-mcp.mjs` 启动后连接当前标签页，复制对应客户端配置即可；工程留在原网页，无需迁移。也可通过 `npm run dev` 连接本地编辑器。修改支持撤销与版本回退。详见 [MCP 接入说明](docs/mcp.md)。
 
 顶部语言选择支持「跟随系统」「中文」与「English」。首次打开跟随系统首选语言（中文地区使用中文，英文地区使用英文，其他语言回退英文）；选择会保存在当前浏览器。系统语言变化时自动跟随，显式选择优先。切换即时更新菜单、属性、提示和预览控件，保留未应用的表单输入及工程、页面、自定义组件和画布文案。中文品牌为「易设」，英文品牌为「Protolab」。
 
@@ -141,6 +141,7 @@ src/assistant.js          对话、设置、版本与合并交互
 src/mcp-editor.js         MCP 模型操作与写入版本检查
 src/mcp-connection.js     浏览器标签页连接与客户端配置界面
 src/mcp-protocol.js       MCP 工具清单、参数与协议说明
+src/mcp-tools.js          浏览器与外挂共用的工具定义
 src/mcp-config.js         五种客户端配置生成
 src/versions.js           持久版本图和字段级三方合并
 src/project-import.js     工程文件校验及隔离 HTML 布局识别
@@ -148,6 +149,9 @@ scripts/serve.mjs         无依赖本地静态服务器
 scripts/mcp-bridge.mjs    本地标签页请求桥
 scripts/mcp-server.mjs    标准 MCP 输入输出服务
 scripts/mcp-config.mjs    客户端配置生成命令
+scripts/mcp-sidecar.mjs   线上网页本机外挂入口
+scripts/build-mcp.mjs     无依赖单文件外挂打包
+downloads/protolab-mcp.mjs 可独立运行的外挂下载文件
 scripts/mcp-browser-test.mjs MCP 调用与浏览器同步验收
 scripts/check.mjs         语法与页面绑定检查
 scripts/browser-test.mjs  浏览器验收脚本
@@ -183,13 +187,14 @@ npm run test:pages
 npm run test:projects
 npm run test:i18n
 npm run test:mcp
+npm run test:sidecar
 ```
 
 验收脚本自动启动临时服务，覆盖拖拽、缩放、属性、历史、文件导入导出、草稿恢复、窄屏面板和存储异常；截图写入不参与提交的 `test-results/`。已有 Playwright 可通过 `PROTOLAB_PLAYWRIGHT_MODULE` 指定其 `index.mjs`，通过 `PROTOLAB_BROWSER_EXECUTABLE` 指定浏览器执行文件，或用 `PROTOLAB_TEST_URL` 测试已启动服务。
 
 ## GitHub Pages
 
-将代码推送到远程 `main` 后，在仓库 **Settings → Pages → Source** 选择 **GitHub Actions**。工作流先执行测试与静态检查，然后只发布 `index.html`、`src/`、`styles/`。所有资源采用相对地址，可放在项目子路径。仓库文档及原始资料不进入 Pages 发布目录。
+将代码推送到远程 `main` 后，在仓库 **Settings → Pages → Source** 选择 **GitHub Actions**。工作流先执行测试与静态检查，然后发布 `index.html`、`src/`、`styles/` 和单文件外挂 `downloads/`。所有资源采用相对地址，可放在项目子路径。仓库文档及原始资料不进入 Pages 发布目录。
 
 目标公开仓库为 `unknownparticles/protolab`，Pages 使用此工作流发布。后续每次推送 `main` 都会在检查通过后自动更新网站。
 
