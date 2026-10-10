@@ -843,6 +843,106 @@ $('projectForm').addEventListener('submit', async event => {
   finally { button.disabled = false; button.textContent = '导入并替换画布'; }
 });
 $('importLibBtn').addEventListener('click', () => $('libFileInput').click());
+function fillGroupSelect(select, value = '') {
+  select.replaceChildren(new Option('未分组', ''), ...libraryGroups.map(group => new Option(group.name, group.id)));
+  select.value = libraryGroups.some(group => group.id === value) ? value : '';
+}
+function saveLibraryChange(label) {
+  commit(label); renderLibrary(); persistLibrary();
+}
+function installLibraryImport(incoming, groups, label) {
+  const merged = mergeLibrary(library, libraryGroups, incoming, groups);
+  const nextLibrary = validateLibrary(merged.components, sanitizeContent);
+  finishGesture(); library = nextLibrary; libraryGroups = merged.groups; groupFilter = 'all';
+  saveLibraryChange(label); setLibraryTab('custom'); notify('已合并导入组件，现有组件与分组已保留');
+}
+$('customGroupFilter').addEventListener('change', () => { groupFilter = $('customGroupFilter').value; renderLibrary(); });
+function openGroupDialog(id = '') {
+  const group = libraryGroups.find(group => group.id === id);
+  $('groupForm').dataset.groupId = group?.id || ''; $('groupName').value = group?.name || '';
+  $('groupDialogTitle').textContent = group ? '管理分组' : '新建分组';
+  $('deleteGroupBtn').hidden = !group; $('groupError').textContent = '';
+  $('groupDialog').showModal(); $('groupName').focus();
+}
+$('newGroupBtn').addEventListener('click', () => openGroupDialog());
+$('manageGroupBtn').addEventListener('click', () => openGroupDialog(groupFilter));
+$('groupForm').addEventListener('submit', event => {
+  event.preventDefault();
+  try {
+    const id = $('groupForm').dataset.groupId, name = $('groupName').value.trim();
+    const next = validateGroups(id ? libraryGroups.map(group => group.id === id ? { ...group, name } : group) : [...libraryGroups, { id: uid(), name }]);
+    finishGesture(); libraryGroups = next; groupFilter = id || next.at(-1).id;
+    saveLibraryChange(id ? '重命名组件分组' : '新建组件分组'); $('groupDialog').close();
+  } catch (error) { $('groupError').textContent = error.message; }
+});
+$('deleteGroupBtn').addEventListener('click', () => {
+  const id = $('groupForm').dataset.groupId;
+  if (!confirm('删除此分组？其中的组件会保留并移到未分组，可撤销。')) return;
+  finishGesture(); libraryGroups = libraryGroups.filter(group => group.id !== id);
+  library = library.map(component => component.groupId === id ? { ...component, groupId: '' } : component);
+  groupFilter = ''; saveLibraryChange('删除组件分组'); $('groupDialog').close();
+});
+$('customList').addEventListener('click', event => {
+  const button = event.target.closest('[data-manage-component]'); if (!button) return;
+  const component = library.find(component => component.id === button.dataset.manageComponent);
+  if (!component) return;
+  $('manageComponentForm').dataset.componentId = component.id;
+  $('manageComponentName').value = component.name; fillGroupSelect($('manageComponentGroup'), component.groupId);
+  $('manageComponentError').textContent = ''; $('manageComponentDialog').showModal(); $('manageComponentName').focus();
+});
+$('manageComponentForm').addEventListener('submit', event => {
+  event.preventDefault();
+  try {
+    const id = $('manageComponentForm').dataset.componentId;
+    const name = $('manageComponentName').value.trim(); if (!name) throw new Error('请输入组件名称');
+    const next = validateLibrary(library.map(component => component.id === id ? { ...component, name, groupId: $('manageComponentGroup').value } : component), sanitizeContent);
+    finishGesture(); library = next; saveLibraryChange('修改组件名称与分组'); $('manageComponentDialog').close();
+  } catch (error) { $('manageComponentError').textContent = error.message; }
+});
+$('deleteCustomComponentBtn').addEventListener('click', () => {
+  if (!confirm('删除此自定义组件？画布中已有的组件会保留，可撤销。')) return;
+  finishGesture(); library = library.filter(component => component.id !== $('manageComponentForm').dataset.componentId);
+  saveLibraryChange('删除自定义组件'); $('manageComponentDialog').close();
+});
+$('exportComponentBtn').addEventListener('click', () => {
+  const component = library.find(component => component.id === $('manageComponentForm').dataset.componentId);
+  if (!component) return;
+  const groups = libraryGroups.filter(group => group.id === component.groupId);
+  download(JSON.stringify({ version: 1, components: [component], groups }, null, 2), 'protolab-component.json', 'application/json');
+});
+$('importComponentBtn').addEventListener('click', () => $('componentFileInput').click());
+$('componentFileInput').addEventListener('change', safeAction(async event => {
+  const file = event.target.files[0]; event.target.value = ''; if (!file) return;
+  if (file.size > MAX_LIBRARY_BYTES) throw new Error('组件文件不能超过十二兆字节');
+  const sourceSession = projectSession, sourceFilter = groupFilter;
+  const content = await readFile(file);
+  if (sourceSession !== projectSession) throw new Error('工程已切换，请重新导入组件');
+  if (/\.json$/i.test(file.name) || file.type === 'application/json') {
+    const raw = JSON.parse(content);
+    const values = Array.isArray(raw) || raw?.components ? raw : [raw?.component || raw];
+    const components = validateLibrary(values, sanitizeContent).map(component => ({ ...component, builtin: false }));
+    const groups = validateGroups(raw?.groups);
+    // 未携带分组的单组件文件归入当前分组。
+    if (!groups.length && libraryGroups.some(group => group.id === sourceFilter)) {
+      groups.push(libraryGroups.find(group => group.id === sourceFilter));
+      components.forEach(component => { component.groupId = sourceFilter; });
+    }
+    installLibraryImport(components, groups, '导入自定义组件');
+  } else {
+    const type = /\.svg$/i.test(file.name) ? 'svg' : 'html';
+    sanitizeContent(content, type);
+    openComponentDialog(type, null, file.name.replace(/\.[^.]+$/, ''));
+    $('customCode').value = content;
+    previewCustomComponent();
+  }
+}));
+$('saveSelectionComponentBtn').addEventListener('click', () => {
+  const item = selectedItem(); if (!item) return;
+  finishGesture(); openComponentDialog(item.type, item.type === 'image' ? item.content : null, item.name);
+  $('customWidth').value = item.width; $('customHeight').value = item.height;
+  if (item.type !== 'image') $('customCode').value = item.content;
+  $('componentForm').dataset.sourceId = item.id;
+});
 $('libFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
   if (file.size > MAX_LIBRARY_BYTES) throw new Error('组件库文件不能超过 12 MB');
@@ -856,6 +956,7 @@ $('libFileInput').addEventListener('change', safeAction(async event => {
 function openComponentDialog(type, data = null, name = '') {
   customType = type; imageData = data;
   $('componentForm').reset(); $('componentError').textContent = '';
+  delete $('componentForm').dataset.sourceId;
   updateOrientationFields('custom');
   $('componentPreviewSection').hidden = true;
   clearComponentPreview($('componentPreview'));
@@ -877,7 +978,8 @@ function readCustomComponent(preview = false) {
   }
   const raw = customType === 'image' ? imageData : $('customCode').value;
   if (!contentSizeValid(raw, customType)) throw new Error('组件标记不能超过 100000 字符，内嵌图片另计体积');
-  return validateLibrary([{ id: uid(), groupId: $('customGroup').value, name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value, orientationResponse: readOrientationFields('custom') }], sanitizeContent)[0];
+  const source = project.items.find(item => item.id === $('componentForm').dataset.sourceId);
+  return validateLibrary([{ id: uid(), groupId: $('customGroup').value, name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value, ...(source ? { appearance: source.appearance, imageSlot: source.imageSlot } : {}), orientationResponse: readOrientationFields('custom') }], sanitizeContent)[0];
 }
 function previewCustomComponent() {
   try {
