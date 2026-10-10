@@ -93,3 +93,16 @@ test('版本回退继续编辑保留分支，合并记录双亲且刷新可恢�
   assert.equal(restored.entries.length, 5);
   assert.throws(() => validateWorkspace({ ...saved, pending: { baseId: 'missing', aiId, summary: '修改' } }, value => value));
 });
+
+test('相同内容的每次主动保存仍形成版本，未保存草稿独立备份且兼容旧备份', () => {
+  const versions = createVersions(base());
+  versions.add(base(), '保存', { force: true }); versions.add(base(), '保存', { force: true });
+  assert.equal(versions.entries.length, 3);
+  const draft = base(); draft.items[0].name = '尚未生成版本的草稿';
+  const workspace = { version: 1, project: draft, versions: versions.serialize(), messages: [], pending: null };
+  const valid = value => validateProject(value, clean);
+  assert.deepEqual(validateWorkspace(workspace, valid).project, draft);
+  assert.equal(validateWorkspace(workspace, valid).versions.entries.length, 3);
+  delete workspace.project;
+  assert.equal(validateWorkspace(workspace, valid).project, undefined);
+});

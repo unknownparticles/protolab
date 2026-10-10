@@ -82,3 +82,17 @@ test('组件库总大小限制保证导出文件可重新导入', () => {
   const entries = Array.from({ length: 4 }, (_, index) => ({ id: `large-${index}`, name: '大图片', type: 'image', content: 'a'.repeat(3_500_000) }));
   assert.throws(() => validateLibrary(entries, sanitize), /总大小不能超过 12 MB/);
 });
+
+test('历史可跨步恢复，保留重做且新编辑只替换后续步骤', () => {
+  const history = createHistory({ value: 0 });
+  for (let value = 1; value <= 65; value++) history.push({ value }, `步骤${value}`);
+  assert.equal(history.entries.length, 66);
+  assert.deepEqual(history.checkout(1), { value: 1 });
+  assert.equal(history.entries[1].label, '步骤1');
+  assert.equal(history.canRedo, true);
+  const entries = history.entries; entries[1].value.value = 99;
+  assert.deepEqual(history.redo(), { value: 2 });
+  history.push({ value: 80 }, '新的编辑');
+  assert.equal(history.entries.length, 4); assert.equal(history.canRedo, false);
+  assert.throws(() => history.checkout(20), /不存在/);
+});

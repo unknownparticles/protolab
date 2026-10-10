@@ -57,6 +57,7 @@ let initialSavedAt = null;
 let catalog = null;
 let catalogReadable = true;
 let projectSession = 0;
+let previewSession = null;
 const currentRecord = () => catalog?.entries.find(entry => entry.id === catalog.activeId);
 function completeLibrary(values) {
   const ids = new Set(COMPONENTS.map(component => component.id));
@@ -869,8 +870,40 @@ $('componentForm').addEventListener('submit', event => {
   } catch (error) { $('componentError').textContent = error.message; }
 });
 document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => $(button.dataset.close).close()));
-$('previewBtn').addEventListener('click', () => { finishGesture(); $('previewFrame').srcdoc = exportHTML(project, { preview: true }); $('previewDialog').showModal(); });
-$('previewDialog').addEventListener('close', () => { $('previewFrame').removeAttribute('srcdoc'); });
+$('previewBtn').addEventListener('click', () => {
+  finishGesture(); previewSession = { token: uid(), projectSession };
+  $('previewFrame').srcdoc = exportHTML(project, { preview: true, editToken: previewSession.token }); $('previewDialog').showModal();
+});
+$('previewDialog').addEventListener('close', () => { previewSession = null; $('previewFrame').removeAttribute('srcdoc'); });
+window.addEventListener('message', event => {
+  const message = event.data;
+  if (!previewSession || !$('previewDialog').open || previewSession.projectSession !== projectSession || event.source !== $('previewFrame').contentWindow || message?.type !== 'protolab-preview-edit' || message.token !== previewSession.token) return;
+  const snapshot = withPages(project), page = snapshot.pages.find(page => page.id === message.pageId);
+  const original = page?.items.find(item => item.id === message.itemId);
+  if (!original) return;
+  let item = original, error;
+  try {
+    if (message.kind === 'text') {
+      const values = editableContent(original).texts.map(text => text.value);
+      if (!Array.isArray(message.changes) || !message.changes.length || message.changes.some(change => !Number.isInteger(change.index) || change.index < 0 || change.index >= values.length || typeof change.value !== 'string')) throw new Error('文字修改无效');
+      for (const change of message.changes) values[change.index] = change.value;
+      const content = updateTextContent(original, values);
+      if (!contentSizeValid(content, original.type)) throw new Error('组件文字过长，请缩短内容');
+      item = { ...original, content };
+    } else if (message.kind === 'resize') {
+      const keys = ['x', 'y', 'width', 'height'];
+      if (!message.geometry || keys.some(key => !Number.isFinite(message.geometry[key]))) throw new Error('组件尺寸无效');
+      item = normalizeItem({ ...original, ...Object.fromEntries(keys.map(key => [key, message.geometry[key]])) }, page.canvas, itemBounds(page));
+    } else return;
+    if (JSON.stringify(item) !== JSON.stringify(original)) {
+      const items = page.items.map(value => value.id === item.id ? item : value);
+      project = { ...snapshot, pages: snapshot.pages.map(value => value.id === page.id ? { ...value, items } : value), ...(page.id === snapshot.activePageId ? { items } : {}) };
+      commit(message.kind === 'text' ? '预览修改文字' : '预览调整尺寸');
+    }
+  } catch (failure) { error = failure.message; notify(error, true); }
+  event.source.postMessage({ type: 'protolab-preview-result', token: previewSession.token, pageId: page.id, itemId: original.id, item,
+    html: itemHTML(item, page.canvas), ...(error ? { error } : {}) }, '*');
+});
 $('exportHtmlBtn').addEventListener('click', () => { finishGesture(); download(exportHTML(project), 'prototype.html', 'text/html;charset=utf-8'); notify('原型已导出为 prototype.html'); });
 document.querySelectorAll('[data-panel]').forEach(button => button.addEventListener('click', () => {
   const panel = $(button.dataset.panel === 'library' ? 'libraryPanel' : 'propertiesPanel');

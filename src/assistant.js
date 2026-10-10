@@ -55,7 +55,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     for (const entry of entries.toReversed()) {
       const row = document.createElement('div'); row.className = `version-row${entry.id === versions.head ? ' current' : ''}`;
       const info = document.createElement('div');
-      const title = document.createElement('strong'); title.textContent = `版本 ${numbers.get(entry.id)} · ${entry.label}${entry.id === versions.head ? ' · 当前' : ''}`;
+      const title = document.createElement('strong'); title.textContent = `版本 ${numbers.get(entry.id)} · ${entry.label}${entry.id === versions.head ? JSON.stringify(getProject()) === JSON.stringify(entry.project) ? ' · 当前' : ' · 编辑基准' : ''}`;
       const meta = document.createElement('small'); meta.textContent = `${new Date(entry.createdAt).toLocaleString('zh-CN')} · ${entry.project.items.length} 个组件${entry.parent ? ` · 源于版本 ${numbers.get(entry.parent)}` : ''}${entry.mergeParent ? ` · 合并版本 ${numbers.get(entry.mergeParent)}` : ''}`;
       info.append(title, meta);
       const button = document.createElement('button'); button.className = 'btn btn-sm'; button.textContent = '回退到此版本'; button.disabled = entry.id === versions.head && JSON.stringify(getProject()) === JSON.stringify(entry.project);
@@ -160,6 +160,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       const text = await requestAI(settings, requirement, base, context, active.signal, fetch, { mode, rules: getRules() });
       if (currentSession !== session) return;
       if (active.signal.aborted) throw new Error('请求已取消');
+      finishGesture();
       if (mode !== 'modify') {
         generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent), mode };
         versions.add(getProject(), `AI 生成后（待确认）：${generated.summary}`, { force: true });
@@ -170,7 +171,6 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
         return;
       }
       const response = parseAIResponse(text, base, sanitizeContent);
-      finishGesture();
       const aiId = versions.add(response.project, `AI：${response.summary}`, { parent: baseId, branch: true });
       addMessage('assistant', response.summary);
       if (versions.head === baseId && JSON.stringify(getProject()) === JSON.stringify(requestProject)) {

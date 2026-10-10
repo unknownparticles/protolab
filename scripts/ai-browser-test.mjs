@@ -45,7 +45,24 @@ try {
     await page.locator('#aiRequirement').fill(requirement); await page.locator('#aiSendBtn').click();
   };
   const waitDone = () => page.waitForFunction(() => document.getElementById('aiCancelBtn').hidden);
+  await page.locator('#canvas').focus(); await page.keyboard.press('ArrowRight');
+  await page.locator('#undoBtn').click(); await page.locator('#redoBtn').click();
+  await page.waitForTimeout(350);
+  const versionCount = () => page.evaluate(() => JSON.parse(localStorage.getItem('protolab.projects.v1')).entries[0].workspace.versions.entries.length);
+  assert.equal(await versionCount(), 1);
+  await page.locator('#historyBtn').click();
+  assert.equal(await page.locator('#historyList .version-row').count(), 3);
+  await page.locator('#historyList .version-row').last().locator('button').click();
+  assert.equal(await page.locator('.editor-item').count(), 0);
+  await page.locator('#historyList .version-row').first().locator('button').click();
+  assert.equal(await page.locator('.editor-item').count(), 1);
+  await page.locator('[data-close="historyDialog"]').click();
+  await page.locator('#saveBtn').click(); assert.equal(await versionCount(), 2);
+  await page.locator('#componentSearch').focus(); await page.keyboard.press('Control+s'); assert.equal(await versionCount(), 3);
+  await page.keyboard.press('Meta+s'); assert.equal(await versionCount(), 4);
+  console.log('通过：逐步历史可撤回重做，自动保存不生成版本，保存按钮及两种快捷键各生成版本');
   await send('新增标题'); await waitDone();
+  await page.waitForTimeout(350); assert.equal(await versionCount(), 6);
   assert.equal(await page.locator('.editor-item').count(), 2);
   assert.match(requestBody.messages[0].content, /唯一 JSON/);
   assert.equal(requestBody.model, 'test-model');
@@ -105,7 +122,7 @@ try {
   await page.waitForTimeout(350); await page.reload();
   assert.equal(await page.locator('.editor-item').count(), 1);
   await page.locator('#versionsBtn').click();
-  assert.equal(await page.locator('.version-row').count(), versionsBefore + 1);
+  assert.equal(await page.locator('.version-row').count(), versionsBefore);
   assert.ok(workspace.versions.entries.length > 1);
   const downloadPromise = page.waitForEvent('download'); await page.locator('#versionsExportBtn').click();
   const download = await downloadPromise; const archive = await readFile(await download.path(), 'utf8');
@@ -138,7 +155,7 @@ try {
   assert.equal(await partial.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')).items.length), 2);
   await partial.reload(); assert.equal(await partial.locator('.editor-item').count(), 2);
   await partial.locator('#versionsBtn').click();
-  assert.match(await partial.locator('.version-row').first().textContent(), /手动修改/);
-  assert.equal(await partial.locator('.version-row').count(), 3);
-  console.log('通过：兼容版本缓存写入失败时，完整工程集合保留最新草稿和全部版本');
+  assert.match(await partial.locator('.version-row').first().textContent(), /初始版本/);
+  assert.equal(await partial.locator('.version-row').count(), 1);
+  console.log('通过：兼容版本缓存写入失败时，完整工程集合保留最新草稿且不额外生成版本');
 } finally { await browser?.close(); server?.kill(); }

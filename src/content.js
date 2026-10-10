@@ -3,6 +3,7 @@ import { appearancePresentation, APPEARANCE_CSS } from './appearance.js';
 import { orientationPresentation } from './orientation.js';
 import { withPages, normalizeInteraction } from './pages.js';
 import { PROTOTYPE_RUNTIME, INTERACTION_CSS } from './prototype-runtime.js';
+import { previewEditorScript, PREVIEW_EDIT_CSS } from './preview-editor.js';
 /** 组件只承载静态标记，移除脚本、事件、页面级样式及外部资源。 */
 const HTML_TAGS = new Set('div span p strong b em i u s small h1 h2 h3 h4 h5 h6 section article header footer main nav aside ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col label button input textarea select option img a br hr pre code blockquote figure figcaption'.split(' '));
 const SVG_TAGS = new Set('svg g path rect circle ellipse line polyline polygon text tspan image defs lineargradient radialgradient stop clippath mask title desc'.split(' '));
@@ -138,7 +139,7 @@ export function deviceMarkup(canvas, rawFrame, screenHTML = '') {
   const navigation = mobile && frame.navigation !== 'none' ? `<div class="device-navigation ${frame.navigation}" aria-label="底部导航栏">${frame.navigation === 'gesture' ? '<span class="device-gesture"></span>' : '<span class="device-nav-back"></span><span class="device-nav-home"></span><span class="device-nav-recent"></span>'}</div>` : '';
   return { layout, className: `device-shell ${key}`, style: `width:${layout.width}px;height:${layout.height}px`, inner: `<div class="device-decoration" aria-hidden="true">${decoration}</div><div class="device-screen" style="left:${layout.left}px;top:${layout.top}px;width:${canvas.width}px;height:${canvas.height}px">${screenHTML}${status}${navigation}${cutout}</div>` };
 }
-export function exportHTML(value, { preview = false } = {}) {
+export function exportHTML(value, { preview = false, editToken = '' } = {}) {
   const project = withPages(value);
   const active = project.pages.find(page => page.id === project.activePageId);
   const startId = preview && active.kind === 'page' ? active.id : project.startPageId;
@@ -157,6 +158,7 @@ export function exportHTML(value, { preview = false } = {}) {
 html,body{margin:0;min-height:100%;background:#f1f5f9}body{display:flex;flex-direction:column;align-items:center;padding:32px;box-sizing:border-box}
 ${PROTOTYPE_CSS}
 ${INTERACTION_CSS}
+${preview && editToken ? PREVIEW_EDIT_CSS : ''}
 @media(max-width:${maxWidth + 64}px){body{padding:0;align-items:flex-start}}
-</style></head><body data-start-page="${escapeHTML(startId)}"${preview && active.kind === 'popup' ? ` data-initial-popup="${escapeHTML(active.id)}"` : ''}>${controls}${pages}${popups}<script type="application/json" id="protolab-project">${JSON.stringify(value.pages ? project : value).replace(/</g, '\\u003c')}</script><script>${PROTOTYPE_RUNTIME}</script></body></html>`;
+</style></head><body data-start-page="${escapeHTML(startId)}"${preview && active.kind === 'popup' ? ` data-initial-popup="${escapeHTML(active.id)}"` : ''}>${controls}${pages}${popups}<script type="application/json" id="protolab-project">${JSON.stringify(value.pages ? project : value).replace(/</g, '\\u003c')}</script><script>${PROTOTYPE_RUNTIME}</script>${preview && editToken ? `<script>${previewEditorScript(project, editToken)}</script>` : ''}</body></html>`;
 }
