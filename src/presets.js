@@ -23,5 +23,5 @@ export const COMPONENTS = [
     ['triangle', '三角形', 100, 90, '<polygon points="50,3 97,97 3,97" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>'],
     ['arrow', '箭头', 180, 24, '<path d="M2 50H95M80 15L97 50L80 85" fill="none" stroke="#2563eb" stroke-width="4" stroke-linejoin="round"/>'],
     ['diamond', '菱形', 100, 100, '<polygon points="50,3 97,50 50,97 3,50" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>'],
-  ].map(([id, name, defaultWidth, defaultHeight, shape]) => ({ id: `lib-svg-${id}`, name, type: 'svg', defaultWidth, defaultHeight, content: `<svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="100%">${shape}</svg>` })),
+  ].map(([id, name, defaultWidth, defaultHeight, shape]) => ({ id: `lib-svg-${id}`, name, type: 'svg', defaultWidth, defaultHeight, content: `<svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="100%">${shape.replaceAll(' stroke=', ' vector-effect="non-scaling-stroke" stroke=')}</svg>` })),
 ].map(component => ({ ...component, builtin: true, category: component.type === 'svg' ? 'vector' : 'basic' }));

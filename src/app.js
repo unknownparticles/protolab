@@ -276,6 +276,45 @@ document.querySelectorAll('[data-preset]').forEach(button => button.addEventList
 }));
 $('rotateBtn').addEventListener('click', () => { finishGesture(); project = resizeProject(project, project.canvas.height, project.canvas.width, project.canvas.preset); commit(); });
 $('canvasSizeForm').addEventListener('submit', event => { event.preventDefault(); finishGesture(); project = resizeProject(project, $('canvasWidthInput').value, $('canvasHeightInput').value); commit(); notify('画布尺寸已更新'); });
+function updateFrame(changes) {
+  finishGesture();
+  project.frame = normalizeFrame({ ...project.frame, ...changes }, 'custom', sanitizeContent);
+  commit();
+}
+function openFrameDialog() {
+  $('frameError').textContent = '';
+  $('frameCode').value = project.frame.html || CUSTOM_FRAME_HTML;
+  for (const side of ['top', 'right', 'bottom', 'left']) $(`frame${side[0].toUpperCase()}${side.slice(1)}`).value = project.frame.insets[side];
+  $('frameDialog').showModal();
+}
+$('frameDevice').addEventListener('change', () => {
+  project.canvas.preset = 'custom';
+  updateFrame({ device: $('frameDevice').value });
+});
+$('frameStyle').addEventListener('change', () => {
+  if ($('frameStyle').value === 'custom') openFrameDialog();
+  else updateFrame({ style: $('frameStyle').value });
+});
+$('editFrameBtn').addEventListener('click', openFrameDialog);
+$('frameDialog').addEventListener('close', renderDevice);
+$('frameForm').addEventListener('submit', event => {
+  event.preventDefault();
+  try {
+    const html = sanitizeContent($('frameCode').value);
+    if (!html.trim()) throw new Error('请输入可用的外框 HTML');
+    const insets = Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [side, $(`frame${side[0].toUpperCase()}${side.slice(1)}`).value]));
+    updateFrame({ style: 'custom', html, insets });
+    $('frameDialog').close(); notify('自定义外框已应用');
+  } catch (error) { $('frameError').textContent = error.message; }
+});
+$('showStatusBar').addEventListener('change', () => updateFrame({ statusBar: $('showStatusBar').checked }));
+$('navigationStyle').addEventListener('change', () => updateFrame({ navigation: $('navigationStyle').value }));
+$('statusTime').addEventListener('change', safeAction(() => {
+  const time = $('statusTime').value;
+  if (!/^\d{1,2}:\d{2}$/.test(time) || Number(time.split(':')[0]) > 23 || Number(time.split(':')[1]) > 59) { renderDevice(); throw new Error('时间请输入 0:00～23:59'); }
+  updateFrame({ time });
+}));
+$('statusBattery').addEventListener('change', () => updateFrame({ battery: $('statusBattery').value }));
 $('selectionProps').addEventListener('submit', safeAction(event => {
   event.preventDefault(); const item = selectedItem(); if (!item) return;
   const next = normalizeItem({ ...item, name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: $('propPadding').value, margin: $('propMargin').value }, project.canvas);

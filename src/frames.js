@@ -6,6 +6,8 @@ export const FRAME_STYLES = Object.freeze({
 });
 const bounded = (value, fallback, max) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(max, Math.round(Number(value)))) : fallback;
 export function normalizeFrame(raw = {}, preset = 'phone', sanitize = value => value) {
+  if (raw != null && (typeof raw !== 'object' || Array.isArray(raw))) throw new Error('设备外框格式不正确');
+  raw ??= {};
   const device = FRAME_STYLES[preset] ? preset : FRAME_STYLES[raw.device] ? raw.device : 'phone';
   const style = ['none', 'custom'].includes(raw.style) || Object.hasOwn(FRAME_STYLES[device], raw.style) ? raw.style : Object.keys(FRAME_STYLES[device])[0];
   if (raw.html != null && (typeof raw.html !== 'string' || raw.html.length > 100_000)) throw new Error('外框 HTML 不能超过 100000 字符');

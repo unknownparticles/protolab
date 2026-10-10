@@ -5,10 +5,11 @@ import { COMPONENTS } from '../src/presets.js';
 const canvas = { width: 375, height: 667, preset: 'phone' };
 const sanitize = value => value;
 const item = { id: 'one', name: '按钮', type: 'html', content: '<button>按钮</button>', x: 20, y: 30, width: 100, height: 40, radius: 8, padding: '0', margin: '0' };
-test('七个基础组件具有有效内容及独立标识', () => {
-  assert.equal(COMPONENTS.length, 7);
-  assert.equal(new Set(COMPONENTS.map(value => value.id)).size, 7);
-  assert.equal(validateLibrary(COMPONENTS, sanitize).length, 7);
+test('普通组件和矢量图形具有有效内容及独立标识', () => {
+  assert.equal(COMPONENTS.filter(value => value.category === 'basic').length, 14);
+  assert.equal(COMPONENTS.filter(value => value.category === 'vector').length, 9);
+  assert.equal(new Set(COMPONENTS.map(value => value.id)).size, COMPONENTS.length);
+  assert.equal(validateLibrary(COMPONENTS, sanitize).length, COMPONENTS.length);
 });
 test('零坐标与零圆角不被默认值覆盖', () => {
   const value = normalizeItem({ ...item, x: 0, y: 0, radius: 0 }, canvas);
