@@ -135,7 +135,7 @@ try {
   await page.locator('#addSvgCompBtn').click(); await page.locator('#customName').fill('圆形');
   await page.locator('#componentForm button[type="submit"]').click();
   assert.equal(await page.locator('#customList .component-item').count(), 2);
-  await page.locator('#componentSearch').fill('圆形'); assert.equal(await page.locator('.component-item').count(), builtinCount + 1);
+  await page.locator('#componentSearch').fill('圆形'); assert.equal(await page.locator('.component-item').count(), 2);
   await page.locator('#componentSearch').fill('');
   console.log('通过：HTML、SVG 创建、内容清理与搜索');
 
@@ -234,6 +234,32 @@ try {
   assert.match(await damaged.locator('#toast').textContent(), /读取失败/);
   console.log('通过：损坏存储回退且保留原始数据');
   await damagedContext.close();
+
+  const controlsContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const controls = await controlsContext.newPage();
+  controls.on('pageerror', error => errors.push(error.message));
+  await controls.goto(base);
+  for (const [id, x, y] of [['lib-slider', 30, 60], ['lib-textarea', 30, 120], ['lib-svg-line', 30, 260], ['lib-svg-circle', 30, 320], ['lib-svg-rect', 170, 320]]) {
+    await controls.locator(`[data-comp-id="${id}"]`).click();
+    await controls.locator('#propX').fill(String(x)); await controls.locator('#propY').fill(String(y));
+    await controls.locator('#selectionProps button[type="submit"]').click();
+  }
+  assert.equal(await controls.locator('.vector-item').count(), 3);
+  assert.equal(await controls.locator('.vector-item').first().evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)');
+  assert.equal(await controls.locator('#propRadius').inputValue(), '0');
+  await controls.locator('#previewBtn').click();
+  const controlsPreview = controls.frameLocator('#previewFrame');
+  await controlsPreview.locator('input[type="range"]').focus();
+  await controlsPreview.locator('input[type="range"]').press('ArrowRight');
+  assert.equal(await controlsPreview.locator('input[type="range"]').inputValue(), '51');
+  await controlsPreview.locator('textarea').fill('多行\n文本');
+  assert.equal(await controlsPreview.locator('textarea').inputValue(), '多行\n文本');
+  assert.equal(await controlsPreview.locator('.vector-item').count(), 3);
+  await controls.locator('[data-close="previewDialog"]').click();
+  await controls.locator('#vectorList').scrollIntoViewIfNeeded();
+  await controls.screenshot({ path: resolve(output, 'desktop-components.png') });
+  await controlsContext.close();
+  console.log('通过：滑杆和多行文本框在预览中可操作，矢量图形保持透明底及零圆角');
   assert.deepEqual(errors, []);
   console.log('浏览器验收全部通过；截图目录：' + output);
 } finally { await browser?.close(); server?.kill(); }

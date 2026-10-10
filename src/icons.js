@@ -25,8 +25,15 @@ const paths = {
   phone: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/>',
   tablet: '<rect x="3" y="2" width="18" height="20" rx="3"/><path d="M10 18h4"/>',
   pc: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  slider: '<path d="M3 12h5m6 0h7"/><circle cx="11" cy="12" r="3"/>',
+  checkbox: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>',
+  radio: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
+  select: '<rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 12h6m3-1 2 2 2-2"/>',
+  switch: '<rect x="2" y="6" width="20" height="12" rx="6"/><circle cx="16" cy="12" r="3"/>',
+  progress: '<rect x="2" y="8" width="20" height="8" rx="4"/><path d="M6 12h7"/>',
+  line: '<path d="M3 12h18"/>',
 };
 export function icon(name, className = '') {
   return `<svg class="icon ${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.code}</svg>`;
 }
-export const componentIcon = component => ({ 'lib-btn': 'button', 'lib-text': 'text', 'lib-input': 'input', 'lib-card': 'card', 'lib-image': 'image', 'lib-svg-star': 'star', 'lib-avatar': 'avatar' }[component.id] || ({ html: 'code', svg: 'star', image: 'image' }[component.type]));
+export const componentIcon = component => ({ 'lib-btn': 'button', 'lib-text': 'text', 'lib-input': 'input', 'lib-card': 'card', 'lib-image': 'image', 'lib-svg-star': 'star', 'lib-avatar': 'avatar', 'lib-slider': 'slider', 'lib-textarea': 'card', 'lib-checkbox': 'checkbox', 'lib-radio': 'radio', 'lib-select': 'select', 'lib-switch': 'switch', 'lib-progress': 'progress', 'lib-divider': 'line' }[component.id] || ({ html: 'code', svg: 'star', image: 'image' }[component.type]));
