@@ -21,6 +21,7 @@ import { PROJECTS_KEY, emptyProject, projectRecord, projectDetails, validateProj
 import { COLOR_ROLES, PALETTES, normalizeDesign, linkedComponents, libraryManifest, designAssets } from './project-design.js';
 import { initializeCollapsible } from './collapsible.js';
 import { attachViewportZoom } from './viewport-zoom.js';
+import { attachViewportPan } from './viewport-pan.js';
 import { validateGroups, mergeLibrary } from './library-groups.js';
 import { initializeTabs } from './panel-tabs.js';
 import { initializeMenus } from './menus.js';
@@ -914,10 +915,14 @@ $('menuDeleteBtn').addEventListener('click', removeSelected);
 $('menuDuplicateBtn').addEventListener('click', safeAction(duplicateSelected));
 $('undoBtn').addEventListener('click', () => restore('undo')); $('redoBtn').addEventListener('click', () => restore('redo'));
 $('zoomSelect').addEventListener('change', () => { finishGesture(); zoom = Number($('zoomSelect').value); updateZoom(); });
+const viewportPan = attachViewportPan($('canvasViewport'), {
+  beforePan: () => finishGesture(true),
+  onBlankClick: target => { if (target.closest('#canvas')) select(null); }
+});
 attachViewportZoom($('canvasViewport'), $('canvasScaler'), {
   getZoom: () => zoom,
   setZoom: value => { zoom = value; updateZoom(); },
-  beforeZoom: () => finishGesture(true)
+  beforeZoom: () => { viewportPan.cancel(); finishGesture(true); }
 });
 function fitCanvas() {
   const layout = frameLayout(project.canvas, project.frame);

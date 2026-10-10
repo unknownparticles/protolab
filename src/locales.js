@@ -93,6 +93,7 @@ export const EN = Object.freeze({
   "也可以点击组件快速添加": "Or click a component to add it",
   "拖拽 · 编辑 · 导出": "Drag · Edit · Export",
   "滚轮 / 双指缩放 · 方向键微调": "Scroll / pinch to zoom · Arrow keys to nudge",
+  "滚轮 / 双指缩放 · 空白处 / 空格 / 中键拖动画布 · 方向键微调": "Scroll / pinch to zoom · Drag blank area / Space / middle button to pan · Arrows to nudge",
   "删除": "Delete",
   "缩放": "Zoom",
   "画布缩放": "Canvas zoom",

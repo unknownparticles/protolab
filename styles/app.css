@@ -46,6 +46,10 @@
 .component-card-meta{display:flex;align-items:center;gap:8px;min-width:0}
 .component-dialog-preview{height:220px;margin-bottom:12px}
 .canvas-viewport{touch-action:pan-x pan-y}
+.canvas-viewport.can-pan{cursor:grab}
+.canvas-viewport.pan-ready,.canvas-viewport.pan-ready *{cursor:grab!important}
+.canvas-viewport.is-panning,.canvas-viewport.is-panning *{cursor:grabbing!important;user-select:none}
+.keyboard-hint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* 可放置区域及拖动吸附参考线，仅用于编辑 */
 .canvas-safe-area{position:absolute;pointer-events:none;z-index:2;border:1px dashed #f59e0b;box-shadow:0 0 0 3000px #f59e0b12}
