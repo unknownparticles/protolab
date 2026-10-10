@@ -119,8 +119,8 @@ try {
   await selectPage(popupId); await page.locator('#managePageBtn').click(); await page.locator('#deletePageBtn').click();
   await selectPage(details); await page.locator('#layerList button').filter({ hasText: '显示确认框' }).click();
   assert.equal(await page.locator('#propClickAction').inputValue(), 'none');
-  // 切换编辑页自身也支持撤销：撤销切换，再撤销删除。
-  await page.locator('#undoBtn').click(); await page.locator('#undoBtn').click();
+  // 删除后已回到设定首页；一次撤销恢复弹窗与关联动作。
+  await page.locator('#undoBtn').click();
   assert.equal(await page.locator(`[data-page-id="${popupId}"]`).count(), 1);
   await page.locator('#redoBtn').click(); assert.equal(await page.locator(`[data-page-id="${popupId}"]`).count(), 0);
   await page.locator('#undoBtn').click();
