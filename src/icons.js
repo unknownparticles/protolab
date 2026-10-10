@@ -1,0 +1,32 @@
+const paths = {
+  logo: '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4z"/><path d="M13 13h7v7h-7z" fill="currentColor"/>',
+  button: '<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 12h8"/>',
+  text: '<path d="M4 5h16M12 5v15M8 20h8"/>',
+  input: '<rect x="2" y="6" width="20" height="12" rx="3"/><path d="M7 10v4M10 12h7"/>',
+  card: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h6M7 16h8"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 3-3 5 5"/>',
+  star: '<path d="m12 3 3 6 6 .8-4.5 4.5 1 6.2-5.5-3-5.5 3 1-6.2L3 9.8 6 9z"/>',
+  avatar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="9" r="3"/><path d="M6 18c0-5 12-5 12 0"/>',
+  code: '<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  rotate: '<path d="M20 7h-5V2M4 17h5v5M20 7a9 9 0 0 0-15-2M4 17a9 9 0 0 0 15 2"/>',
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+  upload: '<path d="M12 16V4m-5 5 5-5 5 5M4 16v5h16v-5"/>',
+  undo: '<path d="m8 3-5 5 5 5M3 8h10a7 7 0 0 1 0 14"/>',
+  redo: '<path d="m16 3 5 5-5 5m5-5H11a7 7 0 0 0 0 14"/>',
+  eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12"/><circle cx="12" cy="12" r="3"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+  pointer: '<path d="m5 3 15 10-7 1-3 7z"/>',
+  layers: '<path d="m12 3 10 5-10 5L2 8zM2 12l10 5 10-5M2 16l10 5 10-5"/>',
+  trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
+  copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  save: '<path d="M4 3h14l3 3v15H3V3zM7 3v7h10V3M7 21v-7h10v7"/>',
+  phone: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/>',
+  tablet: '<rect x="3" y="2" width="18" height="20" rx="3"/><path d="M10 18h4"/>',
+  pc: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+};
+export function icon(name, className = '') {
+  return `<svg class="icon ${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.code}</svg>`;
+}
+export const componentIcon = component => ({ 'lib-btn': 'button', 'lib-text': 'text', 'lib-input': 'input', 'lib-card': 'card', 'lib-image': 'image', 'lib-svg-star': 'star', 'lib-avatar': 'avatar' }[component.id] || ({ html: 'code', svg: 'star', image: 'image' }[component.type]));

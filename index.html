@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Protolab 原型实验室：拖拽搭建、随时编辑、导出即用的轻量原型设计器。">
+  <meta name="theme-color" content="#2563eb">
+  <title>Protolab · 原型实验室</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M9 9h6v6H9zm8 0h6v6h-6zM9 17h6v6H9zm8 0h6v6h-6z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles/app.css">
+  <script type="module" src="./src/app.js"></script>
+</head>
+<body>
+  <header class="toolbar">
+    <a class="brand" href="./" aria-label="Protolab 首页"><span class="brand-symbol" data-icon="logo"></span><span>Protolab<small>原型实验室</small></span></a>
+    <div class="toolbar-divider"></div>
+    <div class="toolbar-group presets" aria-label="画布预设">
+      <button class="btn btn-sm" data-preset="phone"><span data-icon="phone"></span>手机</button>
+      <button class="btn btn-sm" data-preset="tablet"><span data-icon="tablet"></span>平板</button>
+      <button class="btn btn-sm" data-preset="pc"><span data-icon="pc"></span>PC</button>
+    </div>
+    <button class="btn btn-icon" id="rotateBtn" title="横竖屏切换" aria-label="横竖屏切换"><span data-icon="rotate"></span></button>
+    <div class="toolbar-divider"></div>
+    <button class="btn btn-icon" id="undoBtn" title="撤销（Ctrl / ⌘ Z）" aria-label="撤销" disabled><span data-icon="undo"></span></button>
+    <button class="btn btn-icon" id="redoBtn" title="重做（Ctrl / ⌘ Shift Z）" aria-label="重做" disabled><span data-icon="redo"></span></button>
+    <span class="save-state" id="saveState">本地草稿</span>
+    <div class="toolbar-end">
+      <button class="btn" id="previewBtn"><span data-icon="eye"></span>预览</button>
+      <button class="btn btn-primary" id="exportHtmlBtn"><span data-icon="download"></span>导出 HTML</button>
+    </div>
+  </header>
+  <nav class="mobile-tabs" aria-label="工作区面板">
+    <button class="btn btn-sm" data-panel="library" aria-expanded="false">组件库</button>
+    <button class="btn btn-sm" data-panel="properties" aria-expanded="false">属性面板</button>
+  </nav>
+  <main class="workspace">
+    <aside class="sidebar" id="libraryPanel" aria-label="组件库">
+      <div class="panel-heading"><h1>组件库</h1><span class="badge" id="libCount">7</span></div>
+      <p class="panel-description">拖拽到画布，或点击快速添加</p>
+      <label class="search-box"><span data-icon="search"></span><input id="componentSearch" type="search" placeholder="搜索组件…" aria-label="搜索组件"></label>
+      <div class="library-scroll">
+        <div class="section-label">基础组件 <span>BUILT-IN</span></div>
+        <div class="component-list" id="presetList"></div>
+        <div class="section-label">我的组件 <span id="customCount">0</span></div>
+        <div class="component-list" id="customList"></div>
+        <p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p>
+        <div class="creation-actions">
+          <button class="btn" id="addHtmlCompBtn"><span data-icon="plus"></span>新建 HTML 组件</button>
+          <button class="btn" id="addSvgCompBtn"><span data-icon="code"></span>新建 SVG 组件</button>
+          <button class="btn" id="importImgCompBtn"><span data-icon="image"></span>导入图片组件</button>
+        </div>
+      </div>
+      <div class="library-footer">
+        <div class="section-label">组件库管理</div>
+        <div class="lib-actions">
+          <button class="btn btn-sm" id="saveLibBtn"><span data-icon="save"></span>保存</button>
+          <button class="btn btn-sm" id="exportLibBtn"><span data-icon="download"></span>导出</button>
+          <button class="btn btn-sm" id="importLibBtn"><span data-icon="upload"></span>导入</button>
+        </div>
+        <small>保存在当前浏览器 · 支持 JSON 备份</small>
+      </div>
+    </aside>
+    <section class="canvas-area" aria-label="画布工作区">
+      <div class="canvas-topbar"><span class="canvas-breadcrumb"><span data-icon="layers"></span>未命名原型 <span>/</span> <strong id="presetLabel">手机 · 竖屏</strong></span><span class="canvas-dimensions" id="canvasSizeLabel">375 × 667</span></div>
+      <div class="canvas-viewport" id="canvasViewport">
+        <div class="canvas-stage" id="canvasStage">
+          <div class="canvas-scaler" id="canvasScaler">
+            <div class="canvas-caption"><span>画板 01</span><span id="artboardSize">375 × 667</span></div>
+            <div class="canvas-container prototype" id="canvas" tabindex="0" aria-label="原型画布">
+              <div class="empty-canvas-hint" id="emptyHint"><span class="empty-icon" data-icon="pointer"></span><strong>让想法，从这里开始</strong><span>从左侧拖拽组件到画布<br>也可以点击组件快速添加</span><span class="empty-chip">拖拽 · 编辑 · 导出</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="canvas-bottom-controls"><span class="keyboard-hint">方向键微调 <kbd>⇧</kbd> × 10 · <kbd>Del</kbd> 删除</span><label class="zoom-control">缩放 <select id="zoomSelect" aria-label="画布缩放"><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label><button class="btn btn-sm" id="fitBtn">适应窗口</button></div>
+    </section>
+    <aside class="properties" id="propertiesPanel" aria-label="属性面板">
+      <div class="panel-heading"><h2>设计属性</h2><span class="heading-icon" data-icon="pointer"></span></div>
+      <div class="properties-scroll">
+        <section class="prop-section">
+          <div class="section-label">组件属性</div>
+          <div id="noSelectionMsg" class="selection-empty"><span data-icon="pointer"></span><strong>未选中组件</strong><p>点击画布中的组件<br>在这里调整它的设计</p></div>
+          <form id="selectionProps" hidden>
+            <label class="field">组件名称<input id="propName" maxlength="80" required></label>
+            <div class="field-grid"><label class="field">X<input id="propX" type="number" min="0" required></label><label class="field">Y<input id="propY" type="number" min="0" required></label></div>
+            <div class="field-grid"><label class="field">宽度<input id="propW" type="number" min="1" max="2000" required></label><label class="field">高度<input id="propH" type="number" min="1" max="2000" required></label></div>
+            <label class="field">圆角 <span class="unit">px</span><input id="propRadius" type="number" min="0" max="50" required></label>
+            <div class="field-grid"><label class="field">内边距<input id="propPadding" placeholder="8px 12px" required></label><label class="field">外边距<input id="propMargin" placeholder="0" required></label></div>
+            <p class="field-help">边距使用 px；外边距作用于组件内部内容。</p>
+            <button class="btn btn-primary apply-button" type="submit">应用属性</button>
+            <div class="prop-actions"><button class="btn btn-sm" type="button" id="duplicateItemBtn"><span data-icon="copy"></span>复制</button><button class="btn btn-sm btn-danger" type="button" id="deleteItemBtn"><span data-icon="trash"></span>删除</button></div>
+          </form>
+        </section>
+        <section class="prop-section"><div class="section-label">画布设置</div><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
+        <section class="prop-section"><div class="section-label">图层 <span id="layerCount">0</span></div><div class="layer-list" id="layerList"></div><p class="field-help" id="layerEmpty">添加组件后在这里快速选中。</p><div class="layer-actions" id="layerActions" hidden><button class="btn btn-sm" id="layerUpBtn" title="上移一层">上移一层</button><button class="btn btn-sm" id="layerDownBtn" title="下移一层">下移一层</button></div></section>
+      </div>
+      <div class="properties-footer"><span class="local-dot"></span>你的设计，只保存在本地</div>
+    </aside>
+  </main>
+  <footer class="status-bar"><span id="statusMessage" role="status"><span class="local-dot"></span>准备就绪 · 点击或拖拽组件开始设计</span><span id="componentCount">0 个组件</span></footer>
+  <input type="file" id="libFileInput" hidden accept=".json,application/json">
+  <input type="file" id="imgFileInput" hidden accept="image/png,image/jpeg,image/gif,image/webp,image/avif">
+  <dialog id="componentDialog"><form id="componentForm"><div class="dialog-heading"><h2 id="dialogTitle">新建 HTML 组件</h2><button class="btn btn-icon" type="button" data-close="componentDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">将常用的界面片段保存到组件库，随时复用。</p><label class="field">组件名称<input id="customName" maxlength="80" placeholder="例如：欢迎卡片" required></label><div class="field-grid"><label class="field">默认宽度<input id="customWidth" type="number" min="1" max="2000" value="200" required></label><label class="field">默认高度<input id="customHeight" type="number" min="1" max="2000" value="100" required></label></div><label class="field" id="codeField">组件代码<textarea id="customCode" rows="8" maxlength="100000" spellcheck="false" required></textarea></label><p class="field-help">支持静态 HTML / SVG 和内联样式；图片可单独上传。</p><p class="form-error" id="componentError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="componentDialog">取消</button><button class="btn btn-primary" type="submit">添加到组件库</button></div></form></dialog>
+  <dialog id="previewDialog" class="preview-dialog"><div class="dialog-heading"><h2>原型预览 <small>与 HTML 导出一致</small></h2><button class="btn btn-icon" data-close="previewDialog" aria-label="关闭预览"><span data-icon="close"></span></button></div><iframe id="previewFrame" title="原型预览" sandbox=""></iframe></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <noscript><div class="noscript">请启用 JavaScript 以使用原型设计器。</div></noscript>
+</body>
+</html>
