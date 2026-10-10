@@ -1,4 +1,5 @@
-import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, normalizeItem, constrainProject, resizeProject, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
+import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, normalizeItem, constrainProject, resizeProject, rotateProject, itemBounds, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
+import { ORIENTATION_ACTIONS, normalizeOrientationResponse, orientationPresentation } from './orientation.js';
 import { COMPONENTS } from './presets.js';
 import { icon, componentIcon } from './icons.js';
 import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
@@ -13,6 +14,19 @@ import { snapItems } from './snapping.js';
 import { createAssistant } from './assistant.js';
 
 const $ = id => document.getElementById(id);
+for (const prefix of ['prop', 'custom']) {
+  for (const direction of ['Portrait', 'Landscape']) $(`${prefix}${direction}Action`).replaceChildren(...Object.entries(ORIENTATION_ACTIONS).map(([value, label]) => new Option(label, value)));
+  $(`${prefix}OrientationEnabled`).addEventListener('change', () => updateOrientationFields(prefix));
+}
+function updateOrientationFields(prefix) {
+  const enabled = $(`${prefix}OrientationEnabled`).checked;
+  $(`${prefix}OrientationFields`).hidden = !enabled;
+  for (const direction of ['Portrait', 'Landscape']) $(`${prefix}${direction}Action`).disabled = !enabled;
+}
+function readOrientationFields(prefix) {
+  return normalizeOrientationResponse({ enabled: $(`${prefix}OrientationEnabled`).checked,
+    portrait: $(`${prefix}PortraitAction`).value, landscape: $(`${prefix}LandscapeAction`).value });
+}
 document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
 const sharedStyles = document.createElement('style');
 sharedStyles.textContent = PROTOTYPE_CSS;
@@ -130,6 +144,10 @@ function renderProperties() {
   if (!item) return;
   $('selectionDetail').textContent = selectedIds.size > 1 ? `已选 ${selectedIds.size} 个组件，以下属性仅编辑「${item.name}」；拖动、复制、删除作用于全部所选组件。` : '按住 Shift 点击组件可多选并对齐。';
   for (const [field, key] of Object.entries({ propName: 'name', propX: 'x', propY: 'y', propW: 'width', propH: 'height', propRadius: 'radius', propPadding: 'padding', propMargin: 'margin' })) $(field).value = item[key];
+  const response = normalizeOrientationResponse(item.orientationResponse);
+  $('propOrientationEnabled').checked = response.enabled;
+  $('propPortraitAction').value = response.portrait; $('propLandscapeAction').value = response.landscape;
+  updateOrientationFields('prop');
 }
 function renderLayers() {
   $('layerList').replaceChildren();
@@ -138,7 +156,8 @@ function renderLayers() {
     button.className = `layer-item${selectedIds.has(item.id) ? ' selected' : ''}`;
     button.setAttribute('aria-pressed', String(selectedIds.has(item.id)));
     button.dataset.itemId = item.id;
-    button.innerHTML = `${icon(item.type === 'image' ? 'image' : item.type === 'svg' ? 'star' : 'layers')}<span>${escapeHTML(item.name)}</span>`;
+    const hidden = orientationPresentation(item, project.canvas).hidden;
+    button.innerHTML = `${icon(item.type === 'image' ? 'image' : item.type === 'svg' ? 'star' : 'layers')}<span>${escapeHTML(item.name)}${hidden ? ' · 当前方向隐藏' : ''}</span>`;
     $('layerList').append(button);
   }
   $('layerCount').textContent = project.items.length;
@@ -211,6 +230,7 @@ function applySafeArea(event) {
   }
   finishGesture();
   project.safeArea = normalizeSafeArea(raw, project.canvas, project.frame);
+  project = constrainProject(project, true);
   $('safeAreaError').textContent = '';
   commit(); notify(raw.enabled ? '安全区已应用，组件已约束在可放置区域内' : '安全区限制已关闭');
 }
@@ -269,6 +289,9 @@ function renderCanvas() {
     if (!node) { node = document.createElement('div'); node.dataset.itemId = item.id; itemNodes.set(item.id, node); }
     node.className = `editor-item${selectedIds.has(item.id) ? ' selected' : ''}`;
     Object.assign(node.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px`, borderRadius: `${item.radius}px` });
+    const presentation = orientationPresentation(item, canvas);
+    node.hidden = presentation.hidden;
+    node.style.transform = presentation.angle ? `rotate(${presentation.angle}deg)` : '';
     const html = itemHTML(item);
     if (node.contentHTML !== html) {
       node.innerHTML = `${html}<span class="item-label">${escapeHTML(item.name)}</span>${['a','b','c','d'].map(corner => `<span class="selection-dot ${corner}"></span>`).join('')}`;
@@ -311,7 +334,7 @@ function duplicateSelected() {
   if (!item) return;
   if (project.items.length + selectedIds.size > MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
   const moved = moveItems(project, selectionStarts(), 16, 16);
-  const copies = moved.items.filter(value => selectedIds.has(value.id)).map(value => normalizeItem({ ...clone(value), id: uid(), name: `${value.name} 副本` }, project.canvas));
+  const copies = moved.items.filter(value => selectedIds.has(value.id)).map(value => normalizeItem({ ...clone(value), id: uid(), name: `${value.name} 副本` }, project.canvas, itemBounds(project)));
   project.items.push(...copies); selectedIds = new Set(copies.map(value => value.id)); selectedId = copies.at(-1).id; commit(); notify('已复制所选组件');
 }
 function restore(direction) {
@@ -399,7 +422,7 @@ document.querySelectorAll('[data-preset]').forEach(button => button.addEventList
   const key = button.dataset.preset;
   project = resizeProject(project, PRESETS[key].width, PRESETS[key].height, key); commit();
 }));
-$('rotateBtn').addEventListener('click', () => { finishGesture(); project = resizeProject(project, project.canvas.height, project.canvas.width, project.canvas.preset); commit(); });
+$('rotateBtn').addEventListener('click', () => { finishGesture(); project = rotateProject(project); commit(); });
 $('canvasSizeForm').addEventListener('submit', event => { event.preventDefault(); finishGesture(); project = resizeProject(project, $('canvasWidthInput').value, $('canvasHeightInput').value); commit(); notify('画布尺寸已更新'); });
 function updateFrame(changes) {
   finishGesture();
@@ -443,7 +466,8 @@ $('statusTime').addEventListener('change', safeAction(() => {
 $('statusBattery').addEventListener('change', () => updateFrame({ battery: $('statusBattery').value }));
 $('selectionProps').addEventListener('submit', safeAction(event => {
   event.preventDefault(); const item = selectedItem(); if (!item) return;
-  const next = normalizeItem({ ...item, name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: $('propPadding').value, margin: $('propMargin').value }, project.canvas, placementBounds(project));
+  const geometryChanged = Object.entries({ propX: 'x', propY: 'y', propW: 'width', propH: 'height' }).some(([field, key]) => Number($(field).value) !== item[key]);
+  const next = normalizeItem({ ...item, name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: $('propPadding').value, margin: $('propMargin').value, orientationResponse: readOrientationFields('prop') }, project.canvas, geometryChanged ? placementBounds(project) : itemBounds(project));
   project.items[project.items.indexOf(item)] = next;
   commit(); notify('组件属性已更新');
 }));
@@ -495,6 +519,7 @@ $('libFileInput').addEventListener('change', safeAction(async event => {
 function openComponentDialog(type, data = null, name = '') {
   customType = type; imageData = data;
   $('componentForm').reset(); $('componentError').textContent = '';
+  updateOrientationFields('custom');
   $('componentPreviewSection').hidden = true;
   clearComponentPreview($('componentPreview'));
   $('previewComponentBtn').hidden = type === 'image';
@@ -514,7 +539,7 @@ function readCustomComponent(preview = false) {
   }
   const raw = customType === 'image' ? imageData : $('customCode').value;
   if (customType !== 'image' && raw.length > MAX_CODE) throw new Error('组件代码不能超过 100000 字符');
-  return validateLibrary([{ id: uid(), name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value }], sanitizeContent)[0];
+  return validateLibrary([{ id: uid(), name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value, orientationResponse: readOrientationFields('custom') }], sanitizeContent)[0];
 }
 function previewCustomComponent() {
   try {

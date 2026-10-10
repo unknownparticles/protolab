@@ -1,5 +1,6 @@
 import { normalizeFrame } from './frames.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
+import { normalizeOrientationResponse } from './orientation.js';
 /** 与 DOM 无关的画布模型；坐标始终使用实际画布像素。 */
 export const PRESETS = Object.freeze({
   phone: { width: 375, height: 667, label: '手机' },
@@ -32,15 +33,29 @@ export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) 
     x: number(item.x, bounds.x, bounds.x, bounds.x + bounds.width - width),
     y: number(item.y, bounds.y, bounds.y, bounds.y + bounds.height - height),
     radius: number(item.radius, 8, 0, 50), padding: spacing(item.padding ?? '0'), margin: spacing(item.margin ?? '0'),
+    orientationResponse: normalizeOrientationResponse(item.orientationResponse),
   };
 }
 export function resizeProject(project, width, height, preset = 'custom') {
   const canvas = { ...project.canvas, width: number(width, 375, 100, 2000), height: number(height, 667, 100, 2000), preset };
+  delete canvas.layoutSize;
   return constrainProject({ ...project, canvas, ...(project.frame ? { frame: normalizeFrame(project.frame, preset) } : {}) });
 }
-export function constrainProject(project) {
+/** 方向切换扩大可保存的设计范围，越界内容由屏幕裁切，避免逐个挪动。 */
+export function rotateProject(project) {
+  const { canvas } = project;
+  const extent = Math.max(canvas.width, canvas.height);
+  return constrainProject({ ...project, canvas: { ...canvas, width: canvas.height, height: canvas.width,
+    layoutSize: { width: extent, height: extent } } });
+}
+export function itemBounds(project) {
+  const size = project.canvas.layoutSize;
+  return size ? { x: 0, y: 0, ...size } : placementBounds(project);
+}
+export function constrainProject(project, fitToCanvas = false) {
   const next = { ...project, safeArea: normalizeSafeArea(project.safeArea, project.canvas, project.frame) };
-  const bounds = placementBounds(next);
+  if (fitToCanvas) { next.canvas = { ...next.canvas }; delete next.canvas.layoutSize; }
+  const bounds = itemBounds(next);
   return { ...next, items: next.items.map(item => normalizeItem(item, next.canvas, bounds)) };
 }
 export function createItem(component, canvas, x = 40, y = 40, bounds) {
@@ -48,6 +63,7 @@ export function createItem(component, canvas, x = 40, y = 40, bounds) {
     id: uid(), name: component.name, type: component.type,
     content: component.content, x, y, width: component.defaultWidth,
     height: component.defaultHeight, radius: component.type === 'svg' ? 0 : 8, padding: '0', margin: '0',
+    orientationResponse: component.orientationResponse,
   }, canvas, bounds);
 }
 export function validateLibrary(raw, sanitize) {
@@ -67,12 +83,18 @@ export function validateLibrary(raw, sanitize) {
     seen.add(id);
     return { id, name: entry.name.trim().slice(0, 80), type, content: safe,
       builtin: entry.builtin === true || entry.type === 'preset', category: type === 'svg' ? 'vector' : 'basic',
+      orientationResponse: normalizeOrientationResponse(entry.orientationResponse),
       defaultWidth: number(entry.defaultWidth, 120, 1, 2000), defaultHeight: number(entry.defaultHeight, 60, 1, 2000) };
   });
 }
 export function validateProject(raw, sanitize) {
   if (!raw || raw.version !== 1 || !raw.canvas || !Array.isArray(raw.items) || raw.items.length > MAX_ITEMS) throw new Error('草稿格式不正确');
   const project = resizeProject({ version: 1, items: [] }, raw.canvas.width, raw.canvas.height, PRESETS[raw.canvas.preset] ? raw.canvas.preset : 'custom');
+  if (raw.canvas.layoutSize != null) {
+    const extent = Math.max(project.canvas.width, project.canvas.height);
+    if (raw.canvas.layoutSize.width !== extent || raw.canvas.layoutSize.height !== extent) throw new Error('方向切换的设计范围格式不正确');
+    project.canvas.layoutSize = { width: extent, height: extent };
+  }
   if (typeof raw.canvas.background === 'string' && /^(?:#[\da-f]{3,8}|rgba?\([\d.,%\s]+\)|[a-z]+)$/i.test(raw.canvas.background)) project.canvas.background = raw.canvas.background;
   project.frame = normalizeFrame(raw.frame, project.canvas.preset, sanitize);
   project.safeArea = normalizeSafeArea(raw.safeArea, project.canvas, project.frame);
@@ -82,7 +104,7 @@ export function validateProject(raw, sanitize) {
     const id = typeof item.id === 'string' ? item.id : uid();
     if (ids.has(id)) throw new Error('草稿中存在重复标识');
     ids.add(id);
-    return normalizeItem({ ...item, id, imported: item.imported === true, content: sanitize(item.content, item.type) }, project.canvas, placementBounds(project));
+    return normalizeItem({ ...item, id, imported: item.imported === true, content: sanitize(item.content, item.type) }, project.canvas, itemBounds(project));
   });
   return project;
 }

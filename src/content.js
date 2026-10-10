@@ -1,4 +1,5 @@
 import { normalizeFrame, frameLayout, cameraLayout } from './frames.js';
+import { orientationPresentation } from './orientation.js';
 /** 组件只承载静态标记，移除脚本、事件、页面级样式及外部资源。 */
 const HTML_TAGS = new Set('div span p strong b em i u s small h1 h2 h3 h4 h5 h6 section article header footer main nav aside ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col label button input textarea select option img a br hr pre code blockquote figure figcaption'.split(' '));
 const SVG_TAGS = new Set('svg g path rect circle ellipse line polyline polygon text tspan defs lineargradient radialgradient stop clippath mask title desc'.split(' '));
@@ -45,9 +46,10 @@ export function sanitizeContent(content, type = 'html') {
 }
 export const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 /** 编辑、预览和导出共用结构，确保尺寸、边距及零圆角一致。 */
-export function itemHTML(item) {
+export function itemHTML(item, canvas) {
   const inner = item.type === 'image' ? `<img src="${escapeHTML(item.content)}" alt="${escapeHTML(item.name)}" style="width:100%;height:100%;object-fit:contain">` : item.content;
-  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}" data-name="${escapeHTML(item.name)}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
+  const { hidden, angle } = orientationPresentation(item, canvas);
+  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}" data-name="${escapeHTML(item.name)}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}${hidden ? ';display:none' : ''}${angle ? `;transform:rotate(${angle}deg)` : ''}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
 }
 export const PROTOTYPE_CSS = `
 .prototype{position:relative;background:#fff;overflow:hidden;color:#0f172a;font-family:Inter,system-ui,-apple-system,sans-serif}
@@ -114,7 +116,7 @@ export function deviceMarkup(canvas, rawFrame, screenHTML = '') {
   return { layout, className: `device-shell ${key}`, style: `width:${layout.width}px;height:${layout.height}px`, inner: `<div class="device-decoration" aria-hidden="true">${decoration}</div><div class="device-screen" style="left:${layout.left}px;top:${layout.top}px;width:${canvas.width}px;height:${canvas.height}px">${screenHTML}${status}${navigation}${cutout}</div>` };
 }
 export function exportHTML(project) {
-  const screen = `<main class="prototype" style="background-color:${escapeHTML(project.canvas.background || '#fff')}" aria-label="原型画布">${project.items.map(itemHTML).join('\n')}</main>`;
+  const screen = `<main class="prototype" style="background-color:${escapeHTML(project.canvas.background || '#fff')}" aria-label="原型画布">${project.items.map(item => itemHTML(item, project.canvas)).join('\n')}</main>`;
   const device = deviceMarkup(project.canvas, project.frame, screen);
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Protolab 原型</title><style>
