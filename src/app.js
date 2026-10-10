@@ -373,7 +373,7 @@ $('pageForm').addEventListener('submit', event => {
   const page = project.pages.find(page => page.id === managedPageId);
   page.name = name;
   if (page.kind === 'page' && $('pageStart').checked) project.startPageId = page.id;
-  commit('更新页面名称与首页'); $('pageDialog').close();
+  commit('更新页面名称与首页'); $('pageDialog').close(); saveProject('保存页面设置');
 });
 $('duplicatePageBtn').addEventListener('click', safeAction(() => {
   applyPageChange(addPage(project, 'page', true), '复制页面或弹窗'); $('pageDialog').close();
