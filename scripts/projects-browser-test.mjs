@@ -22,7 +22,7 @@ try {
   const saved = () => page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await page.locator('[data-comp-id="lib-btn"]').click();
   await page.locator('#propName').fill('原工程按钮'); await page.locator('#selectionProps button[type=submit]').click();
-  await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('原工程组件');
+  await page.locator('#customTab').click(); await page.locator('#addHtmlCompBtn').click(); await page.locator('#customName').fill('原工程组件');
   await page.locator('#componentForm button[type=submit]').click(); await saved();
   const originalId = (await store()).activeId;
   await clickAction(page, '#newProjectBtn'); await page.locator('#engineeringName').fill('商城工程');
@@ -30,12 +30,12 @@ try {
   await page.locator('#engineeringSubmitBtn').click(); await saved();
   const shopId = (await store()).activeId;
   assert.notEqual(shopId, originalId); assert.equal(await page.locator('.editor-item').count(), 0);
-  assert.equal(await page.locator('#customList button').count(), 0); assert.equal(await page.locator('#canvasWidthInput').inputValue(), '1280');
+  assert.equal(await page.locator('#customList .component-item').count(), 0); assert.equal(await page.locator('#canvasWidthInput').inputValue(), '1280');
   assert.equal(await page.locator('#undoBtn').isDisabled(), true);
-  await page.locator('[data-comp-id="lib-text"]').click();
+  await page.locator('#basicTab').click(); await page.locator('[data-comp-id="lib-text"]').click();
   // 在自动保存延迟内切换也必须保留修改。
   await page.locator('#projectSelect').selectOption(originalId);
-  assert.equal(await page.locator('.editor-item').count(), 1); assert.equal(await page.locator('#customList button').count(), 1);
+  assert.equal(await page.locator('.editor-item').count(), 1); assert.equal(await page.locator('#customList .component-item').count(), 1);
   await page.locator('#projectSelect').selectOption(shopId); assert.equal(await page.locator('.editor-item').count(), 1);
   await clickAction(page, '#undoBtn'); assert.equal(await page.locator('.editor-item').count(), 0);
   await clickAction(page, '#redoBtn'); assert.equal(await page.locator('.editor-item').count(), 1);
@@ -65,18 +65,18 @@ try {
   const beforeGenerateVersions = (await current()).workspace.versions.entries.length;
   await send('component', '生成欢迎卡片'); await page.locator('#generationDialog').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.editor-item').count(), 1);
-  assert.equal(await page.locator('#customList button').count(), 0);
+  assert.equal(await page.locator('#customList .component-item').count(), 0);
   await saved(); assert.equal((await current()).workspace.versions.entries.length, beforeGenerateVersions + 2);
   assert.match(requestBody.messages[0].content, /主色为紫色/); assert.match(requestBody.messages[0].content, /内置设计规范/);
   assert.equal(requestBody.messages.length, 2); assert.equal(JSON.parse(requestBody.messages.at(-1).content).project.items.length, 0);
   assert.match(await page.frameLocator('#generationPreview').locator('body').textContent(), /欢迎商城/);
   await page.locator('#generationName').fill('商城欢迎卡片'); await page.locator('#generationApplyBtn').click(); await saved();
-  assert.equal(await page.locator('#customList button').count(), 1); assert.equal(await page.locator('.editor-item').count(), 1);
+  assert.equal(await page.locator('#customList .component-item').count(), 1); assert.equal(await page.locator('.editor-item').count(), 1);
   assert.equal((await current()).workspace.versions.entries.length, beforeGenerateVersions + 3);
   await page.locator('#aiCloseBtn').click();
-  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#customList button').count(), 0);
-  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#customList button').count(), 1);
-  await page.locator('#customList button').click(); assert.equal(await page.locator('.editor-item').count(), 2);
+  await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#customList .component-item').count(), 0);
+  await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#customList .component-item').count(), 1);
+  await page.locator('#customList .component-item').click(); assert.equal(await page.locator('.editor-item').count(), 2);
   const beforePages = (await current()).project.pages.length;
   await send('page', '生成商城登录页'); await page.locator('#generationDialog').waitFor({ state: 'visible' });
   assert.equal((await current()).project.pages.length, beforePages);
@@ -87,7 +87,7 @@ try {
   assert.equal((await current()).project.pages[0].items.length, 2);
   await page.locator('#aiCloseBtn').click(); await clickAction(page, '#undoBtn'); assert.equal(await page.locator('#pageList button').count(), beforePages);
   await clickAction(page, '#redoBtn'); assert.equal(await page.locator('#pageList button').count(), beforePages + 1);
-  await saved(); await page.reload(); assert.equal(await page.locator('#customList button').count(), 1);
+  await saved(); await page.reload(); assert.equal(await page.locator('#customList .component-item').count(), 1);
   console.log('通过：规范注入、组件预览复用、新增可编辑页面、撤销重做及刷新恢复');
 
   // 设置和规范随工程导出，密钥不进入工程集合及导出文件。
@@ -111,7 +111,7 @@ try {
   release(); await page.waitForTimeout(200);
   assert.equal(await page.locator('#generationDialog').isVisible(), false);
   assert.equal(await page.locator('#aiCancelBtn').isHidden(), true);
-  assert.equal(await page.locator('#customList button').count(), 1);
+  assert.equal(await page.locator('#customList .component-item').count(), 1);
   assert.equal((await current()).workspace.messages.length, 0);
   await page.locator('#projectSelect').selectOption(shopId);
   // 当前工程已有对话，等待新修改时切换到另一个工程不会污染其对话。
@@ -124,7 +124,7 @@ try {
 
   await page.locator('#projectSelect').selectOption(shopId);
   await send('modify', '等待产生待合并版本'); await page.waitForTimeout(100);
-  await page.locator('#canvasWidthInput').fill('1200'); await page.locator('#applyCanvasSizeBtn').click();
+  await page.locator('#canvasTab').click(); await page.locator('#canvasWidthInput').fill('1200'); await page.locator('#applyCanvasSizeBtn').click();
   release(); await waitDone(); await saved(); assert.equal(await page.locator('#aiPending').isVisible(), true);
   await page.locator('#projectSelect').selectOption(originalId); assert.equal(await page.locator('#aiPending').isVisible(), false);
   await page.locator('#projectSelect').selectOption(shopId); assert.equal(await page.locator('#aiPending').isVisible(), true);
@@ -154,7 +154,7 @@ try {
     localStorage.setItem('protolab.workspace.v1', JSON.stringify(entry.workspace));
   }, (await store()).entries.find(entry => entry.id === shopId));
   await migrated.goto(base); assert.equal(await migrated.locator('#projectSelect option').count(), 1);
-  assert.equal(await migrated.locator('.editor-item').count(), 2); assert.equal(await migrated.locator('#customList button').count(), 1);
+  assert.equal(await migrated.locator('.editor-item').count(), 2); assert.equal(await migrated.locator('#customList .component-item').count(), 1);
   await clickAction(migrated, '#newProjectBtn'); await migrated.locator('#engineeringName').fill('迁移后新工程'); await migrated.locator('#engineeringSubmitBtn').click();
   const value = await migrated.evaluate(() => JSON.parse(localStorage.getItem('protolab.projects.v1')));
   assert.equal(value.entries[0].project.pages.length, 2); assert.ok(value.entries[0].workspace.messages.length > 0);
