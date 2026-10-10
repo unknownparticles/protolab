@@ -36,9 +36,29 @@ test('图片空白画布隔离工程配色安全区，生成保留尺寸并清�
   assert.equal(result.project.canvas.width, 375);
   assert.equal(nameImageComponents([{ ...button, name: '重复' }, { ...button, name: '重复' }])[1].name, '重复 2');
 });
-test('拒绝单层整图、越界、改变图片尺寸、设备外框或安全区、引用组件库和跨页动作', () => {
+test('模型重复返回参考尺寸、默认预设或其他尺寸时保留本地参考画布及组件坐标', () => {
   const valid = [{ op: 'add', item: heading }, { op: 'add', item: button }];
-  for (const changes of [valid.slice(0, 1), [...valid, { op: 'canvas', fields: { width: 800 } }], [...valid, { op: 'frame', fields: { style: 'browser' } }], [...valid, { op: 'safeArea', fields: { enabled: true } }], [valid[0], { op: 'add', item: { ...button, x: 300 } }], [valid[0], { op: 'add', item: { ...button, libraryId: 'existing' } }], [valid[0], { op: 'add', item: { ...button, interaction: { type: 'navigate', targetId: 'home' } } }]]) {
+  for (const canvasFields of [
+    { width: 375, height: 667, background: '#f8fafc' },
+    { width: 375, height: 667, preset: 'phone', background: '#f8fafc' },
+    { width: 1280, height: 800, preset: 'pc', background: '#f8fafc' },
+    { width: 800 },
+    { preset: 'phone' },
+  ]) {
+    // 放在新增组件之后，确保处理顺序不会改变组件位置。
+    const result = parseGenerationResponse(reply([...valid, { op: 'canvas', fields: canvasFields }]), base(), 'image', clean);
+    assert.equal(result.project.canvas.width, 375); assert.equal(result.project.canvas.height, 667);
+    assert.equal(result.project.canvas.preset, 'custom');
+    assert.deepEqual(result.project.items.map(({ x, y, width, height }) => ({ x, y, width, height })), [heading, button].map(({ x, y, width, height }) => ({ x, y, width, height })));
+    if (canvasFields.background) assert.equal(result.project.canvas.background, '#f8fafc');
+  }
+  for (const canvasFields of [{ width: '375' }, { height: null }, { unknown: true }, {}]) {
+    assert.throws(() => parseGenerationResponse(reply([...valid, { op: 'canvas', fields: canvasFields }]), base(), 'image', clean));
+  }
+});
+test('拒绝单层整图、越界、设备外框或安全区、引用组件库和跨页动作', () => {
+  const valid = [{ op: 'add', item: heading }, { op: 'add', item: button }];
+  for (const changes of [valid.slice(0, 1), [...valid, { op: 'frame', fields: { style: 'browser' } }], [...valid, { op: 'safeArea', fields: { enabled: true } }], [valid[0], { op: 'add', item: { ...button, x: 300 } }], [valid[0], { op: 'add', item: { ...button, libraryId: 'existing' } }], [valid[0], { op: 'add', item: { ...button, interaction: { type: 'navigate', targetId: 'home' } } }]]) {
     assert.throws(() => parseGenerationResponse(reply(changes), base(), 'image', clean));
   }
 });

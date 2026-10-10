@@ -39,7 +39,11 @@ export function parseGenerationResponse(text, base, mode, sanitize, options = {}
     const additions = raw.changes.filter(change => change.op === 'add');
     if (additions.length < 2) throw new Error('图片界面须拆分为多个可独立编辑的组件，请重新生成');
     for (const change of raw.changes) {
-      if (change.op === 'canvas' && (!object(change.fields) || Object.keys(change.fields).some(key => key !== 'background'))) throw new Error('图片生成须保留参考图片的画布尺寸');
+      if (change.op === 'canvas') {
+        checkFields(change.fields, fields.canvas);
+        // 模型可能重复返回尺寸或使用默认设备预设；参考图尺寸由本地确定。
+        change.fields = { ...change.fields, width: base.canvas.width, height: base.canvas.height, preset: 'custom' };
+      }
       if (change.op === 'add') {
         const item = change.item;
         if (!object(item) || 'libraryId' in item) throw new Error('图片生成须还原独立组件');

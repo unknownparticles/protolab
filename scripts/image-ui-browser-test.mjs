@@ -32,7 +32,7 @@ try {
     sent = route.request().postDataJSON();
     if (responseMode === 'wait') await new Promise(resolve => { release = resolve; });
     if (responseMode === 'unsupported') { await route.fulfill({ status: 400, body: '{}' }); return; }
-    const changes = [{ op: 'canvas', fields: { background: '#f8fafc' } }, ...items.map(item => ({ op: 'add', item }))];
+    const changes = [{ op: 'canvas', fields: { width: 1280, height: 800, preset: 'pc', background: '#f8fafc' } }, ...items.map(item => ({ op: 'add', item }))];
     const content = responseMode === 'invalid' ? '无法识别' : JSON.stringify({ version: 1, name: '图片登录页', summary: '已识别并命名四个可编辑组件', changes });
     await route.fulfill({ json: { choices: [{ message: { content } }] } });
   });
@@ -67,6 +67,8 @@ try {
   const generated = (await current()).project;
   assert.equal(generated.pages.length, original.pages.length + 1); assert.equal(generated.items.length, 4);
   assert.equal(generated.canvas.width, 375); assert.equal(generated.canvas.height, 667); assert.equal(generated.frame.style, 'none');
+  assert.equal(generated.canvas.preset, 'custom');
+  assert.deepEqual(generated.items.map(({ x, y, width, height }) => ({ x, y, width, height })), items.map(({ x, y, width, height }) => ({ x, y, width, height })));
   assert.equal(generated.items[3].name, '登录即表示同意用户协议 · 文本');
   await page.locator('#aiCloseBtn').click(); await page.locator('#layersTab').click();
   await page.locator('.layer-item').filter({ hasText: '登录按钮' }).click();
