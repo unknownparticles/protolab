@@ -46,7 +46,7 @@ try {
   await page.locator('#zoomSelect').selectOption('1');
   await page.locator('#previewBtn').click();
   const preview = page.frameLocator('#previewFrame'), viewport = preview.locator('.preview-viewport').first();
-  const frame = page.frames().find(frame => frame.parentFrame());
+  const frame = await (await page.locator('#previewFrame').elementHandle()).contentFrame();
   await pinch(viewport, async () => Number(await viewport.getAttribute('data-zoom')));
   await preview.getByRole('button', { name: '重置缩放', exact: true }).click();
   assert.equal(await viewport.getAttribute('data-zoom'), '1');
