@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateGroups, mergeLibrary } from '../src/library-groups.js';
-import { validateLibrary, createHistory } from '../src/model.js';
+import { validateLibrary, createItem, createHistory } from '../src/model.js';
 import { projectRecord, validateProjects, emptyProject } from '../src/projects.js';
 
 const sanitize = value => value;
@@ -40,4 +40,14 @@ test('损坏分组不能覆盖工程，旧组件库仍归入未分组', () => {
   assert.deepEqual(validateGroups(), []);
   assert.equal(component('legacy').groupId, '');
   for (const raw of [[{ id: '', name: '分组' }], [{ id: 'a', name: ' ' }], [{ id: 'a', name: '同名' }, { id: 'b', name: '同名' }], [{ id: 'a', name: '甲' }, { id: 'a', name: '乙' }]]) assert.throws(() => validateGroups(raw));
+});
+
+
+test('从画布建立的组件在导出往返和重新添加后保留圆角、边距与外观', () => {
+  const raw = { ...component('saved'), defaultRadius: 18, padding: '7px 0px 0px 0px', margin: '2px', appearance: { background: '#eff6ff' } };
+  const restored = validateLibrary(JSON.parse(JSON.stringify({ version: 1, components: [raw] })), sanitize)[0];
+  const item = createItem(restored, { width: 375, height: 667 });
+  assert.equal(item.radius, 18); assert.equal(item.padding, raw.padding); assert.equal(item.margin, raw.margin);
+  assert.equal(item.appearance.background, '#eff6ff');
+  assert.throws(() => validateLibrary([{ ...raw, padding: 'calc(1px)' }], sanitize));
 });

@@ -79,7 +79,7 @@ export function createItem(component, canvas, x = 40, y = 40, bounds) {
   return normalizeItem({
     id: uid(), name: component.name, type: component.type, imported: false,
     content: component.content, x, y, width: component.defaultWidth,
-    height: component.defaultHeight, radius: component.type === 'svg' ? 0 : 8, padding: '0', margin: '0',
+    height: component.defaultHeight, radius: component.defaultRadius ?? (component.type === 'svg' ? 0 : 8), padding: component.padding ?? '0', margin: component.margin ?? '0',
     orientationResponse: component.orientationResponse,
     ...(component.imageSlot ? { imageSlot: true } : {}),
     ...(component.appearance ? { appearance: component.appearance } : {}),
@@ -102,6 +102,9 @@ export function validateLibrary(raw, sanitize) {
     seen.add(id);
     return { id, name: entry.name.trim().slice(0, 80), type, content: safe,
       groupId: typeof entry.groupId === 'string' && entry.groupId.length <= 100 ? entry.groupId : '',
+      ...(entry.defaultRadius != null ? { defaultRadius: number(entry.defaultRadius, 8, 0, 50) } : {}),
+      ...(entry.padding != null ? { padding: spacing(entry.padding) } : {}),
+      ...(entry.margin != null ? { margin: spacing(entry.margin) } : {}),
       builtin: entry.builtin === true || entry.type === 'preset', category: type === 'svg' ? 'vector' : 'basic',
       orientationResponse: normalizeOrientationResponse(entry.orientationResponse),
       ...(entry.imageSlot === true ? { imageSlot: true } : {}),

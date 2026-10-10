@@ -33,7 +33,8 @@ export function parseGenerationResponse(text, base, mode, sanitize, options = {}
   if (mode === 'component') {
     const item = response.project.items[0];
     const component = validateLibrary([{ id: uid(), name: raw.name.trim(), type: item.type, content: item.content,
-      defaultWidth: item.width, defaultHeight: item.height, orientationResponse: item.orientationResponse }], sanitize)[0];
+      defaultWidth: item.width, defaultHeight: item.height, orientationResponse: item.orientationResponse,
+      ...(item.imageSlot ? { imageSlot: true } : {}), ...(item.appearance ? { appearance: item.appearance } : {}) }], sanitize)[0];
     const project = { ...response.project, canvas: { width: Math.max(100, item.width), height: Math.max(100, item.height), preset: 'custom' }, items: [{ ...item, x: 0, y: 0 }] };
     return { ...response, name: raw.name.trim(), project, component };
   }
@@ -100,19 +101,22 @@ export function parseAIResponse(text, base, sanitize, options = {}) {
     const allowed = change.op === 'add' ? ['op', 'item'] : change.op === 'remove' ? ['op', 'id'] : change.op === 'update' ? ['op', 'id', 'fields'] : ['op', 'fields'];
     if (Object.keys(change).some(key => !allowed.includes(key))) throw new Error('AI 变更包含不支持的操作字段');
     if (change.op === 'add') {
+      let source;
       if (object(change.item) && 'libraryId' in change.item) {
-        const source = options.library?.find(item => item.id === change.item.libraryId);
+        source = options.library?.find(item => item.id === change.item.libraryId);
         if (!source) throw new Error('AI 引用了未关联或不存在的组件库组件');
         const { libraryId, ...item } = change.item;
         if ('content' in item || 'type' in item) throw new Error('复用组件时只需引用标识，无需提供类型和代码');
         change.item = { name: source.name, width: source.defaultWidth, height: source.defaultHeight,
-          orientationResponse: source.orientationResponse, ...item, type: source.type, content: source.content };
+          ...(source.orientationResponse ? { orientationResponse: source.orientationResponse } : {}), ...item, type: source.type, content: source.content };
       }
       const item = change.item;
       if (!object(item) || typeof item.id !== 'string' || !item.id || item.id.length > 100 || next.items.some(value => value.id === item.id)) throw new Error('AI 新组件标识为空或重复');
-      if (!['html', 'svg', 'image'].includes(item.type) || item.type === 'image' && !options.library?.some(source => source.type === 'image' && source.content === item.content) || typeof item.content !== 'string' || !item.content.trim() || typeof item.name !== 'string') throw new Error('AI 新组件缺少名称、类型或内容');
+      if (!['html', 'svg', 'image'].includes(item.type) || item.type === 'image' && !source || typeof item.content !== 'string' || !item.content.trim() || typeof item.name !== 'string') throw new Error('AI 新组件缺少名称、类型或内容');
       for (const key of ['x', 'y', 'width', 'height']) if (typeof item[key] !== 'number' || !Number.isFinite(item[key])) throw new Error('AI 新组件缺少位置或尺寸');
       checkFields(Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'id')), fields.update);
+      if (source?.imageSlot) item.imageSlot = true;
+      if (source?.appearance) item.appearance = clone(source.appearance);
       next.items.push(item);
     } else if (change.op === 'update' || change.op === 'remove') {
       const index = next.items.findIndex(item => item.id === change.id);
@@ -128,7 +132,10 @@ export function parseAIResponse(text, base, sanitize, options = {}) {
     } else throw new Error('AI 返回了未知的变更操作');
     if (next.items.length > MAX_ITEMS) throw new Error('AI 项目超过组件数量上限');
   }
-  if (!options.componentMode && options.designContext?.safeArea) next.safeArea = clone(options.designContext.safeArea);
+  if (!options.componentMode && options.designContext?.safeArea) {
+    next.safeArea = clone(options.designContext.safeArea);
+    if (next.safeArea.enabled || next.safeArea.mode !== 'current') delete next.canvas.layoutSize;
+  }
   const project = validateProject(next, sanitize);
   if (project.items.some(item => !item.content.trim())) throw new Error('AI 组件经过安全处理后没有可用内容');
   return { summary: raw.summary.trim(), project, changes };

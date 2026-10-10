@@ -672,7 +672,7 @@ function select(id, toggle = false) {
 }
 function commit(label = '修改设计') {
   project = constrainProject(withPages(project)); history.push({ project, library, libraryGroups }, label);
-  renderCanvas(); assistant.refreshVersions(); renderHistory(); scheduleSave();
+  renderCanvas(); assistant.refreshVersions(); assistant.refreshRules(); renderHistory(); scheduleSave();
 }
 function saveProject(label = '手动保存') {
   finishGesture(); assistant.saveVersion(label);
@@ -1056,7 +1056,7 @@ function readCustomComponent(preview = false) {
   const raw = customType === 'image' ? imageData : $('customCode').value;
   if (!contentSizeValid(raw, customType)) throw new Error('组件标记不能超过 100000 字符，内嵌图片另计体积');
   const source = project.items.find(item => item.id === $('componentForm').dataset.sourceId);
-  return validateLibrary([{ id: uid(), groupId: $('customGroup').value, name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value, ...(source ? { appearance: source.appearance, imageSlot: source.imageSlot } : {}), orientationResponse: readOrientationFields('custom') }], sanitizeContent)[0];
+  return validateLibrary([{ id: uid(), groupId: $('customGroup').value, name: preview ? $('customName').value.trim() || '未命名组件' : $('customName').value, type: customType, content: raw, defaultWidth: $('customWidth').value, defaultHeight: $('customHeight').value, ...(source ? { appearance: source.appearance, imageSlot: source.imageSlot, defaultRadius: source.radius, padding: source.padding, margin: source.margin } : {}), orientationResponse: readOrientationFields('custom') }], sanitizeContent)[0];
 }
 function previewCustomComponent() {
   try {

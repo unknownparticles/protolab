@@ -20,7 +20,7 @@ export function renderComponentPreview(host, component) {
   const stage = document.createElement('div');
   stage.className = 'prototype';
   stage.inert = true;
-  stage.innerHTML = itemHTML({ ...component, x: 0, y: 0, width: component.defaultWidth, height: component.defaultHeight, radius: component.type === 'svg' ? 0 : 8, padding: '0', margin: '0' });
+  stage.innerHTML = itemHTML({ ...component, x: 0, y: 0, width: component.defaultWidth, height: component.defaultHeight, radius: component.defaultRadius ?? (component.type === 'svg' ? 0 : 8), padding: component.padding ?? '0', margin: component.margin ?? '0' });
   root.replaceChildren(style, stage);
   observer.observe(host);
   fitPreview(host);

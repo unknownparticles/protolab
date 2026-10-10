@@ -43,6 +43,8 @@ try {
   await page.locator('#propertiesPanel .panel-toggle').click();
   console.log('通过：属性隔离、键盘切换保留表单、常驻图层、历史与版本');
 
+  await page.locator('#propRadius').fill('18'); await page.locator('#propPaddingTop').fill('7');
+  await page.locator('#selectionProps button[type=submit]').click();
   await page.locator('#customTab').click(); await page.locator('#newGroupBtn').click();
   await page.locator('#groupName').fill('导航'); await page.locator('#groupForm button[type=submit]').click();
   const navigation = await page.locator('#customGroupFilter').inputValue();
@@ -67,6 +69,8 @@ try {
   await page.locator('#libFileInput').setInputFiles({ name: '组件库.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(raw)) });
   await page.waitForFunction(() => document.querySelectorAll('#customList .component-item').length === 3);
   const backup = await libraryFile();
+  const fromCanvas = backup.components.find(component => component.name === '画布按钮');
+  assert.equal(fromCanvas.defaultRadius, 18); assert.equal(fromCanvas.padding, '7px 0px 0px 0px');
   assert.equal(backup.groups.length, 2); assert.equal(backup.components.find(c => c.id === 'imported').groupId, navigation);
   assert.equal(backup.components.find(c => c.id === 'imported').content.includes('onclick'), false);
   await page.locator('#libFileInput').setInputFiles({ name: '重复.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
@@ -94,6 +98,13 @@ try {
   assert.equal(await page.locator('#customList .component-item').count(), 0);
   await page.locator('#projectSelect').selectOption(oldProject); await page.locator('#customTab').click();
   assert.equal(await page.locator('#customList .component-item').count(), 5);
+  const projectDownload = page.waitForEvent('download'); await clickAction(page, '#exportProjectBtn');
+  const projectBackup = JSON.parse(await readFile(await (await projectDownload).path(), 'utf8'));
+  assert.deepEqual(projectBackup.groups, (await libraryFile()).groups);
+  await clickAction(page, '#importProjectBtn');
+  await page.locator('#projectFileInput').setInputFiles({ name: '工程.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(projectBackup)) });
+  await page.locator('#projectForm button[type=submit]').click(); await page.locator('#projectDialog').waitFor({ state: 'hidden' });
+  assert.deepEqual((await libraryFile()).groups, projectBackup.groups);
   await page.screenshot({ path: resolve(output, 'library-groups-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('[data-panel=properties]').click();

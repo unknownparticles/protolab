@@ -14,12 +14,17 @@ try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
+  context.setDefaultTimeout(15000);
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
   const click = async id => {
     const control = page.locator(`#${id}`);
-    if (!await control.isVisible()) await control.locator('xpath=ancestor::details').locator('summary').click();
+    if (!await control.isVisible()) {
+      const trigger = await control.evaluate(node => node.closest('[role="menu"]')?.getAttribute('aria-labelledby'));
+      if (trigger) await page.locator(`#${trigger}`).click();
+      else await control.locator('xpath=ancestor::details').locator('summary').click();
+    }
     await control.click();
   };
   const apply = () => page.locator('#selectionProps button[type=submit]').click();
@@ -44,6 +49,7 @@ try {
   await click('addToastBtn');
   const toast = await page.locator('#pageList .active').getAttribute('data-page-id');
   await layer('提示文案').click(); await page.locator('[data-text-index="0"]').fill('保存成功'); await apply();
+  console.log('已准备提示内容，验证预览编辑');
   await click('previewBtn');
   let preview = page.frameLocator('#previewFrame');
   await preview.locator('[data-prototype-toast]:popover-open').waitFor();
