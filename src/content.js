@@ -4,7 +4,7 @@ const HTML_TAGS = new Set('div span p strong b em i u s small h1 h2 h3 h4 h5 h6 
 const SVG_TAGS = new Set('svg g path rect circle ellipse line polyline polygon text tspan defs lineargradient radialgradient stop clippath mask title desc'.split(' '));
 const REMOVE = new Set('script style iframe object embed link meta base form foreignobject animate animatetransform set use'.split(' '));
 const ATTRS = new Set('title alt placeholder value type disabled checked selected readonly multiple rows cols maxlength min max step role tabindex width height viewbox fill stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray stroke-dashoffset fill-rule clip-rule d x y x1 x2 y1 y2 cx cy r rx ry points opacity fill-opacity stroke-opacity transform preserveaspectratio offset stop-color stop-opacity gradientunits gradienttransform spreadmethod vector-effect'.split(' '));
-const STYLES = new Set('display position flex flex-direction flex-wrap flex-grow flex-shrink align-items align-self justify-content gap row-gap column-gap grid-template-columns grid-template-rows grid-column grid-row width height min-width min-height max-width max-height top right bottom left margin margin-top margin-right margin-bottom margin-left padding padding-top padding-right padding-bottom padding-left background background-color color border border-width border-style border-color border-top border-right border-bottom border-left border-radius box-shadow box-sizing overflow overflow-x overflow-y opacity font-size font-family font-weight font-style line-height letter-spacing text-align text-decoration text-transform white-space word-break object-fit object-position vertical-align cursor'.split(' '));
+export const STYLES = new Set('display position flex flex-direction flex-wrap flex-grow flex-shrink align-items align-self justify-content gap row-gap column-gap grid-template-columns grid-template-rows grid-column grid-row width height min-width min-height max-width max-height top right bottom left margin margin-top margin-right margin-bottom margin-left padding padding-top padding-right padding-bottom padding-left background background-color background-image background-size background-position color border border-width border-style border-color border-top border-right border-bottom border-left border-radius box-shadow box-sizing overflow overflow-x overflow-y opacity font-size font-family font-weight font-style line-height letter-spacing text-align text-decoration text-transform white-space word-break object-fit object-position vertical-align cursor appearance list-style-type text-indent text-overflow border-collapse border-spacing'.split(' '));
 export function isImageData(value) {
   return /^data:image\/(?:png|jpeg|gif|webp|avif);base64,[A-Za-z0-9+/=\s]+$/.test(value);
 }
@@ -43,7 +43,7 @@ export const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ 
 /** 编辑、预览和导出共用结构，确保尺寸、边距及零圆角一致。 */
 export function itemHTML(item) {
   const inner = item.type === 'image' ? `<img src="${escapeHTML(item.content)}" alt="${escapeHTML(item.name)}" style="width:100%;height:100%;object-fit:contain">` : item.content;
-  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}" data-name="${escapeHTML(item.name)}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
+  return `<div class="prototype-item${item.type === 'svg' ? ' vector-item' : ''}${item.imported ? ' imported-item' : ''}" data-name="${escapeHTML(item.name)}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;border-radius:${item.radius}px;padding:${escapeHTML(item.padding)}"><div class="prototype-content" style="margin:${escapeHTML(item.margin)}">${inner}</div></div>`;
 }
 export const PROTOTYPE_CSS = `
 .prototype{position:relative;background:#fff;overflow:hidden;color:#0f172a;font-family:Inter,system-ui,-apple-system,sans-serif}
@@ -53,6 +53,8 @@ export const PROTOTYPE_CSS = `
 .prototype-content p,.prototype-content h1,.prototype-content h2,.prototype-content h3{margin:0}
 .prototype-content input,.prototype-content textarea,.prototype-content button{font-family:inherit}
 .prototype-item.vector-item{background:transparent;box-shadow:none}
+.prototype-item.imported-item{background:transparent;box-shadow:none}
+.imported-item>.prototype-content{display:block;overflow:visible}
 .device-shell{position:relative;flex-shrink:0;isolation:isolate;font-family:system-ui,-apple-system,sans-serif}
 .device-decoration{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;border-radius:32px}
 .device-screen{position:absolute;z-index:1;isolation:isolate}
@@ -108,12 +110,12 @@ export function deviceMarkup(canvas, rawFrame, screenHTML = '') {
   return { layout, className: `device-shell ${key}`, style: `width:${layout.width}px;height:${layout.height}px`, inner: `<div class="device-decoration" aria-hidden="true">${decoration}</div><div class="device-screen" style="left:${layout.left}px;top:${layout.top}px;width:${canvas.width}px;height:${canvas.height}px">${screenHTML}${status}${navigation}${cutout}</div>` };
 }
 export function exportHTML(project) {
-  const screen = `<main class="prototype" aria-label="原型画布">${project.items.map(itemHTML).join('\n')}</main>`;
+  const screen = `<main class="prototype" style="background-color:${escapeHTML(project.canvas.background || '#fff')}" aria-label="原型画布">${project.items.map(itemHTML).join('\n')}</main>`;
   const device = deviceMarkup(project.canvas, project.frame, screen);
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Protolab 原型</title><style>
 html,body{margin:0;min-height:100%;background:#f1f5f9}body{display:grid;place-items:start center;padding:32px;box-sizing:border-box}
 ${PROTOTYPE_CSS}
 @media(max-width:${device.layout.width + 64}px){body{padding:0;display:block}}
-</style></head><body><div class="${device.className}" style="${device.style}">${device.inner}</div></body></html>`;
+</style></head><body><div class="${device.className}" style="${device.style}">${device.inner}</div><script type="application/json" id="protolab-project">${JSON.stringify(project).replace(/</g, '\\u003c')}</script></body></html>`;
 }

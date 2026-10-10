@@ -44,8 +44,8 @@ test('对齐作为单次历史操作撤销重做', () => {
   assert.deepEqual(history.undo(), project); assert.deepEqual(history.redo(), aligned);
 });
 test('辅助线设置恢复有默认值，标尺标签在不同缩放下仍使用实际像素', () => {
-  assert.deepEqual(normalizeGuides(null), { rulers: true, grid: false, gridSize: 20 });
-  assert.deepEqual(normalizeGuides({ rulers: false, grid: true, gridSize: 50 }), { rulers: false, grid: true, gridSize: 50 });
+  assert.deepEqual(normalizeGuides(null), { rulers: true, grid: false, snap: true, gridSize: 20 });
+  assert.deepEqual(normalizeGuides({ rulers: false, grid: true, snap: true, gridSize: 50 }), { rulers: false, grid: true, snap: true, gridSize: 50 });
   assert.equal(normalizeGuides({ gridSize: -5 }).gridSize, 20);
   assert.match(rulerMarkup(375, .5), /width="187.5"/);
   assert.match(rulerMarkup(375, .5), /x="53" y="10">100<\/text>/);

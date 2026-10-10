@@ -41,3 +41,10 @@
 .component-preview{width:100%;height:116px;border:1px solid var(--border);border-radius:8px;background-color:#f8fafc;background-image:linear-gradient(45deg,#e2e8f066 25%,transparent 25%,transparent 75%,#e2e8f066 75%),linear-gradient(45deg,#e2e8f066 25%,transparent 25%,transparent 75%,#e2e8f066 75%);background-size:16px 16px;background-position:0 0,8px 8px;overflow:hidden;pointer-events:none}
 .component-card-meta{display:flex;align-items:center;gap:8px;min-width:0}
 .component-dialog-preview{height:220px;margin-bottom:12px}
+
+/* 可放置区域及拖动吸附参考线，仅用于编辑 */
+.canvas-safe-area{position:absolute;pointer-events:none;z-index:2;border:1px dashed #f59e0b;box-shadow:0 0 0 3000px #f59e0b12}
+.canvas-snap-guides{position:absolute;inset:0;z-index:4;pointer-events:none}
+.snap-guide{position:absolute;display:block;background:#db2777}
+.snap-guide.vertical{top:0;bottom:0;width:1px}
+.snap-guide.horizontal{left:0;right:0;height:1px}

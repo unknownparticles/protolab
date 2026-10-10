@@ -35,7 +35,7 @@ export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) 
   };
 }
 export function resizeProject(project, width, height, preset = 'custom') {
-  const canvas = { width: number(width, 375, 100, 2000), height: number(height, 667, 100, 2000), preset };
+  const canvas = { ...project.canvas, width: number(width, 375, 100, 2000), height: number(height, 667, 100, 2000), preset };
   return constrainProject({ ...project, canvas, ...(project.frame ? { frame: normalizeFrame(project.frame, preset) } : {}) });
 }
 export function constrainProject(project) {
@@ -73,6 +73,7 @@ export function validateLibrary(raw, sanitize) {
 export function validateProject(raw, sanitize) {
   if (!raw || raw.version !== 1 || !raw.canvas || !Array.isArray(raw.items) || raw.items.length > MAX_ITEMS) throw new Error('草稿格式不正确');
   const project = resizeProject({ version: 1, items: [] }, raw.canvas.width, raw.canvas.height, PRESETS[raw.canvas.preset] ? raw.canvas.preset : 'custom');
+  if (typeof raw.canvas.background === 'string' && /^(?:#[\da-f]{3,8}|rgba?\([\d.,%\s]+\)|[a-z]+)$/i.test(raw.canvas.background)) project.canvas.background = raw.canvas.background;
   project.frame = normalizeFrame(raw.frame, project.canvas.preset, sanitize);
   project.safeArea = normalizeSafeArea(raw.safeArea, project.canvas, project.frame);
   const ids = new Set();
@@ -81,7 +82,7 @@ export function validateProject(raw, sanitize) {
     const id = typeof item.id === 'string' ? item.id : uid();
     if (ids.has(id)) throw new Error('草稿中存在重复标识');
     ids.add(id);
-    return normalizeItem({ ...item, id, content: sanitize(item.content, item.type) }, project.canvas, placementBounds(project));
+    return normalizeItem({ ...item, id, imported: item.imported === true, content: sanitize(item.content, item.type) }, project.canvas, placementBounds(project));
   });
   return project;
 }

@@ -1,12 +1,14 @@
-import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, normalizeItem, resizeProject, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
+import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, normalizeItem, constrainProject, resizeProject, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
 import { COMPONENTS } from './presets.js';
 import { icon, componentIcon } from './icons.js';
 import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
 import { renderComponentPreview, clearComponentPreview } from './component-preview.js';
-import { FRAME_STYLES, CAMERA_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLayout } from './frames.js';
+import { FRAME_STYLES, CAMERA_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLayout, systemBarInsets } from './frames.js';
 import { LIBRARY_KEY, PROJECT_KEY, readStorage, writeStorage, download, readFile } from './storage.js';
 import { alignItems, moveItems } from './layout.js';
 import { GUIDES_KEY, normalizeGuides, rulerMarkup } from './guides.js';
+import { normalizeSafeArea, placementBounds } from './safe-area.js';
+import { snapItems } from './snapping.js';
 
 const $ = id => document.getElementById(id);
 document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
@@ -14,7 +16,7 @@ const sharedStyles = document.createElement('style');
 sharedStyles.textContent = PROTOTYPE_CSS;
 document.head.append(sharedStyles);
 let library = clone(COMPONENTS);
-let project = { version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, frame: normalizeFrame({ camera: 'island' }), items: [] };
+let project = constrainProject({ version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, frame: normalizeFrame({ camera: 'island' }), items: [] });
 let selectedId = null;
 let selectedIds = new Set();
 let guides = normalizeGuides();
@@ -148,6 +150,7 @@ function updateZoom() {
 }
 function renderGuides(layout) {
   $('showRulers').checked = guides.rulers; $('showGrid').checked = guides.grid;
+  $('snapComponents').checked = guides.snap;
   $('gridSize').value = String(guides.gridSize);
   $('canvasGrid').hidden = !guides.grid;
   $('canvasGrid').style.setProperty('--grid-size', `${guides.gridSize}px`);
@@ -160,14 +163,49 @@ function renderGuides(layout) {
   }
 }
 function updateGuides() {
-  const next = normalizeGuides({ rulers: $('showRulers').checked, grid: $('showGrid').checked, gridSize: Number($('gridSize').value) });
+  const next = normalizeGuides({ rulers: $('showRulers').checked, grid: $('showGrid').checked, snap: $('snapComponents').checked, gridSize: Number($('gridSize').value) });
   finishGesture();
   guides = next;
   updateZoom();
   try { writeStorage(GUIDES_KEY, guides); }
   catch { notify('辅助线设置未保存，浏览器存储不可用或已满', true); }
 }
-for (const id of ['showRulers', 'showGrid', 'gridSize']) $(id).addEventListener('change', updateGuides);
+for (const id of ['showRulers', 'showGrid', 'gridSize', 'snapComponents']) $(id).addEventListener('change', updateGuides);
+function renderSafeArea() {
+  const area = project.safeArea;
+  const bounds = placementBounds(project);
+  $('safeAreaEnabled').checked = area.enabled;
+  for (const side of ['top', 'right', 'bottom', 'left']) $(`safe${side[0].toUpperCase()}${side.slice(1)}`).value = area[side];
+  $('safeAreaSummary').textContent = area.enabled ? `可放置区域：${bounds.width} × ${bounds.height} px，起点 (${bounds.x}, ${bounds.y})` : '安全区限制已关闭';
+  $('canvasSafeArea').hidden = !area.enabled;
+  Object.assign($('canvasSafeArea').style, { left: `${bounds.x}px`, top: `${bounds.y}px`, width: `${bounds.width}px`, height: `${bounds.height}px` });
+}
+function applySafeArea(event) {
+  event.preventDefault();
+  if (!$('safeAreaForm').reportValidity()) { $('safeAreaEnabled').checked = project.safeArea.enabled; return; }
+  const raw = { enabled: $('safeAreaEnabled').checked };
+  for (const side of ['top', 'right', 'bottom', 'left']) raw[side] = Number($(`safe${side[0].toUpperCase()}${side.slice(1)}`).value);
+  const bars = systemBarInsets(project.frame);
+  if (raw.left + raw.right >= project.canvas.width || raw.top + raw.bottom >= project.canvas.height - bars.top - bars.bottom) {
+    $('safeAreaError').textContent = '左右或上下留白总和过大，请至少保留 1 px 的可放置区域';
+    $('safeAreaEnabled').checked = project.safeArea.enabled;
+    return;
+  }
+  finishGesture();
+  project.safeArea = normalizeSafeArea(raw, project.canvas, project.frame);
+  $('safeAreaError').textContent = '';
+  commit(); notify(raw.enabled ? '安全区已应用，组件已约束在可放置区域内' : '安全区限制已关闭');
+}
+$('safeAreaForm').addEventListener('submit', applySafeArea);
+$('safeAreaEnabled').addEventListener('change', applySafeArea);
+function renderSnapGuides(lines = []) {
+  $('canvasSnapGuides').replaceChildren(...lines.map(line => {
+    const element = document.createElement('span');
+    element.className = `snap-guide ${line.axis === 'x' ? 'vertical' : 'horizontal'}`;
+    element.style[line.axis === 'x' ? 'left' : 'top'] = `${line.position}px`;
+    return element;
+  }));
+}
 let lastDeviceMarkup = '';
 function renderDevice() {
   const device = deviceMarkup(project.canvas, project.frame);
@@ -223,7 +261,7 @@ function renderCanvas() {
   $('emptyHint').hidden = project.items.length > 0;
   $('componentCount').textContent = `${project.items.length} 个组件`;
   $('undoBtn').disabled = !history.canUndo; $('redoBtn').disabled = !history.canRedo;
-  updateZoom(); renderProperties(); renderLayers();
+  updateZoom(); renderProperties(); renderLayers(); renderSafeArea();
 }
 function select(id, toggle = false) {
   if (!project.items.some(item => item.id === id)) id = null;
@@ -236,10 +274,10 @@ function select(id, toggle = false) {
   for (const [key, node] of itemNodes) node.classList.toggle('selected', selectedIds.has(key));
   renderProperties(); renderLayers();
 }
-function commit() { history.push(project); renderCanvas(); scheduleSave(); }
+function commit() { project = constrainProject(project); history.push(project); renderCanvas(); scheduleSave(); }
 function add(component, x = 40, y = 40) {
   if (project.items.length >= MAX_ITEMS) throw new Error('单个画布最多 200 个组件');
-  const item = createItem(component, project.canvas, x, y);
+  const item = createItem(component, project.canvas, x, y, placementBounds(project));
   project.items.push(item); selectedId = item.id; selectedIds = new Set([item.id]);
   commit(); notify(`已添加「${item.name}」`);
 }
@@ -263,6 +301,7 @@ function restore(direction) {
   renderCanvas(); scheduleSave();
 }
 function finishGesture(cancel = false) {
+  renderSnapGuides();
   if (!gesture) return;
   const old = gesture; gesture = null;
   const changed = project.items.some(item => old.starts.has(item.id) && (item.x !== old.starts.get(item.id).x || item.y !== old.starts.get(item.id).y));
@@ -285,7 +324,8 @@ $('canvas').addEventListener('pointerdown', event => {
 });
 $('canvas').addEventListener('pointermove', event => {
   if (!gesture || event.pointerId !== gesture.pointerId) return;
-  project = moveItems(project, gesture.starts, (event.clientX - gesture.clientX) / zoom, (event.clientY - gesture.clientY) / zoom);
+  const snapped = snapItems(project, gesture.starts, (event.clientX - gesture.clientX) / zoom, (event.clientY - gesture.clientY) / zoom, zoom, guides.snap && !event.altKey);
+  project = snapped.project; renderSnapGuides(snapped.guides);
   for (const item of project.items) if (gesture.starts.has(item.id)) {
     const node = itemNodes.get(item.id); node.style.left = `${item.x}px`; node.style.top = `${item.y}px`;
   }
@@ -315,6 +355,9 @@ $('canvas').addEventListener('drop', safeAction(event => {
   if (!component) return;
   const point = clientToCanvas(event.clientX, event.clientY, $('canvas').getBoundingClientRect(), zoom);
   add(component, point.x, point.y);
+  const item = selectedItem();
+  project = snapItems(project, new Map([[item.id, { x: item.x, y: item.y }]]), 0, 0, zoom, guides.snap && !event.altKey).project;
+  commit();
 }));
 $('componentSearch').addEventListener('input', renderLibrary);
 $('layerList').addEventListener('click', event => { const button = event.target.closest('[data-item-id]'); if (button) select(button.dataset.itemId, event.shiftKey); });
@@ -382,7 +425,7 @@ $('statusTime').addEventListener('change', safeAction(() => {
 $('statusBattery').addEventListener('change', () => updateFrame({ battery: $('statusBattery').value }));
 $('selectionProps').addEventListener('submit', safeAction(event => {
   event.preventDefault(); const item = selectedItem(); if (!item) return;
-  const next = normalizeItem({ ...item, name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: $('propPadding').value, margin: $('propMargin').value }, project.canvas);
+  const next = normalizeItem({ ...item, name: $('propName').value.trim(), x: $('propX').value, y: $('propY').value, width: $('propW').value, height: $('propH').value, radius: $('propRadius').value, padding: $('propPadding').value, margin: $('propMargin').value }, project.canvas, placementBounds(project));
   project.items[project.items.indexOf(item)] = next;
   commit(); notify('组件属性已更新');
 }));

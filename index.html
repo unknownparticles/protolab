@@ -73,6 +73,8 @@
             <div class="canvas-caption"><span>画板 01</span><span id="artboardSize">375 × 667</span></div>
             <div id="deviceShell" class="device-shell"><div class="canvas-container prototype" id="canvas" tabindex="0" aria-label="原型画布">
               <div class="canvas-grid" id="canvasGrid" hidden aria-hidden="true"></div>
+              <div class="canvas-safe-area" id="canvasSafeArea" hidden aria-hidden="true"></div>
+              <div class="canvas-snap-guides" id="canvasSnapGuides" aria-hidden="true"></div>
               <div class="empty-canvas-hint" id="emptyHint"><span class="empty-icon" data-icon="pointer"></span><strong>让想法，从这里开始</strong><span>从左侧拖拽组件到画布<br>也可以点击组件快速添加</span><span class="empty-chip">拖拽 · 编辑 · 导出</span></div>
             </div></div>
           </div>
@@ -99,6 +101,7 @@
           </form>
         </section>
         <section class="prop-section">
+          <label class="checkbox-field"><input type="checkbox" id="snapComponents" checked>拖动吸附</label><p class="field-help">靠近中心或边缘时自动吸附；按住 Alt 临时跳过。</p>
           <div class="section-label">对齐与居中 <span id="selectionCount">未选中</span></div>
           <label class="field">对齐参照<select id="alignReference"><option value="canvas">画布</option><option value="selection">所选组件</option></select></label>
           <div class="alignment-actions" id="alignmentActions" role="group" aria-label="对齐与居中">
@@ -108,6 +111,19 @@
           </div><p class="field-help alignment-help">按住 Shift 点击画布或图层可多选。以画布为参照时，各组件分别对齐；以所选组件为参照时，至少选择两个组件。</p>
         </section>
         <section class="prop-section"><div class="section-label">画布设置</div><label class="field">网格间距<select id="gridSize"><option value="5">5 px</option><option value="10">10 px</option><option value="20" selected>20 px</option><option value="40">40 px</option><option value="50">50 px</option><option value="100">100 px</option></select></label><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
+        <section class="prop-section">
+          <div class="section-label">安全区</div>
+          <form id="safeAreaForm">
+            <label class="checkbox-field"><input type="checkbox" id="safeAreaEnabled">启用安全区限制</label>
+            <p class="field-help">从顶部系统栏以下、底部导航栏以上计算额外留白；留白内不能放置组件。</p>
+            <div class="field-grid"><label class="field">上侧留白 px<input id="safeTop" type="number" min="0" max="2000" value="0" required></label><label class="field">下侧留白 px<input id="safeBottom" type="number" min="0" max="2000" value="0" required></label></div>
+            <div class="field-grid"><label class="field">左侧留白 px<input id="safeLeft" type="number" min="0" max="2000" value="0" required></label><label class="field">右侧留白 px<input id="safeRight" type="number" min="0" max="2000" value="0" required></label></div>
+            <p class="field-help" id="safeAreaSummary"></p>
+            <p class="field-help">应用后自动移入越界组件；过大组件缩小到可用尺寸。可撤销。缩小画布时留白自动收缩。</p>
+            <p class="form-error" id="safeAreaError" role="alert"></p>
+            <button class="btn apply-button" type="submit">应用安全区</button>
+          </form>
+        </section>
         <section class="prop-section">
           <div class="section-label">设备外框</div>
           <label class="field">设备类型<select id="frameDevice"><option value="phone">手机</option><option value="tablet">平板</option><option value="pc">电脑</option></select></label>

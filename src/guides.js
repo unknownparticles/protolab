@@ -1,6 +1,6 @@
 export const GUIDES_KEY = 'protolab.guides.v1';
 export function normalizeGuides(raw = {}) {
-  return { rulers: raw?.rulers !== false, grid: raw?.grid === true,
+  return { rulers: raw?.rulers !== false, grid: raw?.grid === true, snap: raw?.snap !== false,
     gridSize: [5, 10, 20, 40, 50, 100].includes(raw?.gridSize) ? raw.gridSize : 20 };
 }
 /** 刻度间距随缩放调整；文字保持屏幕字号，标签使用实际像素。 */
