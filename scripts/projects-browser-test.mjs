@@ -124,7 +124,7 @@ try {
 
   await page.locator('#projectSelect').selectOption(shopId);
   await send('modify', '等待产生待合并版本'); await page.waitForTimeout(100);
-  await page.locator('#canvasTab').click(); await page.locator('#canvasWidthInput').fill('1200'); await page.locator('#applyCanvasSizeBtn').click();
+  await page.locator('#canvasPropertiesTab').click(); await page.locator('#canvasWidthInput').fill('1200'); await page.locator('#applyCanvasSizeBtn').click();
   release(); await waitDone(); await saved(); assert.equal(await page.locator('#aiPending').isVisible(), true);
   await page.locator('#projectSelect').selectOption(originalId); assert.equal(await page.locator('#aiPending').isVisible(), false);
   await page.locator('#projectSelect').selectOption(shopId); assert.equal(await page.locator('#aiPending').isVisible(), true);
