@@ -22,10 +22,11 @@ try {
   const selected = () => page.locator('.editor-item.selected > .prototype-item');
   const add = async id => { await page.locator('#basicTab').click(); await page.locator(`[data-comp-id="${id}"]`).click(); };
   const custom = async (name, content, type = 'html') => {
+    await page.locator('#customTab').click();
     await page.locator(type === 'svg' ? '#addSvgCompBtn' : '#addHtmlCompBtn').click();
     await page.locator('#customName').fill(name); await page.locator('#customCode').fill(content);
     await page.locator('#componentForm button[type=submit]').click();
-    await page.locator('#customList button').filter({ hasText: name }).click();
+    await page.locator('#customList .component-item').filter({ hasText: name }).click();
   };
   assert.ok(await page.locator('#basicPanel').isVisible()); assert.ok(await page.locator('#vectorPanel').isHidden());
   await page.locator('#vectorTab').click(); assert.ok(await page.locator('#basicPanel').isHidden());
@@ -89,9 +90,9 @@ try {
   await large.waitForFunction(() => document.querySelector('.editor-item img')?.getAttribute('src')?.length > 100000);
   await large.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await large.reload(); assert.equal(await large.locator('.editor-item img').getAttribute('src'), source);
-  await large.locator('#addHtmlCompBtn').click(); await large.locator('#customName').fill('含大图片的组件');
+  await large.locator('#customTab').click(); await large.locator('#addHtmlCompBtn').click(); await large.locator('#customName').fill('含大图片的组件');
   await large.locator('#customCode').fill(`<div><img src="${source}"><img src="${source}"></div>`);
-  await large.locator('#componentForm button[type=submit]').click(); await large.locator('#customList button').click();
+  await large.locator('#componentForm button[type=submit]').click(); await large.locator('#customList .component-item').click();
   assert.equal(await large.locator('.editor-item.selected img').count(), 2); await large.close();
   const smallSource = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jG4cAAAAASUVORK5CYII=';
   const smallUpload = { name: 'small.png', mimeType: 'image/png', buffer: Buffer.from(smallSource.split(',')[1], 'base64') };
