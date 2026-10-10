@@ -23,7 +23,8 @@ try {
   const card = item('card', '<div style="width:100%;height:100%;padding:20px;background:#f8fafc"><strong>原始标题</strong><p>保留正文 <b>强调</b> 尾部</p></div>', 40, 40, 240, 128, { interaction: { type: 'navigate', targetId: 'details' } });
   const input = item('input', '<input placeholder="原始提示" value="原始值" style="width:100%;height:100%">', 40, 220, 220, 40);
   const vector = item('vector', '<svg width="100%" height="100%" viewBox="0 0 180 100"><text x="10" y="50">矢量文字</text></svg>', 330, 40, 180, 100, { type: 'svg' });
-  const board = { canvas, frame, safeArea: { enabled: false }, items: [card, input, vector] };
+  const plain = item('plain', '直接文字', 40, 350, 180, 32);
+  const board = { canvas, frame, safeArea: { enabled: false }, items: [card, input, vector, plain] };
   const data = { version: 1, ...board, activePageId: 'home', startPageId: 'home', pages: [
     { id: 'home', name: '首页', kind: 'page', ...board },
     { id: 'details', name: '详情', kind: 'page', canvas, frame, items: [item('open', '<button>打开弹窗</button>', 40, 40, 180, 60, { interaction: { type: 'openPopup', targetId: 'popup' } })] },
@@ -60,6 +61,8 @@ try {
   assert.equal(await preview.locator('[data-name="input"] input').getAttribute('placeholder'), '新提示');
   await edit(preview.locator('[data-name="vector"] text'), '新矢量文字');
   await preview.locator('[data-name="vector"] text').filter({ hasText: '新矢量文字' }).waitFor();
+  await edit(preview.locator('[data-name="plain"] .prototype-content'), '新直接文字');
+  await preview.locator('[data-name="plain"]').filter({ hasText: '新直接文字' }).waitFor();
   console.log('通过：多段与嵌套文字独立编辑、空文字恢复、表单提示与值、矢量文字、编辑时阻止跳转');
 
   await preview.locator('[data-name="card"]').click({ position: { x: 10, y: 10 } });
@@ -98,7 +101,12 @@ try {
   await preview.locator('[data-name="popup-text"]').click(); await drag('e', 20, 0);
   await preview.locator('[data-name="popup-text"]').evaluate(node => new Promise(resolve => { const timer = setInterval(() => { if (node.style.width === '200px') { clearInterval(timer); resolve(); } }, 10); }));
   await page.locator('[data-close="previewDialog"]').click();
-  await page.locator('#undoBtn').click(); await page.locator('#redoBtn').click();
+  await page.locator('#undoBtn').click();
+  const undoneEvent = page.waitForEvent('download'); await page.locator('#exportProjectBtn').click();
+  const undone = JSON.parse(await readFile(await (await undoneEvent).path(), 'utf8')).project;
+  assert.equal(undone.pages.find(page => page.id === 'popup').items[0].width, 180);
+  assert.match(undone.pages.find(page => page.id === 'popup').items[0].content, /新弹窗文字/);
+  await page.locator('#redoBtn').click();
   await page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
   await page.reload();
   const event = page.waitForEvent('download'); await page.locator('#exportProjectBtn').click();

@@ -30,7 +30,7 @@ export function updateTextContent(item, values) {
         if (!node.parentElement) { const span = document.createElement('span'); node.replaceWith(span); span.append(node); }
         node.parentElement.setAttribute('data-protolab-text', 'true');
       }
-      else if (node.nodeType === 3) node.parentElement.removeAttribute('data-protolab-text');
+      else if (node.nodeType === 3) node.parentElement?.removeAttribute('data-protolab-text');
     }
   });
   return sanitizeContent(template.innerHTML, item.type);
