@@ -1,3 +1,4 @@
+import { normalizeFrame } from './frames.js';
 /** 与 DOM 无关的画布模型；坐标始终使用实际画布像素。 */
 export const PRESETS = Object.freeze({
   phone: { width: 375, height: 667, label: '手机' },
@@ -34,13 +35,13 @@ export function normalizeItem(item, canvas) {
 }
 export function resizeProject(project, width, height, preset = 'custom') {
   const canvas = { width: number(width, 375, 100, 2000), height: number(height, 667, 100, 2000), preset };
-  return { ...project, canvas, items: project.items.map(item => normalizeItem(item, canvas)) };
+  return { ...project, canvas, ...(project.frame ? { frame: normalizeFrame(project.frame, preset) } : {}), items: project.items.map(item => normalizeItem(item, canvas)) };
 }
 export function createItem(component, canvas, x = 40, y = 40) {
   return normalizeItem({
     id: uid(), name: component.name, type: component.type,
     content: component.content, x, y, width: component.defaultWidth,
-    height: component.defaultHeight, radius: 8, padding: '0', margin: '0',
+    height: component.defaultHeight, radius: component.type === 'svg' ? 0 : 8, padding: '0', margin: '0',
   }, canvas);
 }
 export function validateLibrary(raw, sanitize) {
@@ -59,13 +60,14 @@ export function validateLibrary(raw, sanitize) {
     if (seen.has(id)) throw new Error('组件库中存在重复标识');
     seen.add(id);
     return { id, name: entry.name.trim().slice(0, 80), type, content: safe,
-      builtin: entry.builtin === true || entry.type === 'preset',
+      builtin: entry.builtin === true || entry.type === 'preset', category: type === 'svg' ? 'vector' : 'basic',
       defaultWidth: number(entry.defaultWidth, 120, 1, 2000), defaultHeight: number(entry.defaultHeight, 60, 1, 2000) };
   });
 }
 export function validateProject(raw, sanitize) {
   if (!raw || raw.version !== 1 || !raw.canvas || !Array.isArray(raw.items) || raw.items.length > MAX_ITEMS) throw new Error('草稿格式不正确');
   const project = resizeProject({ version: 1, items: [] }, raw.canvas.width, raw.canvas.height, PRESETS[raw.canvas.preset] ? raw.canvas.preset : 'custom');
+  project.frame = normalizeFrame(raw.frame, project.canvas.preset, sanitize);
   const ids = new Set();
   project.items = raw.items.map(item => {
     if (!item || !['html', 'svg', 'image'].includes(item.type) || typeof item.content !== 'string' || item.content.length > (item.type === 'image' ? MAX_IMAGE * 1.4 : MAX_CODE)) throw new Error('草稿组件格式不正确');

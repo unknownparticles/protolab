@@ -6,4 +6,22 @@ export const COMPONENTS = [
   { id: 'lib-image', name: '图片占位', type: 'html', defaultWidth: 200, defaultHeight: 140, content: '<div style="width:100%;height:100%;background:#f1f5f9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#94a3b8"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 3-3 5 5"/></svg><span style="font-size:12px">图片占位</span></div>' },
   { id: 'lib-svg-star', name: 'SVG 星星', type: 'svg', defaultWidth: 60, defaultHeight: 60, content: '<svg viewBox="0 0 24 24" fill="#f59e0b" width="100%" height="100%"><path d="M12 2L15 9H22L16 14L19 21L12 16.5L5 21L8 14L2 9H9L12 2Z"/></svg>' },
   { id: 'lib-avatar', name: '头像', type: 'html', defaultWidth: 56, defaultHeight: 56, content: '<div style="width:100%;height:100%;background:#dbeafe;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#2563eb;font-weight:600;font-size:20px">A</div>' },
-].map(component => ({ ...component, builtin: true }));
+  { id: 'lib-slider', name: '滑杆', type: 'html', defaultWidth: 220, defaultHeight: 32, content: '<input type="range" min="0" max="100" value="50" aria-label="滑杆" style="width:100%">' },
+  { id: 'lib-textarea', name: '多行文本框', type: 'html', defaultWidth: 240, defaultHeight: 100, content: '<textarea placeholder="请输入多行文本…" rows="3" style="width:100%;height:100%;padding:12px;border:1px solid #cbd5e1;border-radius:inherit;font-size:14px;background:#fff"></textarea>' },
+  { id: 'lib-checkbox', name: '复选框', type: 'html', defaultWidth: 120, defaultHeight: 32, content: '<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" checked>记住选择</label>' },
+  { id: 'lib-radio', name: '单选框', type: 'html', defaultWidth: 120, defaultHeight: 32, content: '<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="radio">选择此项</label>' },
+  { id: 'lib-select', name: '下拉选择', type: 'html', defaultWidth: 200, defaultHeight: 40, content: '<select aria-label="下拉选择" style="width:100%;height:100%;padding:8px;border:1px solid #cbd5e1;border-radius:inherit;background:#fff;font-size:14px"><option>请选择</option><option>选项一</option><option>选项二</option></select>' },
+  { id: 'lib-switch', name: '开关', type: 'html', defaultWidth: 52, defaultHeight: 32, content: '<label style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#dbeafe;border-radius:16px"><input type="checkbox" role="switch" checked aria-label="开关" style="width:22px;height:22px"></label>' },
+  { id: 'lib-progress', name: '进度条', type: 'html', defaultWidth: 220, defaultHeight: 16, content: '<div role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width:100%;height:100%;border-radius:8px;background:#e2e8f0;overflow:hidden"><div style="width:60%;height:100%;background:#2563eb;border-radius:8px"></div></div>' },
+  { id: 'lib-divider', name: '分隔线', type: 'html', defaultWidth: 240, defaultHeight: 4, content: '<div style="width:100%;height:1px;background:#cbd5e1"></div>' },
+  ...[
+    ['point', '点', 12, 12, '<circle cx="50" cy="50" r="42" fill="#2563eb"/>'],
+    ['line', '线段', 180, 12, '<line x1="2" y1="50" x2="98" y2="50" stroke="#2563eb" stroke-width="4"/>'],
+    ['rect', '矩形', 160, 100, '<rect x="2" y="2" width="96" height="96" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>'],
+    ['circle', '圆形', 100, 100, '<circle cx="50" cy="50" r="47" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>'],
+    ['ellipse', '椭圆', 160, 90, '<ellipse cx="50" cy="50" rx="47" ry="47" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>'],
+    ['triangle', '三角形', 100, 90, '<polygon points="50,3 97,97 3,97" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>'],
+    ['arrow', '箭头', 180, 24, '<path d="M2 50H95M80 15L97 50L80 85" fill="none" stroke="#2563eb" stroke-width="4" stroke-linejoin="round"/>'],
+    ['diamond', '菱形', 100, 100, '<polygon points="50,3 97,50 50,97 3,50" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>'],
+  ].map(([id, name, defaultWidth, defaultHeight, shape]) => ({ id: `lib-svg-${id}`, name, type: 'svg', defaultWidth, defaultHeight, content: `<svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="100%">${shape}</svg>` })),
+].map(component => ({ ...component, builtin: true, category: component.type === 'svg' ? 'vector' : 'basic' }));

@@ -35,12 +35,15 @@
   </nav>
   <main class="workspace">
     <aside class="sidebar" id="libraryPanel" aria-label="组件库">
-      <div class="panel-heading"><h1>组件库</h1><span class="badge" id="libCount">7</span></div>
+      <div class="panel-heading"><h1>组件库</h1><span class="badge" id="libCount">23</span></div>
       <p class="panel-description">拖拽到画布，或点击快速添加</p>
       <label class="search-box"><span data-icon="search"></span><input id="componentSearch" type="search" placeholder="搜索组件…" aria-label="搜索组件"></label>
       <div class="library-scroll">
-        <div class="section-label">基础组件 <span>BUILT-IN</span></div>
+        <div class="section-label">普通组件 <span id="basicCount">14</span></div>
         <div class="component-list" id="presetList"></div>
+        <div class="section-label">矢量图形 <span id="vectorCount">9</span></div>
+        <div class="component-list vector-list" id="vectorList"></div>
+        <p class="custom-empty" id="libraryEmpty" hidden>没有找到匹配的组件</p>
         <div class="section-label">我的组件 <span id="customCount">0</span></div>
         <div class="component-list" id="customList"></div>
         <p class="custom-empty" id="customEmpty">把常用的设计，变成自己的组件。</p>
@@ -66,9 +69,9 @@
         <div class="canvas-stage" id="canvasStage">
           <div class="canvas-scaler" id="canvasScaler">
             <div class="canvas-caption"><span>画板 01</span><span id="artboardSize">375 × 667</span></div>
-            <div class="canvas-container prototype" id="canvas" tabindex="0" aria-label="原型画布">
+            <div id="deviceShell" class="device-shell"><div class="canvas-container prototype" id="canvas" tabindex="0" aria-label="原型画布">
               <div class="empty-canvas-hint" id="emptyHint"><span class="empty-icon" data-icon="pointer"></span><strong>让想法，从这里开始</strong><span>从左侧拖拽组件到画布<br>也可以点击组件快速添加</span><span class="empty-chip">拖拽 · 编辑 · 导出</span></div>
-            </div>
+            </div></div>
           </div>
         </div>
       </div>
@@ -92,6 +95,18 @@
           </form>
         </section>
         <section class="prop-section"><div class="section-label">画布设置</div><form id="canvasSizeForm"><div class="field-grid"><label class="field">宽度<input id="canvasWidthInput" type="number" min="100" max="2000" value="375" required></label><label class="field">高度<input id="canvasHeightInput" type="number" min="100" max="2000" value="667" required></label></div><p class="field-help">100～2000 px · 缩小画布自动约束组件</p><button class="btn apply-button" type="submit" id="applyCanvasSizeBtn">更新画布</button></form></section>
+        <section class="prop-section">
+          <div class="section-label">设备外框</div>
+          <label class="field">设备类型<select id="frameDevice"><option value="phone">手机</option><option value="tablet">平板</option><option value="pc">电脑</option></select></label>
+          <label class="field">外框样式<select id="frameStyle"></select></label>
+          <button class="btn apply-button" id="editFrameBtn">编辑自定义 HTML 外框</button>
+          <div id="systemBarSettings">
+            <label class="checkbox-field"><input type="checkbox" id="showStatusBar">显示顶部时间电量栏</label>
+            <div class="field-grid" id="statusBarFields"><label class="field">时间<input id="statusTime" value="9:41" maxlength="5" placeholder="9:41"></label><label class="field">电量 %<input id="statusBattery" type="number" min="0" max="100" value="100"></label></div>
+            <label class="field">底部导航栏<select id="navigationStyle"><option value="none">隐藏</option><option value="gesture">手势横条</option><option value="buttons">三键导航</option></select></label>
+            <p class="field-help">系统栏覆盖画布顶部 28 px、底部 28 / 40 px，设计时请留出空间。</p>
+          </div>
+        </section>
         <section class="prop-section"><div class="section-label">图层 <span id="layerCount">0</span></div><div class="layer-list" id="layerList"></div><p class="field-help" id="layerEmpty">添加组件后在这里快速选中。</p><div class="layer-actions" id="layerActions" hidden><button class="btn btn-sm" id="layerUpBtn" title="上移一层">上移一层</button><button class="btn btn-sm" id="layerDownBtn" title="下移一层">下移一层</button></div></section>
       </div>
       <div class="properties-footer"><span class="local-dot"></span>你的设计，只保存在本地</div>
@@ -102,6 +117,7 @@
   <input type="file" id="imgFileInput" hidden accept="image/png,image/jpeg,image/gif,image/webp,image/avif">
   <dialog id="componentDialog"><form id="componentForm"><div class="dialog-heading"><h2 id="dialogTitle">新建 HTML 组件</h2><button class="btn btn-icon" type="button" data-close="componentDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">将常用的界面片段保存到组件库，随时复用。</p><label class="field">组件名称<input id="customName" maxlength="80" placeholder="例如：欢迎卡片" required></label><div class="field-grid"><label class="field">默认宽度<input id="customWidth" type="number" min="1" max="2000" value="200" required></label><label class="field">默认高度<input id="customHeight" type="number" min="1" max="2000" value="100" required></label></div><label class="field" id="codeField">组件代码<textarea id="customCode" rows="8" maxlength="100000" spellcheck="false" required></textarea></label><p class="field-help">支持静态 HTML / SVG 和内联样式；图片可单独上传。</p><p class="form-error" id="componentError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="componentDialog">取消</button><button class="btn btn-primary" type="submit">添加到组件库</button></div></form></dialog>
   <dialog id="previewDialog" class="preview-dialog"><div class="dialog-heading"><h2>原型预览 <small>与 HTML 导出一致</small></h2><button class="btn btn-icon" data-close="previewDialog" aria-label="关闭预览"><span data-icon="close"></span></button></div><iframe id="previewFrame" title="原型预览" sandbox=""></iframe></dialog>
+  <dialog id="frameDialog"><form id="frameForm"><div class="dialog-heading"><h2>自定义 HTML 外框</h2><button class="btn btn-icon" type="button" data-close="frameDialog" aria-label="关闭"><span data-icon="close"></span></button></div><p class="dialog-description">HTML 绘制画布周围的外框装饰，画布会按以下留白嵌入。支持静态 HTML / SVG 和内联样式，宽高 100% 对应整个外框。</p><div class="field-grid"><label class="field">顶部留白 px<input id="frameTop" type="number" min="0" max="200" required></label><label class="field">右侧留白 px<input id="frameRight" type="number" min="0" max="200" required></label><label class="field">底部留白 px<input id="frameBottom" type="number" min="0" max="200" required></label><label class="field">左侧留白 px<input id="frameLeft" type="number" min="0" max="200" required></label></div><label class="field">外框 HTML<textarea id="frameCode" rows="8" maxlength="100000" spellcheck="false" required></textarea></label><p class="form-error" id="frameError" role="alert"></p><div class="dialog-actions"><button class="btn" type="button" data-close="frameDialog">取消</button><button class="btn btn-primary" type="submit">应用外框</button></div></form></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
   <noscript><div class="noscript">请启用 JavaScript 以使用原型设计器。</div></noscript>
 </body>

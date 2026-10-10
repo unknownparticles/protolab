@@ -1,7 +1,8 @@
 import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, MAX_CODE, uid, clone, number, normalizeItem, resizeProject, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
 import { COMPONENTS } from './presets.js';
 import { icon, componentIcon } from './icons.js';
-import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML } from './content.js';
+import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
+import { FRAME_STYLES, CUSTOM_FRAME_HTML, normalizeFrame, frameLayout } from './frames.js';
 import { LIBRARY_KEY, PROJECT_KEY, readStorage, writeStorage, download, readFile } from './storage.js';
 
 const $ = id => document.getElementById(id);
@@ -10,7 +11,7 @@ const sharedStyles = document.createElement('style');
 sharedStyles.textContent = PROTOTYPE_CSS;
 document.head.append(sharedStyles);
 let library = clone(COMPONENTS);
-let project = { version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, items: [] };
+let project = { version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, frame: normalizeFrame(), items: [] };
 let selectedId = null;
 let zoom = 1;
 let gesture = null;
@@ -19,6 +20,10 @@ let toastTimer;
 let customType = 'html';
 let imageData = null;
 let startupWarnings = [];
+function completeLibrary(values) {
+  const ids = new Set(COMPONENTS.map(component => component.id));
+  return validateLibrary([...COMPONENTS, ...values.filter(component => !ids.has(component.id))], sanitizeContent);
+}
 
 function notify(message, error = false) {
   $('toast').textContent = message;
@@ -49,10 +54,10 @@ function persistLibrary() {
 // 恢复失败不覆盖损坏的数据，以便用户仍可手动备份。
 try {
   const saved = readStorage(LIBRARY_KEY, value => validateLibrary(value, sanitizeContent));
-  if (saved) library = saved;
+  if (saved) library = completeLibrary(saved);
   else {
     const legacy = readStorage('proto_component_library', value => validateLibrary(value, sanitizeContent));
-    if (legacy) library = legacy;
+    if (legacy) library = completeLibrary(legacy);
   }
 } catch { startupWarnings.push('组件库读取失败，已使用基础组件'); }
 try {
@@ -65,19 +70,23 @@ const selectedItem = () => project.items.find(item => item.id === selectedId);
 
 function renderLibrary() {
   const query = $('componentSearch').value.trim().toLowerCase();
-  $('presetList').replaceChildren(); $('customList').replaceChildren();
+  $('presetList').replaceChildren(); $('vectorList').replaceChildren(); $('customList').replaceChildren();
   const visible = library.filter(component => component.name.toLowerCase().includes(query));
   for (const component of visible) {
     const button = document.createElement('button');
     button.className = 'component-item'; button.draggable = true; button.type = 'button';
     button.dataset.compId = component.id;
     button.title = `添加${component.name}（${component.defaultWidth} × ${component.defaultHeight}）`;
-    button.innerHTML = `<span class="component-symbol">${icon(componentIcon(component))}</span><span class="component-name">${escapeHTML(component.name)}</span><span class="drag-dots" aria-hidden="true">⠿</span>`;
-    $(component.builtin ? 'presetList' : 'customList').append(button);
+    const symbol = component.builtin && component.type === 'svg' ? component.content : icon(componentIcon(component));
+    button.innerHTML = `<span class="component-symbol">${symbol}</span><span class="component-name">${escapeHTML(component.name)}</span><span class="drag-dots" aria-hidden="true">⠿</span>`;
+    $(component.builtin ? component.type === 'svg' ? 'vectorList' : 'presetList' : 'customList').append(button);
   }
   const customCount = library.filter(component => !component.builtin).length;
   $('libCount').textContent = library.length;
   $('customCount').textContent = customCount;
+  $('basicCount').textContent = visible.filter(component => component.builtin && component.type !== 'svg').length;
+  $('vectorCount').textContent = visible.filter(component => component.builtin && component.type === 'svg').length;
+  $('libraryEmpty').hidden = visible.length > 0;
   $('customEmpty').hidden = visible.some(component => !component.builtin);
   $('customEmpty').textContent = query ? '没有找到匹配的自定义组件' : '把常用的设计，变成自己的组件。';
 }
@@ -105,19 +114,43 @@ function renderLayers() {
   $('layerDownBtn').disabled = index <= 0;
 }
 function updateZoom() {
+  const layout = frameLayout(project.canvas, project.frame);
   $('canvasScaler').style.transform = `scale(${zoom})`;
-  $('canvasStage').style.width = `${project.canvas.width * zoom}px`;
-  $('canvasStage').style.height = `${(project.canvas.height + 28) * zoom}px`;
+  $('canvasStage').style.width = `${layout.width * zoom}px`;
+  $('canvasStage').style.height = `${(layout.height + 28) * zoom}px`;
   const existing = [...$('zoomSelect').options].find(option => Number(option.value) === zoom);
   for (const option of [...$('zoomSelect').querySelectorAll('[data-custom]')]) if (option !== existing) option.remove();
   if (!existing) { const option = new Option(`${Math.round(zoom * 100)}%`, String(zoom)); option.dataset.custom = 'true'; $('zoomSelect').add(option); }
   $('zoomSelect').value = String(zoom);
 }
+let lastDeviceMarkup = '';
+function renderDevice() {
+  const device = deviceMarkup(project.canvas, project.frame);
+  const signature = device.className + device.style + device.inner;
+  if (signature !== lastDeviceMarkup) {
+    const canvas = $('canvas');
+    const shell = $('deviceShell');
+    canvas.remove(); shell.className = device.className; shell.style.cssText = device.style;
+    shell.innerHTML = device.inner; shell.querySelector('.device-screen').prepend(canvas);
+    shell.querySelector('.device-decoration').inert = true;
+    lastDeviceMarkup = signature;
+  }
+  $('canvasScaler').style.width = `${device.layout.width}px`;
+  const frame = project.frame;
+  $('frameDevice').value = frame.device;
+  $('frameStyle').replaceChildren(...Object.entries({ none: '无外框', ...FRAME_STYLES[frame.device], custom: '自定义 HTML' }).map(([value, label]) => new Option(label, value)));
+  $('frameStyle').value = frame.style;
+  $('systemBarSettings').hidden = frame.device === 'pc';
+  $('showStatusBar').checked = frame.statusBar;
+  $('statusBarFields').hidden = !frame.statusBar;
+  $('statusTime').value = frame.time; $('statusBattery').value = frame.battery;
+  $('navigationStyle').value = frame.navigation;
+}
 function renderCanvas() {
   const canvas = project.canvas;
   $('canvas').style.width = `${canvas.width}px`;
   $('canvas').style.height = `${canvas.height}px`;
-  $('canvasScaler').style.width = `${canvas.width}px`;
+  renderDevice();
   $('canvasWidthInput').value = canvas.width; $('canvasHeightInput').value = canvas.height;
   $('canvasSizeLabel').textContent = $('artboardSize').textContent = `${canvas.width} × ${canvas.height}`;
   $('presetLabel').textContent = `${PRESETS[canvas.preset]?.label || '自定义'} · ${canvas.width > canvas.height ? '横屏' : '竖屏'}`;
@@ -254,11 +287,12 @@ $('duplicateItemBtn').addEventListener('click', safeAction(duplicateSelected));
 $('undoBtn').addEventListener('click', () => restore('undo')); $('redoBtn').addEventListener('click', () => restore('redo'));
 $('zoomSelect').addEventListener('change', () => { finishGesture(); zoom = Number($('zoomSelect').value); updateZoom(); });
 function fitCanvas() {
+  const layout = frameLayout(project.canvas, project.frame);
   const viewport = $('canvasViewport');
   const computed = getComputedStyle(viewport);
   const availableWidth = viewport.clientWidth - parseFloat(computed.paddingLeft) - parseFloat(computed.paddingRight);
   const availableHeight = viewport.clientHeight - parseFloat(computed.paddingTop) - parseFloat(computed.paddingBottom);
-  zoom = Math.max(.1, Math.min(1, Math.floor(Math.min(availableWidth / project.canvas.width, availableHeight / (project.canvas.height + 28)) * 100) / 100));
+  zoom = Math.max(.1, Math.min(1, Math.floor(Math.min(availableWidth / layout.width, availableHeight / (layout.height + 28)) * 100) / 100));
   updateZoom();
 }
 $('fitBtn').addEventListener('click', fitCanvas);
@@ -268,8 +302,8 @@ $('importLibBtn').addEventListener('click', () => $('libFileInput').click());
 $('libFileInput').addEventListener('change', safeAction(async event => {
   const file = event.target.files[0]; event.target.value = ''; if (!file) return;
   if (file.size > MAX_LIBRARY_BYTES) throw new Error('组件库文件不能超过 12 MB');
-  const imported = validateLibrary(JSON.parse(await readFile(file)), sanitizeContent);
-  if (!confirm(`导入 ${imported.length} 个组件并替换当前组件库？画布中的组件会保留。建议先导出当前库。`)) return;
+  const imported = completeLibrary(validateLibrary(JSON.parse(await readFile(file)), sanitizeContent));
+  if (!confirm(`导入后组件库共 ${imported.length} 个组件，替换当前自定义组件，保留内置组件。画布中的组件会保留。建议先导出当前库。`)) return;
   library = imported; renderLibrary(); if (persistLibrary()) notify(`已导入 ${library.length} 个组件`);
 }));
 function openComponentDialog(type, data = null, name = '') {
