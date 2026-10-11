@@ -3,7 +3,7 @@ import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, contentS
 import { ORIENTATION_ACTIONS, normalizeOrientationResponse, orientationPresentation } from './orientation.js';
 import { COMPONENTS } from './presets.js';
 import { CONTAINERS, normalizeContainer } from './containers.js';
-import { IMAGE_FITS, BLEND_MODES, normalizeAppearance, spacingSides } from './appearance.js';
+import { IMAGE_FITS, BLEND_MODES, normalizeAppearance, normalizeColor, colorPickerValue, colorWithRGB, spacingSides } from './appearance.js';
 import { editableContent, updateTextContent, updateImageContent } from './content-editor.js';
 import { icon, componentIcon } from './icons.js';
 import { sanitizeContent, escapeHTML, itemHTML, PROTOTYPE_CSS, exportHTML, deviceMarkup } from './content.js';
@@ -405,7 +405,11 @@ function renderProperties() {
 }
 function syncColorPicker(field) {
   const value = $(field).value;
-  $(`${field}Picker`).value = /^#[\da-f]{6}$/i.test(value) ? value : /^#[\da-f]{3}$/i.test(value) ? '#' + [...value.slice(1)].map(char => char + char).join('') : '#000000';
+  $(`${field}Picker`).value = colorPickerValue(value);
+  const button = $(`${field}Transparent`);
+  button.setAttribute('aria-pressed', String(value.toLowerCase() === 'transparent'));
+  const swatch = $(field).closest('.color-field');
+  swatch.style.setProperty('--swatch-color', CSS.supports('color', value) ? value : 'transparent');
 }
 function renderPropertyImage() {
   const index = Number($('propImageTarget').value);
@@ -427,9 +431,10 @@ function readPropertyAppearance() {
 }
 $('propBlendMode').replaceChildren(...Object.entries(BLEND_MODES).map(([value, label]) => new Option(t(label), value)));
 $('propImageFit').append(...Object.entries(IMAGE_FITS).map(([value, label]) => new Option(t(label), value)));
-for (const field of ['propBackground', 'propColor', 'propTextColor']) {
+for (const field of ['propBackground', 'propColor', 'propTextColor', 'canvasBackground']) {
   $(field).addEventListener('input', () => syncColorPicker(field));
-  $(`${field}Picker`).addEventListener('input', event => { $(field).value = event.target.value; });
+  $(`${field}Picker`).addEventListener('input', event => { $(field).value = colorWithRGB($(field).value, event.target.value); syncColorPicker(field); });
+  $(`${field}Transparent`).addEventListener('click', () => { $(field).value = 'transparent'; syncColorPicker(field); });
 }
 $('propImageTarget').addEventListener('change', renderPropertyImage);
 $('propImageSource').addEventListener('input', () => {
@@ -698,6 +703,7 @@ function renderCanvas() {
   $('canvas').style.backgroundColor = canvas.background || '#fff';
   renderDevice();
   $('canvasWidthInput').value = canvas.width; $('canvasHeightInput').value = canvas.height;
+  $('canvasBackground').value = canvas.background || '#ffffff'; syncColorPicker('canvasBackground');
   $('canvasSizeLabel').textContent = $('artboardSize').textContent = `${canvas.width} × ${canvas.height}`;
   $('presetLabel').textContent = `${t(PRESETS[canvas.preset]?.label || '自定义')} · ${canvas.width > canvas.height ? t('横屏') : t('竖屏')}`;
   document.querySelectorAll('[data-preset]').forEach(button => { const active = button.dataset.preset === canvas.preset; button.classList.toggle('active', active); button.setAttribute('aria-checked', String(active)); });
@@ -895,7 +901,12 @@ document.querySelectorAll('[data-preset]').forEach(button => button.addEventList
   project = resizeProject(project, PRESETS[key].width, PRESETS[key].height, key); commit(t('切换画布预设'));
 }));
 $('rotateBtn').addEventListener('click', () => { finishGesture(); project = rotateProject(project); commit(t('旋转画布')); });
-$('canvasSizeForm').addEventListener('submit', event => { event.preventDefault(); finishGesture(); project = resizeProject(project, $('canvasWidthInput').value, $('canvasHeightInput').value); commit(t('调整画布尺寸')); notify(t('画布尺寸已更新')); });
+$('canvasSizeForm').addEventListener('submit', safeAction(event => {
+  event.preventDefault();
+  const background = normalizeColor($('canvasBackground').value || '#ffffff');
+  finishGesture(); project = resizeProject(project, $('canvasWidthInput').value, $('canvasHeightInput').value);
+  project.canvas.background = background; commit(t('调整画布尺寸与背景')); notify(t('画布设置已更新'));
+}));
 function updateFrame(changes) {
   finishGesture();
   project.frame = normalizeFrame({ ...project.frame, ...changes }, 'custom', sanitizeContent);
