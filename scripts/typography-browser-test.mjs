@@ -61,6 +61,7 @@ try {
 
   await page.locator('#previewBtn').click();
   const preview = page.frameLocator('#previewFrame');
+  console.log(await preview.locator('[data-name="button"]').evaluate(node => ({ style: node.style.cssText, basis: node.dataset.textBasis, rect: node.getBoundingClientRect().toJSON(), metrics: !!node.textMetrics, html: node.innerHTML })));
   assert.equal(await preview.locator('[data-name="button"] button').evaluate(element => parseFloat(getComputedStyle(element).fontSize)), 28);
   await preview.getByRole('button', { name: '编辑文字与尺寸', exact: true }).click();
   await preview.locator('[data-name="text"]').click({ position: { x: 5, y: 5 } });
