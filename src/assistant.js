@@ -37,6 +37,16 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiPanel').hidden = !open;
     $('aiToggleBtn').setAttribute('aria-expanded', String(open));
     if (open) renderMode();
+    else if ($('aiPanel').contains(document.activeElement)) $('aiToggleBtn').focus();
+  }
+  function renderRequestState() {
+    const busy = !!controller;
+    $('aiProgress').hidden = !busy;
+    $('aiToggleProgress').hidden = !busy;
+    $('aiForm').setAttribute('aria-busy', String(busy));
+    $('aiRequirement').disabled = busy;
+    const mode = $('aiMode').value;
+    $('aiSendBtn').textContent = busy ? t('正在生成…') : mode === 'image' ? t('根据图片生成 UI') : mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : mode === 'popup' ? t('生成弹窗') : t('生成页面');
   }
   function renderMessages() {
     $('aiMessages').replaceChildren();
@@ -57,6 +67,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiSendBtn').disabled ||= !!generated;
     $('aiSendBtn').disabled ||= imageLoading;
     for (const id of ['aiImageFile', 'aiImageRemoveBtn', 'aiTarget', 'aiRefName', 'aiRefWidth', 'aiRefHeight', 'aiRefColor', 'aiRefFunction', 'aiRefBodyFont', 'aiRefTitleFont', 'aiRefSmallFont', 'aiRefGap']) $(id).disabled = !!controller || !!pending || !!generated || imageLoading;
+    renderRequestState();
   }
   function addMessage(role, content) { messages.push({ role, content }); renderMessages(); scheduleSave(); }
   function renderVersions() {
@@ -301,7 +312,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     refreshTargets();
     renderLayoutReference();
     $('aiModeHelp').textContent = mode === 'image' ? t('上传界面图片，AI 还原布局和文案，拆分可编辑组件并自动命名，预览后添加为新页面。') : mode === 'modify' ? t('发送当前工程和最近对话，修改当前页。') : mode === 'component' ? t('根据提示词和规范独立生成组件，预览后保存到当前工程组件库。') : mode === 'popup' ? t('根据提示词、参考图片和基础信息生成弹窗，预览后添加为新弹窗。') : t('根据提示词和规范独立生成页面，预览后添加为新页面。');
-    $('aiSendBtn').textContent = mode === 'image' ? t('根据图片生成 UI') : mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : mode === 'popup' ? t('生成弹窗') : t('生成页面');
+    renderRequestState();
     const design = getDesignAssets?.().context;
     $('aiRulesSummary').textContent = mode === 'image' ? t('优先还原图片的布局、颜色和原文案；提示词可留空，也可填写额外要求。') : t`自动使用内置规范${getRules() ? t('、工程规范') : ''}${design?.palette ? t`、${design.palette.name}配色` : ''}${design ? t`、${design.library.components.length} 个关联组件及安全区信息` : ''}，可在「工程设置」中编辑。`;
     $('aiBuiltinRules').textContent = t(DESIGN_SPEC);

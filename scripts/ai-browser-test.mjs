@@ -21,7 +21,9 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   let release;
   let requestBody;
+  let requestCount = 0;
   await page.route('https://ai.example.test/**', async route => {
+    requestCount++;
     requestBody = route.request().postDataJSON();
     const { requirement, project } = JSON.parse(requestBody.messages.at(-1).content);
     let changes = [];
@@ -34,6 +36,8 @@ try {
     assert.equal(project.version, 1);
   });
   await page.goto(base);
+  assert.equal(await page.locator('#aiToggleBtn').isVisible(), true);
+  assert.equal(await page.locator('#aiToggleBtn').evaluate(node => !!node.closest('[role="menu"]')), false);
   await clickAction(page, '#settingsBtn');
   await page.locator('#aiURL').fill('https://ai.example.test/v1');
   await page.locator('#aiKey').fill('mock-secret'); await page.locator('#aiModel').fill('test-model');
@@ -63,6 +67,13 @@ try {
   await page.keyboard.press('Meta+s'); assert.equal(await versionCount(), 4);
   console.log('通过：逐步历史可撤回重做，自动保存不生成版本，保存按钮及两种快捷键各生成版本');
   await send('新增标题'); await waitDone();
+  const floatingBounds = await page.locator('#aiPanel').boundingBox();
+  const workspaceBounds = await page.locator('.workspace').boundingBox();
+  assert.ok(floatingBounds.width < workspaceBounds.width && floatingBounds.height < workspaceBounds.height);
+  assert.ok(floatingBounds.x > workspaceBounds.x && floatingBounds.y > workspaceBounds.y);
+  assert.equal(await page.locator('#aiRequirement').isEnabled(), true);
+  assert.equal(await page.locator('#aiProgress').isHidden(), true);
+  assert.equal(await page.locator('#aiToggleProgress').isHidden(), true);
   await page.waitForTimeout(350); assert.equal(await versionCount(), 6);
   assert.equal(await page.locator('.editor-item').count(), 2);
   assert.match(requestBody.messages[0].content, /唯一 JSON/);
@@ -71,11 +82,35 @@ try {
 
   await send('等待后放大标题');
   await page.waitForFunction(() => !document.getElementById('aiCancelBtn').hidden);
+  assert.equal(await page.locator('#aiRequirement').isDisabled(), true);
+  assert.equal(await page.locator('#aiSendBtn').isDisabled(), true);
+  assert.equal(await page.locator('#aiProgress').isVisible(), true);
+  assert.equal(await page.locator('#aiToggleProgress').isVisible(), true);
+  assert.equal(await page.locator('#aiProgress .ai-spinner').evaluate(node => getComputedStyle(node).animationName), 'ai-spin');
+  await page.locator('#languageSelect').selectOption('en');
+  assert.equal(await page.locator('#aiSendBtn').textContent(), 'Generating…');
+  await page.locator('#languageSelect').selectOption('zh');
+  await page.locator('#aiForm').evaluate(form => {
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  });
+  await page.locator('#aiCloseBtn').click();
+  assert.equal(await page.locator('#aiPanel').isHidden(), true);
+  assert.equal(await page.locator('#aiToggleBtn').getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.locator('#aiToggleBtn').evaluate(node => node === document.activeElement), true);
+  assert.equal(await page.locator('#aiToggleProgress').isVisible(), true);
+  await page.locator('#aiToggleBtn').click();
+  assert.match(await page.locator('#aiSendBtn').textContent(), /正在生成/);
+  assert.equal(await page.locator('#aiRequirement').isDisabled(), true);
+  await page.screenshot({ path: resolve(output, 'ai-floating-generating.png') });
   await page.locator('#aiCloseBtn').click();
   await page.locator(`[data-item-id="${initialId}"].editor-item`).click();
   await page.locator('#canvas').focus(); await page.keyboard.press('ArrowRight');
   const localX = await page.locator('#propX').inputValue();
   assert.ok(release); release(); await waitDone();
+  assert.equal(requestCount, 2);
+  assert.equal(await page.locator('#aiRequirement').isEnabled(), true);
+  assert.equal(await page.locator('#aiToggleProgress').isHidden(), true);
   assert.equal(await page.locator('#aiPending').isVisible(), true);
   assert.equal(await page.locator('[data-item-id="ai-heading"].editor-item').evaluate(node => node.style.width), '220px');
   await page.locator('#mergeOpenBtn').click();
@@ -111,6 +146,10 @@ try {
   assert.equal(await page.locator('.editor-item').count(), count); assert.match(await page.locator('#aiStatus').textContent(), /JSON/);
   await send('等待后修改名称'); await page.locator('#aiCancelBtn').click(); await waitDone();
   release(); assert.match(await page.locator('#aiStatus').textContent(), /取消/);
+  assert.equal(await page.locator('#aiRequirement').isEnabled(), true);
+  assert.equal(await page.locator('#aiSendBtn').isEnabled(), true);
+  assert.equal(await page.locator('#aiProgress').isHidden(), true);
+  assert.equal(await page.locator('#aiToggleProgress').isHidden(), true);
   console.log('通过：非法响应和取消请求不修改画布');
 
   await page.locator('#aiCloseBtn').click(); await page.locator('#versionsBtn').click();
@@ -137,6 +176,11 @@ try {
   assert.match(await page.locator('#aiMessages').textContent(), /新增标题/);
   console.log('通过：历史回退、保留分支、刷新及无 Key 备份导入导出');
   await page.setViewportSize({ width: 390, height: 844 });
+  const mobileBounds = await page.locator('#aiPanel').boundingBox();
+  assert.ok(mobileBounds.x >= 12 && mobileBounds.x + mobileBounds.width <= 378);
+  assert.ok(mobileBounds.height < (await page.locator('.workspace').boundingBox()).height);
+  assert.equal(await page.locator('#aiToggleBtn').isVisible(), true);
+  assert.equal(await page.locator('#aiSendBtn').isVisible(), true);
   await page.screenshot({ path: resolve(output, 'ai-mobile.png') });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []); console.log('通过：窄屏对话及无浏览器错误');

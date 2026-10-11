@@ -1,5 +1,9 @@
 // 界面文案以中文为键；插值使用 {0}、{1}，用户内容不参与翻译。
 export const EN = Object.freeze({
+  "隐藏 AI 对话": "Hide AI chat",
+  "生成中": "Generating",
+  "正在生成…": "Generating…",
+  "AI 正在生成…隐藏浮窗后仍会继续，请勿重复发送。": "AI is generating… You can hide this window while it continues. Please wait before sending again.",
   "安全区限制：{0}；留白上 {1} / 右 {2} / 下 {3} / 左 {4} px。坐标为画布实际像素。": "Safe area: {0}; insets top {1} / right {2} / bottom {3} / left {4} px. Coordinates use actual canvas pixels.",
   "已启用": "Enabled",
   "未启用": "Disabled",

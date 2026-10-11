@@ -58,7 +58,6 @@
       <div class="app-menu" role="none">
         <button class="menu-trigger" id="toolsMenuBtn" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="toolsMenu" tabindex="-1">工具</button>
         <div class="menu-dropdown" id="toolsMenu" role="menu" aria-labelledby="toolsMenuBtn" hidden>
-          <button id="aiToggleBtn" type="button" role="menuitem" tabindex="-1" aria-expanded="false" aria-controls="aiPanel">AI 对话</button>
           <button id="imageUIBtn" type="button" role="menuitem" tabindex="-1">图片生成可编辑 UI</button>
           <button id="settingsBtn" type="button" role="menuitem" tabindex="-1">AI 设置</button>
           <button id="mcpSettingsBtn" type="button" role="menuitem" tabindex="-1">MCP 接入</button>
@@ -67,6 +66,7 @@
     </nav>
     <div class="project-controls" role="group" aria-label="工程管理"><select id="projectSelect" aria-label="切换工程"></select></div>
     <div class="toolbar-end">
+      <button class="btn ai-toggle" id="aiToggleBtn" type="button" aria-expanded="false" aria-controls="aiPanel"><span>AI 对话</span><span id="aiToggleProgress" class="ai-toggle-progress" hidden><span class="ai-spinner" aria-hidden="true"></span><span>生成中</span></span></button>
       <label class="language-control"><span data-icon="globe"></span><select id="languageSelect" aria-label="语言"><option value="system">跟随系统</option><option value="zh">中文</option><option value="en">English</option></select></label>
       <span class="save-state" id="saveState" role="status">本地草稿</span>
       <button class="btn btn-primary" id="previewBtn"><span data-icon="eye"></span>预览</button>
@@ -266,13 +266,14 @@
       </div>
     </section>
     </div>
-    <aside id="aiPanel" class="ai-panel" hidden aria-label="AI 对话">
-      <div class="panel-heading"><h2>AI 参考设计对话</h2><button class="btn btn-icon" id="aiCloseBtn" aria-label="关闭 AI 对话">×</button></div>
+    <aside id="aiPanel" class="ai-panel" hidden role="dialog" aria-modal="false" aria-labelledby="aiPanelTitle">
+      <div class="panel-heading"><h2 id="aiPanelTitle">AI 参考设计对话</h2><button class="btn btn-icon" id="aiCloseBtn" aria-label="隐藏 AI 对话" title="隐藏 AI 对话">−</button></div>
+      <div id="aiProgress" class="ai-progress" role="status" hidden><span class="ai-spinner" aria-hidden="true"></span><span>AI 正在生成…隐藏浮窗后仍会继续，请勿重复发送。</span></div>
       <p class="panel-description">上传参考图片，指定输出组件、页面或弹窗，也可选择已有页面进行优化。</p>
       <div class="ai-chat-layout"><div class="ai-conversation"><section class="ai-history" data-collapsible="ai-history" data-collapse-title="对话记录"><div id="aiMessages" class="ai-messages" role="log" aria-live="polite"></div></section>
       <div id="aiPending" data-collapsible="ai-pending" class="ai-pending" hidden><strong>AI 版本等待合并</strong><p id="aiPendingSummary"></p><button class="btn btn-primary btn-sm" id="mergeOpenBtn">查看并合并</button><button class="btn btn-sm" id="discardAIBtn">放弃应用</button></div>
       <div id="aiGenerated" data-collapsible="ai-generated" class="ai-pending" hidden><strong>生成结果等待保存</strong><p id="aiGeneratedSummary"></p><p class="field-help">请保存后再刷新或切换工程。</p><button class="btn btn-primary btn-sm" id="aiGeneratedOpenBtn">预览并保存</button></div>
-      </div><form id="aiForm" class="ai-composer"><label class="field">输出类型<select id="aiMode"><option value="modify">优化已有页面 / 弹窗</option><option value="component">独立生成组件</option><option value="page">独立生成页面</option><option value="popup">独立生成弹窗</option><option value="image">图片生成可编辑 UI</option></select></label><p class="field-help" id="aiModeHelp"></p><label id="aiTargetField" class="field">优化目标<select id="aiTarget"></select></label><section id="aiImageFields"><label class="field">参考图片<input id="aiImageFile" type="file" accept="image/png,image/jpeg,image/webp"></label><p class="field-help">支持 PNG、JPEG、WebP，最大 3 MB；宽高至少 100 px，超过 2000 px 按比例缩小。需配置支持图片输入的视觉模型。点击生成时会将图片发送到已配置的 AI 接口。</p><img id="aiImagePreview" class="ai-image-preview" alt="参考界面图片" hidden><p id="aiImageInfo" class="field-help"></p><button id="aiImageRemoveBtn" class="btn btn-sm" type="button" hidden>移除参考图片</button></section><fieldset class="ai-reference-fields"><legend>基础参考表</legend>
+      </div><form id="aiForm" class="ai-composer"><div class="ai-composer-fields"><label class="field">输出类型<select id="aiMode"><option value="modify">优化已有页面 / 弹窗</option><option value="component">独立生成组件</option><option value="page">独立生成页面</option><option value="popup">独立生成弹窗</option><option value="image">图片生成可编辑 UI</option></select></label><p class="field-help" id="aiModeHelp"></p><label id="aiTargetField" class="field">优化目标<select id="aiTarget"></select></label><section id="aiImageFields"><label class="field">参考图片<input id="aiImageFile" type="file" accept="image/png,image/jpeg,image/webp"></label><p class="field-help">支持 PNG、JPEG、WebP，最大 3 MB；宽高至少 100 px，超过 2000 px 按比例缩小。需配置支持图片输入的视觉模型。点击生成时会将图片发送到已配置的 AI 接口。</p><img id="aiImagePreview" class="ai-image-preview" alt="参考界面图片" hidden><p id="aiImageInfo" class="field-help"></p><button id="aiImageRemoveBtn" class="btn btn-sm" type="button" hidden>移除参考图片</button></section><fieldset class="ai-reference-fields"><legend>基础参考表</legend>
         <label class="field">名称<input id="aiRefName" maxlength="40" placeholder="留空由 AI 命名"></label>
         <div class="field-grid"><label class="field">宽度 px<input id="aiRefWidth" type="number" min="100" max="2000" placeholder="自动"></label><label class="field">高度 px<input id="aiRefHeight" type="number" min="100" max="2000" placeholder="自动"></label></div>
         <label class="field">颜色<input id="aiRefColor" maxlength="100" placeholder="例如：主色 #2563eb，白色背景"></label>
@@ -282,7 +283,7 @@
         <p class="field-help">宽高留空沿用参考画布；填写后按指定尺寸生成。组件支持 1～2000 px，页面与弹窗支持 100～2000 px。</p>
       </fieldset>
       <section class="ai-layout-reference" aria-label="排版参考与限制"><h3>排版参考与限制</h3><p id="aiTypographySummary" class="field-help"></p><p id="aiLayoutSummary" class="field-help"></p><p id="aiSafeAreaSummary" class="field-help"></p><div class="ai-reference-scroll"><table class="ai-reference-table"><caption>组件大小与位置</caption><thead><tr><th>名称 / 功能</th><th>位置 x / y</th><th>宽 × 高</th><th>字号 / 比例</th><th>颜色</th></tr></thead><tbody id="aiLayoutRows"></tbody></table></div></section>
-      <label class="field">用户提示词<textarea id="aiRequirement" rows="4" maxlength="10000" placeholder="例如：生成一个蓝色登录页，包含手机号输入框、验证码和登录按钮" required></textarea></label><p class="field-help" id="aiRulesSummary"></p><details class="ai-rules"><summary>查看内置设计规范</summary><p class="field-help" id="aiBuiltinRules"></p></details><p id="aiStatus" class="field-help" role="status"></p><div class="ai-composer-actions"><button class="btn" type="button" id="aiCancelBtn" hidden>取消请求</button><button class="btn btn-primary" type="submit" id="aiSendBtn">发送需求</button></div></form></div>
+      <label class="field">用户提示词<textarea id="aiRequirement" rows="4" maxlength="10000" placeholder="例如：生成一个蓝色登录页，包含手机号输入框、验证码和登录按钮" required></textarea></label><p class="field-help" id="aiRulesSummary"></p><details class="ai-rules"><summary>查看内置设计规范</summary><p class="field-help" id="aiBuiltinRules"></p></details></div><div class="ai-composer-footer"><p id="aiStatus" class="field-help" role="status"></p><div class="ai-composer-actions"><button class="btn" type="button" id="aiCancelBtn" hidden>取消请求</button><button class="btn btn-primary" type="submit" id="aiSendBtn">发送需求</button></div></div></form></div>
     </aside>
   </main>
   <footer class="status-bar"><span id="statusMessage" role="status"><span class="local-dot"></span>准备就绪 · 点击或拖拽组件开始设计</span><span id="componentCount">0 个组件</span></footer>
