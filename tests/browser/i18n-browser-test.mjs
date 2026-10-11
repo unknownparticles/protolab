@@ -1,22 +1,11 @@
+import { startBrowserTest } from './harness.mjs';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { clickAction } from './browser-actions.mjs';
 
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4191';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4191' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-await mkdir(output, { recursive: true });
-let browser;
+const { base, output, browser, close } = await startBrowserTest({ port: 4191 });
 try {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    try { if ((await fetch(base)).ok) break; } catch { /* 等待服务 */ }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const errors = [];
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
@@ -116,4 +105,4 @@ try {
   assert.equal(await restricted.locator('#fileMenuBtn').textContent(), '文件');
   assert.deepEqual(errors, []);
   console.log('通过：中文系统默认、其他语言回退英文、存储受限仍可切换、无浏览器运行错误');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

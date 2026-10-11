@@ -1,19 +1,13 @@
+import { startBrowserTest } from './harness.mjs';
 /** 顶部菜单的键盘、焦点、操作集成与窄屏验收。 */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { clickAction } from './browser-actions.mjs';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4192';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4192' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-let browser;
+
+const { base, output, browser, close } = await startBrowserTest({ port: 4192 });
 try {
-  await mkdir(output, { recursive: true });
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
+
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -117,4 +111,4 @@ try {
   assert.equal(await mobile.locator('.menu-dropdown:visible').count(), 0);
   assert.deepEqual(errors, []);
   console.log('通过：顶部菜单操作、键盘焦点、工程导入导出、桌面与移动端布局及触摸');
-} finally { if (browser) await browser.close(); if (server) server.kill(); }
+} finally { await close(); }

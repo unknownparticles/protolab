@@ -1,24 +1,12 @@
+import { startBrowserTest } from './harness.mjs';
 import { clickAction } from './browser-actions.mjs';
 /** 验证收起后的编辑状态、原生校验和窄屏入口。 */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
-const moduleName = process.env.PROTOLAB_PLAYWRIGHT_MODULE;
-const { chromium } = await import(moduleName ? pathToFileURL(moduleName).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4183';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4183' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-let browser;
+const { base, output, browser, close } = await startBrowserTest({ port: 4183 });
 try {
-  await mkdir(output, { recursive: true });
-  for (let attempt = 0; attempt < 40; attempt++) {
-    try { if ((await fetch(base)).ok) break; } catch { /* 等待服务器。 */ }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
+
   const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -115,4 +103,4 @@ try {
   await page.screenshot({ path: resolve(output, 'collapse-mobile.png') });
   assert.deepEqual(errors, []);
   console.log('通过：刷新恢复、切换组件保留收起状态、窄屏展开和唯一标识；无脚本错误');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

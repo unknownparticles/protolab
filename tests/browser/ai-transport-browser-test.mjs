@@ -1,19 +1,9 @@
+import { startBrowserTest } from './harness.mjs';
 import { clickAction } from './browser-actions.mjs';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
 
-const moduleName = process.env.PROTOLAB_PLAYWRIGHT_MODULE;
-const { chromium } = await import(moduleName ? pathToFileURL(moduleName).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4188';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4188' }, stdio: 'pipe' });
-let browser;
+const { base, browser, close } = await startBrowserTest({ port: 4188 });
 try {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    try { if ((await fetch(base)).ok) break; } catch { /* 等待开发服务 */ }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const page = await browser.newPage({ locale: 'zh-CN' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('https://protolab.example.test/**', async route => {
@@ -84,4 +74,4 @@ try {
   assert.equal(await page.locator('[data-item-id="transport-title"] .item-label').textContent(), 'DeepSeek 标题');
   assert.deepEqual(errors, []);
   console.log('通过：DeepSeek 快捷配置、清空旧 Key、取消恢复及保存后正确请求和应用');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

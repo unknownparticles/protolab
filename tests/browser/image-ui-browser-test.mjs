@@ -1,18 +1,11 @@
+import { startBrowserTest } from './harness.mjs';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { clickAction } from './browser-actions.mjs';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4191';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4191' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-await mkdir(output, { recursive: true });
-let browser;
+
+const { base, output, browser, close } = await startBrowserTest({ port: 4191 });
 try {
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const fixture = await browser.newPage({ viewport: { width: 375, height: 667 } });
   await fixture.setContent('<body style="margin:0;background:#f8fafc;font-family:sans-serif"><h1 style="position:absolute;left:24px;top:64px;margin:0;font-size:28px">欢迎登录</h1><input placeholder="请输入手机号" style="position:absolute;left:24px;top:140px;width:327px;height:48px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:12px"><button style="position:absolute;left:24px;top:208px;width:327px;height:48px;border:0;border-radius:8px;background:#2563eb;color:white">登录</button><p style="position:absolute;left:24px;top:276px;font-size:12px;color:#64748b;margin:0">登录即表示同意用户协议</p></body>');
@@ -136,4 +129,4 @@ try {
   assert.equal(await page.locator('#aiGenerated').isVisible(), false);
   assert.deepEqual(errors, []);
   console.log('通过：真实图片上传与格式体积校验、多模态请求、对照预览、组件命名和编辑、撤销重做、刷新导出、失败取消保护、工程隔离及双语窄屏');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

@@ -1,15 +1,13 @@
+import { launchBrowser } from './harness.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { pathToFileURL } from 'node:url';
-import { startMCPClient } from '../tests/mcp-client.mjs';
+import { startMCPClient } from '../mcp-client.mjs';
 import { clickAction } from './browser-actions.mjs';
 
-const moduleName = process.env.PROTOLAB_PLAYWRIGHT_MODULE;
-const { chromium } = await import(moduleName ? pathToFileURL(moduleName).href : 'playwright');
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(import.meta.dirname, '../..');
 const website = 'https://alunapp.cn/protolab/';
 const bridgeAddress = 'http://127.0.0.1:4183';
 const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
@@ -17,7 +15,7 @@ await mkdir(output, { recursive: true });
 const temp = await mkdtemp(resolve(tmpdir(), 'protolab-sidecar-'));
 let browser, helper, client;
 try {
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
+  browser = await launchBrowser();
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   // 仅替换网站静态内容；保持真实 HTTPS 站点来源，跨域请求使用实际本机外挂。
   await context.route(`${website}**`, async route => {

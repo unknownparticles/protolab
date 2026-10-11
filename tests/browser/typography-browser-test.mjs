@@ -1,16 +1,10 @@
+import { startBrowserTest } from './harness.mjs';
 import { clickAction } from './browser-actions.mjs';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4197';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4197' }, stdio: 'pipe' });
-let browser;
+const { base, output, browser, close } = await startBrowserTest({ port: 4197 });
 try {
-  for (let index = 0; index < 40; index++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
@@ -89,8 +83,8 @@ try {
   await reusable.click();
   assert.equal(await page.locator('.editor-item.selected .prototype-content span').evaluate(element => parseFloat(getComputedStyle(element).fontSize)), 42);
   console.log('通过：缩放后的组件存入组件库、预览并再次添加保持字号');
-  const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results'); await mkdir(output, { recursive: true });
+
   await page.screenshot({ path: resolve(output, 'typography.png') });
   assert.deepEqual(errors, []);
   console.log('通过：预览即时缩放、画布同步、撤销重做、刷新恢复、独立网页导出，无脚本错误');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

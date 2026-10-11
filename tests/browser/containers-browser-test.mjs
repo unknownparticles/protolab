@@ -1,18 +1,11 @@
+import { startBrowserTest } from './harness.mjs';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { clickAction } from './browser-actions.mjs';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4199';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4199' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-await mkdir(output, { recursive: true });
-let browser;
+
+const { base, output, browser, close } = await startBrowserTest({ port: 4199 });
 try {
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   const apply = () => page.locator('#selectionProps button[type=submit]').click();
@@ -156,4 +149,4 @@ try {
   await page.screenshot({ path: resolve(output, 'containers-mobile.png') });
   assert.deepEqual(errors, []);
   console.log('通过：刷新恢复、预览导出一致、容器显隐、移动端与零浏览器错误');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

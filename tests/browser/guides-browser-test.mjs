@@ -1,23 +1,12 @@
+import { startBrowserTest } from './harness.mjs';
 import { clickAction } from './browser-actions.mjs';
 /** 标尺、网格、多选与对齐的浏览器验收；复用主验收的浏览器配置。 */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-const moduleName = process.env.PROTOLAB_PLAYWRIGHT_MODULE;
-const { chromium } = await import(moduleName ? pathToFileURL(moduleName).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4175';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4175' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-await mkdir(output, { recursive: true });
-let browser;
+
+const { base, output, browser, close } = await startBrowserTest({ port: 4175 });
 try {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    try { if ((await fetch(base)).ok) break; } catch { /* 等待本地服务 */ }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -136,4 +125,4 @@ try {
   await page.screenshot({ path: resolve(output, 'guides-mobile.png') });
   console.log('通过：设备外框原点、刷新恢复、预览导出、窄屏开关与居中');
   assert.deepEqual(errors, []);
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

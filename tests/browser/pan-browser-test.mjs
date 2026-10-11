@@ -1,14 +1,8 @@
+import { startBrowserTest } from './harness.mjs';
 /** 溢出画布的空白拖动、空格与中键平移，以及组件拖动和取消操作验收。 */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4192';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4192' }, stdio: 'pipe' });
-let browser;
+const { base, browser, close } = await startBrowserTest({ port: 4192 });
 try {
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, hasTouch: true }), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
@@ -107,4 +101,4 @@ try {
   assert.deepEqual(await scroll(), [200, 230], '窄窗口也可拖动浏览画布');
   assert.deepEqual(errors, []);
   console.log('通过：画布空白、空格及中键双向平移，保留组件拖动与选择、滚轮及真实双指缩放，移出视口、取消和失焦清理、输入隔离、完整显示及窄窗口，无脚本错误');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

@@ -1,19 +1,12 @@
+import { startBrowserTest } from './harness.mjs';
 /** 属性标签、常驻图层板块及自定义组件分组的完整验收。 */
 import assert from 'node:assert/strict';
 import { clickAction } from './browser-actions.mjs';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4199';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4199' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-await mkdir(output, { recursive: true });
-let browser;
+
+const { base, output, browser, close } = await startBrowserTest({ port: 4199 });
 try {
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const errors = []; page.on('pageerror', error => errors.push(error.message)); page.on('dialog', dialog => dialog.accept());
   const saved = () => page.waitForFunction(() => document.getElementById('saveState').textContent === '已自动保存');
@@ -113,4 +106,4 @@ try {
   const bounds = await page.locator('.activity-panel').boundingBox(); assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 390 && bounds.height >= 180);
   await page.screenshot({ path: resolve(output, 'library-groups-mobile.png') });
   assert.deepEqual(errors, []); console.log('通过：工程分组隔离、移动端布局和零浏览器错误');
-} finally { if (browser) await browser.close(); if (server) server.kill(); }
+} finally { await close(); }

@@ -1,3 +1,5 @@
+import { initializeProjectSettings } from './project-settings.js';
+import { initializePagePanel } from './page-panel.js';
 import { t, translate, getLocale, bindStaticTranslations, initializeLanguage } from './i18n.js';
 import { PRESETS, MAX_ITEMS, MAX_LIBRARY, MAX_LIBRARY_BYTES, MAX_IMAGE, contentSizeValid, uid, clone, normalizeItem, constrainProject, resizeProject, rotateProject, itemBounds, createItem, validateLibrary, validateProject, createHistory, clientToCanvas } from './model.js';
 import { ORIENTATION_ACTIONS, normalizeOrientationResponse, orientationPresentation } from './orientation.js';
@@ -17,9 +19,9 @@ import { projectFile, importProjectFile } from './project-import.js';
 import { normalizeSafeArea, placementBounds } from './safe-area.js';
 import { snapItems } from './snapping.js';
 import { createAssistant } from './assistant.js';
-import { INTERACTIONS, PAGE_KINDS, activePage, withPages, switchPage, addPage, deletePage, normalizeInteraction, pageBoard, copyItems, cleanVisibilityTargets } from './pages.js';
+import { withPages, addPage, pageBoard, copyItems, cleanVisibilityTargets } from './pages.js';
 import { PROJECTS_KEY, emptyProject, projectRecord, projectDetails, validateProjects, saveActiveProject, activateProject, appendProject } from './projects.js';
-import { COLOR_ROLES, PALETTES, normalizeDesign, linkedComponents, libraryManifest, designAssets } from './project-design.js';
+import { designAssets } from './project-design.js';
 import { initializeCollapsible } from './collapsible.js';
 import { attachViewportZoom } from './viewport-zoom.js';
 import { attachViewportPan } from './viewport-pan.js';
@@ -176,79 +178,8 @@ function renderProjects() {
   $('projectSelect').value = catalog.activeId;
   assistant.refreshRules();
 }
-function openProjectDetails(create) {
-  $('engineeringForm').reset(); $('engineeringError').textContent = '';
-  $('engineeringTitle').textContent = create ? t('新建工程') : t('工程设置');
-  $('engineeringForm').dataset.create = String(create);
-  $('engineeringName').value = create ? '' : currentRecord().name;
-  $('engineeringRules').value = create ? '' : currentRecord().rules;
-  fillEngineeringDesign(create ? normalizeDesign() : normalizeDesign(currentRecord().design));
-  $('engineeringPresetField').hidden = !create;
-  $('engineeringSubmitBtn').textContent = create ? t('创建并切换') : t('保存设置');
-  $('engineeringDialog').showModal(); $('engineeringName').focus();
-}
-function engineeringLibrary() {
-  return $('engineeringForm').dataset.create === 'true' ? COMPONENTS : library;
-}
-function engineeringGroups() {
-  return $('engineeringForm').dataset.create === 'true' ? [] : libraryGroups;
-}
-function readEngineeringDesign() {
-  const palette = $('engineeringPalette').value === 'none' ? null : { name: $('engineeringPaletteName').value,
-    colors: Object.fromEntries(Object.keys(COLOR_ROLES).map(role => [role, document.getElementById(`engineeringColor-${role}`).value])) };
-  return normalizeDesign({ palette, library: { scope: $('engineeringLibraryScope').value,
-    groupIds: [...$('engineeringLibraryGroups').querySelectorAll('input:checked')].map(input => input.value) },
-    safeArea: { mode: $('engineeringSafeMode').value, ...Object.fromEntries(['top', 'right', 'bottom', 'left'].map(edge => [edge, Number(document.getElementById(`engineeringSafe${edge[0].toUpperCase()}${edge.slice(1)}`).value)])) } });
-}
-function engineeringManifest() {
-  const selection = { library: { scope: $('engineeringLibraryScope').value,
-    groupIds: [...$('engineeringLibraryGroups').querySelectorAll('input:checked')].map(input => input.value) } };
-  return libraryManifest(linkedComponents(selection, engineeringLibrary(), engineeringGroups()), engineeringGroups());
-}
-function renderEngineeringLinks() {
-  const paletteEnabled = $('engineeringPalette').value !== 'none';
-  $('engineeringPaletteFields').hidden = !paletteEnabled;
-  $('engineeringPaletteName').required = paletteEnabled;
-  const customSafe = $('engineeringSafeMode').value === 'custom';
-  $('engineeringSafeFields').hidden = !customSafe;
-  for (const input of $('engineeringSafeFields').querySelectorAll('input')) { input.disabled = !customSafe; input.required = customSafe; }
-  $('engineeringLibraryGroups').hidden = $('engineeringLibraryScope').value !== 'groups';
-  const manifest = engineeringManifest();
-  $('engineeringManifestSummary').textContent = t`轻量组件清单 · ${manifest.components.length} 个组件`;
-  $('engineeringManifest').textContent = JSON.stringify(manifest, null, 2);
-}
-function fillEngineeringColors(palette) {
-  $('engineeringPaletteName').value = palette.name;
-  $('engineeringColors').replaceChildren(...Object.entries(COLOR_ROLES).map(([role, name]) => {
-    const label = document.createElement('label'); label.className = 'field'; label.textContent = t(name);
-    const input = document.createElement('input'); input.type = 'color'; input.id = `engineeringColor-${role}`; input.value = palette.colors[role]; label.append(input); return label;
-  }));
-}
-function fillEngineeringDesign(design) {
-  $('engineeringPalette').value = design.palette ? 'custom' : 'none';
-  fillEngineeringColors(design.palette || PALETTES.blue);
-  $('engineeringLibraryScope').value = design.library.scope;
-  $('engineeringLibraryGroups').replaceChildren(...engineeringGroups().map(group => {
-    const label = document.createElement('label'); label.className = 'checkbox-field'; label.dataset.i18nIgnore = '';
-    const input = document.createElement('input'); input.type = 'checkbox'; input.value = group.id; input.checked = design.library.groupIds.includes(group.id);
-    label.append(input, document.createTextNode(group.name)); return label;
-  }));
-  if (!engineeringGroups().length) $('engineeringLibraryGroups').textContent = t('当前工程暂无分组，请先在组件库中新建分组。');
-  $('engineeringSafeMode').value = design.safeArea.mode;
-  for (const edge of ['top', 'right', 'bottom', 'left']) document.getElementById(`engineeringSafe${edge[0].toUpperCase()}${edge.slice(1)}`).value = design.safeArea[edge] || 0;
-  renderEngineeringLinks();
-}
-$('engineeringPalette').addEventListener('change', () => {
-  if (PALETTES[$('engineeringPalette').value]) fillEngineeringColors(PALETTES[$('engineeringPalette').value]);
-  renderEngineeringLinks();
-});
-$('engineeringColors').addEventListener('input', () => { $('engineeringPalette').value = 'custom'; });
-$('engineeringPaletteName').addEventListener('input', () => { $('engineeringPalette').value = 'custom'; });
-$('engineeringLibraryScope').addEventListener('change', renderEngineeringLinks);
-$('engineeringLibraryGroups').addEventListener('change', renderEngineeringLinks);
-$('engineeringSafeMode').addEventListener('change', renderEngineeringLinks);
-$('exportEngineeringManifestBtn').addEventListener('click', () => {
-  download(JSON.stringify(engineeringManifest(), null, 2), 'protolab-library-manifest.json', 'application/json'); notify(t('轻量组件清单已导出'));
+const { openProjectDetails, readEngineeringDesign, renderEngineeringLinks } = initializeProjectSettings({
+  getRecord: currentRecord, getLibrary: () => library, getGroups: () => libraryGroups, notify,
 });
 function installProject(next) {
   // 先原子写入完整工程集合，再切换内存；写入失败保留当前工程。
@@ -469,123 +400,10 @@ $('propImageFile').addEventListener('change', safeAction(async event => {
   pendingImages.set(index, source); renderPropertyImage();
   notify(t('图片已准备好，点击应用属性保存'));
 }));
-function renderInteractionTargets(targetId = $('propClickTarget').value) {
-  const type = $('propClickAction').value;
-  const needsTarget = ['navigate', 'openPopup', 'showToast'].includes(type);
-  $('propClickTargetField').hidden = !needsTarget;
-  $('propClickTarget').required = needsTarget;
-  $('propClickTarget').disabled = !needsTarget;
-  const kind = { navigate: 'page', openPopup: 'popup', showToast: 'toast' }[type];
-  const targets = project.pages.filter(page => page.kind === kind);
-  $('propClickTarget').replaceChildren(new Option(t('请选择目标'), ''), ...targets.map(page => new Option(page.name, page.id)));
-  $('propClickTarget').value = targets.some(page => page.id === targetId) ? targetId : '';
-  $('propToastDurationField').hidden = type !== 'showToast';
-  $('propToastDuration').disabled = type !== 'showToast';
-  $('propToastDuration').required = type === 'showToast';
-  $('propVisibilityFields').hidden = type !== 'visibility';
-  $('propVisibilityMode').disabled = type !== 'visibility';
-  const selected = selectedItem()?.interaction?.targetIds || [];
-  $('propVisibilityTargets').replaceChildren(...project.items.map(item => {
-    const label = document.createElement('label'); label.className = 'checkbox-field';
-    const input = document.createElement('input'); input.type = 'checkbox'; input.value = item.id;
-    input.checked = selected.includes(item.id); input.disabled = type !== 'visibility';
-    label.append(input, document.createTextNode(item.name)); return label;
-  }));
-  $('interactionHelp').textContent = needsTarget && !targets.length ? t`请先在页面管理中新建${t(PAGE_KINDS[kind])}。` : type === 'visibility' ? t('目标限于当前页面；多选元素可以一起展开或收起整个板块。') : t('在预览和导出的 HTML 中点击组件执行动作。');
-}
-function readInteraction() {
-  return normalizeInteraction({ type: $('propClickAction').value, targetId: $('propClickTarget').value,
-    duration: $('propToastDuration').value, mode: $('propVisibilityMode').value,
-    targetIds: [...$('propVisibilityTargets').querySelectorAll('input:checked')].map(input => input.value) });
-}
-$('propClickAction').replaceChildren(...Object.entries(INTERACTIONS).map(([value, label]) => new Option(t(label), value)));
-$('propClickAction').addEventListener('change', () => renderInteractionTargets(''));
-function renderPages() {
-  const onlyPage = project.pages.filter(page => page.kind === 'page').length === 1;
-  $('pageList').replaceChildren(...project.pages.map(page => {
-    const entry = document.createElement('div'); entry.className = 'page-tab-entry';
-    const button = document.createElement('button');
-    button.type = 'button'; button.className = `page-tab${page.id === project.activePageId ? ' active' : ''}`;
-    button.dataset.pageId = page.id; button.setAttribute('aria-pressed', String(page.id === project.activePageId));
-    button.textContent = `${page.kind !== 'page' ? `${t(PAGE_KINDS[page.kind])} · ` : ''}${page.name}${page.id === project.startPageId ? t(' · 首页') : ''}`;
-    const remove = document.createElement('button');
-    remove.type = 'button'; remove.className = 'page-tab-delete'; remove.dataset.deletePageId = page.id;
-    remove.textContent = '×'; remove.setAttribute('aria-label', t`删除「${page.name}」`);
-    remove.disabled = page.kind === 'page' && onlyPage;
-    remove.title = remove.disabled ? t('至少保留一个普通页面') : t`删除「${page.name}」`;
-    entry.append(button, remove); return entry;
-  }));
-  const page = activePage(project);
-  $('artboardName').textContent = page.name;
-  $('pageSummary').textContent = Object.entries(PAGE_KINDS).map(([kind, label]) => `${project.pages.filter(page => page.kind === kind).length} ${t(label)}`).join(' · ');
-}
-function applyPageChange(next, label) {
-  project = next; selectedId = null; selectedIds.clear(); commit(label);
-}
-$('pageList').addEventListener('click', safeAction(event => {
-  const remove = event.target.closest('[data-delete-page-id]');
-  if (remove) { requestPageDeletion(remove.dataset.deletePageId); return; }
-  const button = event.target.closest('[data-page-id]');
-  if (!button || button.dataset.pageId === project.activePageId) return;
-  finishGesture(); applyPageChange(switchPage(project, button.dataset.pageId), t('切换编辑页面'));
-}));
-for (const [id, kind] of [['addPageBtn', 'page'], ['addPopupBtn', 'popup'], ['addToastBtn', 'toast']]) $(id).addEventListener('click', safeAction(() => {
-  finishGesture(); applyPageChange(addPage(project, kind), t`新增${t(PAGE_KINDS[kind])}`);
-  notify(t`已新增${t(PAGE_KINDS[kind])}`);
-}));
-let managedPageId = null;
-const PAGE_DELETE_CONFIRMATION_KEY = 'protolab.skipPageDeleteConfirmation';
-let skipPageDeleteConfirmation = false;
-try { skipPageDeleteConfirmation = localStorage.getItem(PAGE_DELETE_CONFIRMATION_KEY) === 'true'; } catch { /* 存储不可用时仍显示确认。 */ }
-let pendingPageDeletion = null;
-function performPageDeletion(id) {
-  finishGesture(); applyPageChange(deletePage(project, id), t('删除页面或弹窗'));
-  if ($('pageDialog').open) $('pageDialog').close();
-  notify(t('已删除，关联跳转已清除，可撤销恢复'));
-}
-function requestPageDeletion(id) {
-  const page = project.pages.find(page => page.id === id);
-  if (!page) return;
-  if (page.kind === 'page' && project.pages.filter(page => page.kind === 'page').length === 1) {
-    notify(t('至少保留一个普通页面'), true); return;
-  }
-  if (skipPageDeleteConfirmation) { performPageDeletion(id); return; }
-  finishGesture(); pendingPageDeletion = { id, session: projectSession };
-  $('deletePageDescription').textContent = t`确认删除「${page.name}」？关联动作将被清除，删除后可撤销恢复。`;
-  $('skipPageDeleteConfirmation').checked = false;
-  $('deletePageDialog').showModal();
-}
-$('deletePageDialog').addEventListener('close', () => { pendingPageDeletion = null; });
-$('deletePageForm').addEventListener('submit', safeAction(event => {
-  event.preventDefault();
-  if (!pendingPageDeletion || pendingPageDeletion.session !== projectSession) { $('deletePageDialog').close(); return; }
-  performPageDeletion(pendingPageDeletion.id);
-  if ($('skipPageDeleteConfirmation').checked) {
-    skipPageDeleteConfirmation = true;
-    try { localStorage.setItem(PAGE_DELETE_CONFIRMATION_KEY, 'true'); } catch { /* 当前会话仍记住选择。 */ }
-  }
-  $('deletePageDialog').close();
-}));
-$('managePageBtn').addEventListener('click', () => {
-  finishGesture(); const page = activePage(project); managedPageId = page.id;
-  $('pageName').value = page.name; $('pageError').textContent = '';
-  $('pageStart').checked = page.id === project.startPageId; $('pageStart').disabled = page.kind !== 'page';
-  $('deletePageBtn').disabled = page.kind === 'page' && project.pages.filter(page => page.kind === 'page').length === 1;
-  $('pageDialog').showModal();
+const { renderPages, renderInteractionTargets, readInteraction } = initializePagePanel({
+  getProject: () => project, getSession: () => projectSession, selectedItem, finishGesture, commit, saveProject, notify, safeAction,
+  applyPageChange(next, label) { project = next; selectedId = null; selectedIds.clear(); commit(label); },
 });
-$('pageForm').addEventListener('submit', event => {
-  event.preventDefault();
-  const name = $('pageName').value.trim();
-  if (!name) { $('pageError').textContent = t('请输入页面名称'); return; }
-  const page = project.pages.find(page => page.id === managedPageId);
-  page.name = name;
-  if (page.kind === 'page' && $('pageStart').checked) project.startPageId = page.id;
-  commit(t('更新页面名称与首页')); $('pageDialog').close(); saveProject(t('保存页面设置'));
-});
-$('duplicatePageBtn').addEventListener('click', safeAction(() => {
-  applyPageChange(addPage(project, 'page', true), t('复制页面或弹窗')); $('pageDialog').close();
-}));
-$('deletePageBtn').addEventListener('click', safeAction(() => requestPageDeletion(managedPageId)));
 function renderLayers() {
   $('layerList').replaceChildren();
   for (const item of [...project.items].reverse()) {

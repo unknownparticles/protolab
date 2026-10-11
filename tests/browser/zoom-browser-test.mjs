@@ -1,14 +1,8 @@
+import { startBrowserTest } from './harness.mjs';
 /** 编辑画布与预览的滚轮、触摸捏合、缩放基点及编辑坐标验收。 */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4191';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4191' }, stdio: 'pipe' });
-let browser;
+const { base, browser, close } = await startBrowserTest({ port: 4191 });
 try {
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, hasTouch: true });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -80,4 +74,4 @@ try {
   assert.equal(await viewport.getAttribute('data-zoom'), '1', '重新打开预览恢复默认缩放');
   assert.deepEqual(errors, []);
   console.log('通过：两处滚轮与真实双指捏合、缩放边界、基点、适应窗口、重置、缩放后尺寸及文字编辑，无脚本错误');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

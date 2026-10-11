@@ -1,13 +1,7 @@
+import { startBrowserTest } from './harness.mjs';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4206';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4206' }, stdio: 'pipe' });
-let browser;
+const { base, browser, close } = await startBrowserTest({ port: 4206 });
 try {
-  for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } }), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
@@ -84,4 +78,4 @@ try {
   assert.deepEqual(await viewport.evaluate(node => [node.scrollLeft, node.scrollTop]), scroll);
   assert.deepEqual(errors, []);
   console.log('通过：缩放与滚动框选、反向框选、Shift 追加、取消、所选请求、越界拒绝及等待期间本地编辑合并');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }

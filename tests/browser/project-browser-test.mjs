@@ -1,21 +1,14 @@
+import { startBrowserTest } from './harness.mjs';
 import { clickAction } from './browser-actions.mjs';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-const { chromium } = await import(process.env.PROTOLAB_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PROTOLAB_PLAYWRIGHT_MODULE).href : 'playwright');
-const base = process.env.PROTOLAB_TEST_URL || 'http://127.0.0.1:4175';
-const server = process.env.PROTOLAB_TEST_URL ? null : spawn(process.execPath, ['scripts/serve.mjs'], { env: { ...process.env, PORT: '4175' }, stdio: 'pipe' });
-const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results');
-await mkdir(output, { recursive: true });
-let browser;
+
+const { base, output, browser, close } = await startBrowserTest({ port: 4175 });
 const source = `<!DOCTYPE html><html><head><style>
 :root{--brand:#2563eb}*{box-sizing:border-box}body{margin:0;padding:24px;background:#f0f4fa;font-family:Arial,sans-serif}.card{width:540px;padding:24px;background:white;border:1px solid #dde3ef;border-radius:16px;box-shadow:0 8px 20px #1232}.card h1{font-size:24px;margin:0 0 16px;color:#123}.row{display:flex;gap:12px;align-items:center}.action{width:120px;height:40px;background:var(--brand);color:white;border:0;border-radius:8px;font-size:16px}input{width:180px;height:40px;padding:8px;border:1px solid #ccd;border-radius:6px}.tiles{display:grid;grid-template-columns:100px 100px;gap:12px;margin-top:16px}.tile{height:60px;background:#e9efff;padding:10px;color:#234}.hidden{display:none}@media(max-width:500px){.card{width:340px}.row{flex-direction:column}}
 </style></head><body><section class="card"><h1>工程导入示例</h1><div class="row"><button class="action">开始设计</button><input placeholder="请输入名称"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="#f59e0b"/></svg></div><div class="tiles"><div class="tile">组件甲</div><div class="tile">组件乙</div></div><p>欢迎使用 <span style="color:#e11;font-weight:bold">原型</span> 编辑器</p><div class="hidden">隐藏内容</div></section></body></html>`;
 try {
-  for (let attempt = 0; attempt < 40; attempt++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
-  browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -98,4 +91,4 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   console.log('通过：窄屏工程操作及无页面异常');
-} finally { await browser?.close(); server?.kill(); }
+} finally { await close(); }
