@@ -141,7 +141,7 @@ try {
 } catch { catalogReadable = false; startupWarnings.push(t('工程列表读取失败，原始数据已保留；请备份本地数据后恢复，暂不允许新建或切换工程')); }
 const assistant = createAssistant({
   initial: project, initialSavedAt, initialWorkspace: currentRecord()?.workspace, getProject: () => project, getRules: () => currentRecord()?.rules || '',
-  getDesignAssets: () => designAssets(currentRecord()?.design, project, library, libraryGroups), finishGesture, notify, scheduleSave,
+  getDesignAssets: (target = project) => designAssets(currentRecord()?.design, target, library, libraryGroups), finishGesture, notify, scheduleSave,
   restoreInitial(value) { project = withPages(value); },
   applyProject(value, label) { finishGesture(); project = withPages(value); selectedId = null; selectedIds.clear(); commit(label); },
   applyGeneration(result) {
@@ -150,12 +150,12 @@ const assistant = createAssistant({
       const nextLibrary = validateLibrary([...library, { ...result.component, id: uid(), name: result.name }], sanitizeContent);
       library = nextLibrary; commit(t`AI 生成组件：${result.name}`); setLibraryTab('custom'); persistLibrary();
     } else {
-      let next = addPage(project);
+      let next = addPage(project, result.mode === 'popup' ? 'popup' : 'page');
       const pageId = next.activePageId;
       const board = pageBoard(result.project);
       board.items = copyItems(board.items);
       next = { ...next, ...board, pages: next.pages.map(page => page.id === pageId ? { ...page, name: result.name, ...board } : page) };
-      project = validateProject(next, sanitizeContent); selectedId = null; selectedIds.clear(); commit(t`AI 生成页面：${result.name}`); fitCanvas();
+      project = validateProject(next, sanitizeContent); selectedId = null; selectedIds.clear(); commit(result.mode === 'popup' ? t`AI 生成弹窗：${result.name}` : t`AI 生成页面：${result.name}`); fitCanvas();
     }
   },
   startupWarning(message) { startupWarnings.push(message); },

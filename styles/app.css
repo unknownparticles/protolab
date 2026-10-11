@@ -211,6 +211,22 @@ html[lang=en] .panel-tabs button{font-size:10px}
 @media(max-width:599px){.toolbar .toolbar-end{gap:8px}.language-control .icon{display:none}.language-control select{max-width:106px;font-size:11px;padding-inline:6px}.toolbar .project-controls{order:3;flex-basis:100%}.canvas-topbar{gap:6px}.canvas-breadcrumb{min-width:0}.canvas-view-controls{flex-shrink:0}}
 
 .ai-image-preview{display:block;width:100%;max-height:140px;object-fit:contain;background:#f1f5f9;border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+.workspace{position:relative}
+#aiPanel{position:absolute;inset:0;width:100%;max-width:100%;z-index:9;border-left:0;background:#f8fafc;box-shadow:none}
+#aiPanel>.panel-heading,#aiPanel>.panel-description{background:white;flex-shrink:0}
+.ai-chat-layout{display:grid;grid-template-columns:minmax(260px,1fr) minmax(360px,440px);flex:1;min-height:0;overflow:hidden}
+.ai-conversation{display:flex;flex-direction:column;min-height:0;min-width:0;padding-top:12px}
+.ai-conversation .ai-history{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
+.ai-conversation .ai-messages{padding:16px 24px;font-size:14px}
+#aiForm{max-height:none;height:100%;min-height:0;min-width:0;overflow:auto;background:white;border-top:0;border-left:1px solid var(--border)}
+.ai-reference-fields{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:10px;min-width:0}
+.ai-reference-fields legend,.ai-layout-reference h3{font-size:12px;font-weight:600;color:var(--secondary)}
+.ai-reference-scroll{overflow:auto;max-height:240px;margin-bottom:16px}
+.ai-reference-table{width:100%;border-collapse:collapse;font-size:10px;text-align:left}
+.ai-reference-table caption{text-align:left;color:var(--muted);padding:8px 0}
+.ai-reference-table th,.ai-reference-table td{padding:8px 5px;border-bottom:1px solid var(--border);vertical-align:top;overflow-wrap:anywhere}
+.ai-reference-table td small{display:block;color:var(--muted);max-width:110px}
+@media(max-width:720px){.ai-chat-layout{display:flex;flex-direction:column;overflow:auto}.ai-conversation{min-height:180px;max-height:300px;flex-shrink:0}#aiForm{height:auto;overflow:visible;border-left:0;border-top:1px solid var(--border)}.ai-conversation .ai-messages{padding:12px 16px}}
 #aiImageFields{margin-bottom:12px}.generation-comparison{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}.generation-comparison.with-reference{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.generation-comparison figure{margin:0;min-width:0;padding:12px;background:#f1f5f9;border:1px solid var(--border);border-radius:8px}.generation-comparison figcaption{font-size:12px;color:var(--muted);margin-bottom:8px}.generation-comparison img{display:block;width:100%;height:calc(min(50dvh,620px) - 50px);object-fit:contain}#generationComponents{margin-top:12px;font-size:12px;color:var(--secondary)}#generationComponentList{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;max-height:130px;overflow:auto}#generationComponentList li{padding:4px 10px;border:1px solid var(--border);border-radius:6px;overflow-wrap:anywhere}
 @media(max-width:680px){.generation-comparison.with-reference{grid-template-columns:minmax(0,1fr)}.generation-comparison img{height:180px}}
 

@@ -1,4 +1,6 @@
 import { t, getLocale } from './i18n.js';
+import { switchPage, activePage } from './pages.js';
+import { normalizeReferenceSpec, layoutReference } from './ai-reference.js';
 import { clone, validateProject } from './model.js';
 import { sanitizeContent, exportHTML } from './content.js';
 import { readStorage, writeStorage, download, readFile } from './storage.js';
@@ -30,9 +32,11 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   let mergeHead = null;
   let mergeProject = null;
   const serialize = () => ({ version: 1, project: clone(getProject()), versions: versions.serialize(), messages: clone(messages), pending: clone(pending) });
+  let targetActive = null;
   function setPanel(open) {
     $('aiPanel').hidden = !open;
     $('aiToggleBtn').setAttribute('aria-expanded', String(open));
+    if (open) renderMode();
   }
   function renderMessages() {
     $('aiMessages').replaceChildren();
@@ -52,7 +56,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiGenerated').hidden = !generated;
     $('aiSendBtn').disabled ||= !!generated;
     $('aiSendBtn').disabled ||= imageLoading;
-    for (const id of ['aiImageFile', 'aiImageRemoveBtn']) $(id).disabled = !!controller || !!generated || imageLoading;
+    for (const id of ['aiImageFile', 'aiImageRemoveBtn', 'aiTarget', 'aiRefName', 'aiRefWidth', 'aiRefHeight', 'aiRefColor', 'aiRefFunction', 'aiRefBodyFont', 'aiRefTitleFont', 'aiRefSmallFont', 'aiRefGap']) $(id).disabled = !!controller || !!pending || !!generated || imageLoading;
   }
   function addMessage(role, content) { messages.push({ role, content }); renderMessages(); scheduleSave(); }
   function renderVersions() {
@@ -131,11 +135,13 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   $('aiToggleBtn').addEventListener('click', () => setPanel($('aiPanel').hidden));
   $('generateComponentBtn').addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'component'; renderMode(); } $('aiRequirement').focus(); });
   $('generatePageBtn').addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'page'; renderMode(); } $('aiRequirement').focus(); });
+  $('generatePopupBtn').addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'popup'; renderMode(); } $('aiRequirement').focus(); });
   for (const id of ['generateImageBtn', 'imageUIBtn']) $(id).addEventListener('click', () => { setPanel(true); if (!controller && !pending && !generated) { $('aiMode').value = 'image'; renderMode(); $('aiImageFile').focus(); } });
   function renderImage() {
     $('aiImagePreview').hidden = !referenceImage;
     if (referenceImage) $('aiImagePreview').src = referenceImage.dataURL;
     else $('aiImagePreview').removeAttribute('src');
+    renderLayoutReference();
     $('aiImageRemoveBtn').hidden = !referenceImage;
     $('aiImageInfo').textContent = referenceImage ? t`画布 ${referenceImage.width} × ${referenceImage.height} px · 自动命名组件` : '';
   }
@@ -186,17 +192,24 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     if (controller || pending || generated || imageLoading) return;
     const mode = $('aiMode').value;
     if (mode === 'image' && !referenceImage) { $('aiStatus').textContent = t('请先上传参考图片'); $('aiImageFile').focus(); return; }
-    const requirement = $('aiRequirement').value.trim() || (mode === 'image' ? IMAGE_UI_REQUIREMENT : '');
-    if (!requirement) return;
+    let referenceSpec;
+    try { referenceSpec = readReferenceSpec(); } catch (error) { $('aiStatus').textContent = t(error.message); return; }
+    const requirement = $('aiRequirement').value.trim() || referenceSpec.function || (referenceImage ? mode === 'image' ? IMAGE_UI_REQUIREMENT : t('根据参考图片和基础参考表完成所选设计任务。') : '');
+    if (!requirement) { $('aiStatus').textContent = t('请输入需求、功能或上传参考图片'); $('aiRequirement').focus(); return; }
     if (!settings.url || !settings.model) { notify(t('请先设置 AI 接口地址和模型'), true); $('settingsBtn').click(); return; }
     finishGesture();
     const currentSession = session;
     const requestProject = clone(getProject());
-    const assets = getDesignAssets ? clone(getDesignAssets()) : {};
-    const designOptions = { designContext: assets.context, library: assets.library };
+    const target = selectedTarget();
+    const assets = getDesignAssets ? clone(getDesignAssets(mode === 'modify' ? target : requestProject)) : {};
+    const designOptions = { designContext: assets.context, library: assets.library, referenceSpec };
     const baseId = versions.add(requestProject, t('AI 生成前'), { force: true });
-    const image = mode === 'image' ? clone(referenceImage) : null;
-    const base = mode === 'modify' ? requestProject : generationBase(requestProject, mode, assets.context, image);
+    const image = referenceImage ? clone(referenceImage) : null;
+    const base = mode === 'modify' ? target : generationBase(requestProject, mode, assets.context, image, referenceSpec);
+    if (mode !== 'modify' && mode !== 'image' && getDesignAssets) {
+      designOptions.designContext = clone(getDesignAssets(base).context);
+      if (mode === 'popup') designOptions.designContext.safeArea = { ...base.safeArea, mode: 'none', bounds: layoutReference(base, referenceSpec, mode).layout.bounds };
+    }
     const context = clone(messages);
     controller = new AbortController(); const active = controller;
     let timedOut = false;
@@ -209,7 +222,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       if (active.signal.aborted) throw new Error(t('请求已取消'));
       finishGesture();
       if (mode !== 'modify') {
-        generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent, designOptions), mode, referenceImage: image };
+        generated = { ...parseGenerationResponse(text, base, mode, sanitizeContent, designOptions), mode, referenceImage: image, referenceSpec };
         versions.add(getProject(), t`AI 生成后（待确认）：${generated.summary}`, { force: true });
         addMessage('assistant', generated.summary);
         $('aiGeneratedSummary').textContent = `${generated.name} · ${generated.summary}`;
@@ -218,6 +231,8 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
         return;
       }
       const response = parseAIResponse(text, base, sanitizeContent, designOptions);
+      if (referenceSpec.name && response.project.pages) response.project.pages = response.project.pages.map(page => page.id === base.activePageId ? { ...page, name: referenceSpec.name } : page);
+      if (requestProject.pages) response.project = switchPage(response.project, requestProject.activePageId);
       const aiId = versions.add(response.project, `AI：${response.summary}`, { parent: baseId, branch: true });
       addMessage('assistant', response.summary);
       if (versions.head === baseId && JSON.stringify(getProject()) === JSON.stringify(requestProject)) {
@@ -240,21 +255,22 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     if (!generated) return;
     $('generationName').value = generated.name;
     $('generationSummary').textContent = generated.summary;
-    $('generationApplyBtn').textContent = generated.mode === 'component' ? t('保存到组件库') : t('添加为新页面');
+    $('generationApplyBtn').textContent = generated.mode === 'component' ? t('保存到组件库') : generated.mode === 'popup' ? t('添加为新弹窗') : t('添加为新页面');
     let preview = exportHTML(generated.project, { preview: true });
     if (generated.mode === 'image') {
       preview = preview.replace('</head>', '<style>html,body{height:100%;min-height:0;overflow:hidden}body{padding:0}.prototype-page{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}.device-shell{transform-origin:center}</style></head>');
       preview = preview.replace('</body>', `<script>const shell=document.querySelector('.device-shell');const fit=()=>{shell.style.transform='scale('+Math.min(1,(innerWidth-24)/shell.offsetWidth,(innerHeight-24)/shell.offsetHeight)+')';};new ResizeObserver(fit).observe(document.documentElement);fit();</script></body>`);
     }
     $('generationPreview').srcdoc = preview;
-    $('generationComparison').classList.toggle('with-reference', generated.mode === 'image');
-    $('generationReference').hidden = generated.mode !== 'image';
+    $('generationComparison').classList.toggle('with-reference', !!generated.referenceImage);
+    $('generationReference').hidden = !generated.referenceImage;
     if (generated.referenceImage) $('generationReferenceImage').src = generated.referenceImage.dataURL;
     else $('generationReferenceImage').removeAttribute('src');
     $('generationComponents').hidden = generated.mode !== 'image';
     $('generationComponentList').replaceChildren(...(generated.mode === 'image' ? generated.project.items : []).map(item => {
       const entry = document.createElement('li'); entry.textContent = item.name; return entry;
     }));
+    renderReferenceRows($('generationLayoutRows'), layoutReference(generated.project, generated.referenceSpec, generated.mode));
     $('generationError').textContent = '';
     if (!$('generationDialog').open) $('generationDialog').showModal();
   }
@@ -267,9 +283,9 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       if (!name || name.length > 40) throw new Error(t('名称请输入 1～40 个字符'));
       finishGesture();
       applyGeneration({ ...generated, name });
-      versions.add(getProject(), t`保存 AI 生成${generated.mode === 'component' ? t('组件') : t('页面')}：${name}`, { force: true });
+      versions.add(getProject(), t`保存 AI 生成${generated.mode === 'component' ? t('组件') : generated.mode === 'popup' ? t('弹窗') : t('页面')}：${name}`, { force: true });
       renderVersions();
-      const label = generated.mode === 'component' ? t('组件已保存到当前工程组件库，可点击或拖拽使用。') : t('新页面已添加到当前工程，可继续编辑。');
+      const label = generated.mode === 'component' ? t('组件已保存到当前工程组件库，可点击或拖拽使用。') : generated.mode === 'popup' ? t('新弹窗已添加到当前工程，可继续编辑。') : t('新页面已添加到当前工程，可继续编辑。');
       generated = null; $('generationDialog').close(); addMessage('system', label); notify(label);
       $('aiStatus').textContent = t('已保存，可以继续提出需求。'); renderMessages();
     } catch (error) { $('generationError').textContent = t(error.message); }
@@ -279,14 +295,69 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   $('aiMode').addEventListener('change', renderMode);
   function renderMode() {
     const mode = $('aiMode').value;
-    $('aiImageFields').hidden = mode !== 'image';
-    $('aiRequirement').required = mode !== 'image';
-    $('aiModeHelp').textContent = mode === 'image' ? t('上传界面图片，AI 还原布局和文案，拆分可编辑组件并自动命名，预览后添加为新页面。') : mode === 'modify' ? t('发送当前工程和最近对话，修改当前页。') : mode === 'component' ? t('根据提示词和规范独立生成组件，预览后保存到当前工程组件库。') : t('根据提示词和规范独立生成页面，预览后添加为新页面。');
-    $('aiSendBtn').textContent = mode === 'image' ? t('根据图片生成 UI') : mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : t('生成页面');
+    $('aiImageFields').hidden = false;
+    $('aiTargetField').hidden = mode !== 'modify';
+    $('aiRequirement').required = false;
+    refreshTargets();
+    renderLayoutReference();
+    $('aiModeHelp').textContent = mode === 'image' ? t('上传界面图片，AI 还原布局和文案，拆分可编辑组件并自动命名，预览后添加为新页面。') : mode === 'modify' ? t('发送当前工程和最近对话，修改当前页。') : mode === 'component' ? t('根据提示词和规范独立生成组件，预览后保存到当前工程组件库。') : mode === 'popup' ? t('根据提示词、参考图片和基础信息生成弹窗，预览后添加为新弹窗。') : t('根据提示词和规范独立生成页面，预览后添加为新页面。');
+    $('aiSendBtn').textContent = mode === 'image' ? t('根据图片生成 UI') : mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : mode === 'popup' ? t('生成弹窗') : t('生成页面');
     const design = getDesignAssets?.().context;
     $('aiRulesSummary').textContent = mode === 'image' ? t('优先还原图片的布局、颜色和原文案；提示词可留空，也可填写额外要求。') : t`自动使用内置规范${getRules() ? t('、工程规范') : ''}${design?.palette ? t`、${design.palette.name}配色` : ''}${design ? t`、${design.library.components.length} 个关联组件及安全区信息` : ''}，可在「工程设置」中编辑。`;
     $('aiBuiltinRules').textContent = t(DESIGN_SPEC);
   }
+  function readReferenceSpec() {
+    return normalizeReferenceSpec(Object.fromEntries([
+      ['name', 'Name'], ['width', 'Width'], ['height', 'Height'], ['color', 'Color'], ['function', 'Function'],
+      ['bodyFont', 'BodyFont'], ['titleFont', 'TitleFont'], ['smallFont', 'SmallFont'], ['gap', 'Gap'],
+    ].map(([key, suffix]) => [key, $('aiMode').value === 'image' && ['width', 'height'].includes(key) ? '' : $(`aiRef${suffix}`).value])), $('aiMode').value);
+  }
+  function refreshTargets() {
+    const project = getProject(), previous = $('aiTarget').value;
+    $('aiTarget').replaceChildren(...(project.pages || []).map(page => new Option(`${page.name} · ${t(page.kind === 'popup' ? '弹窗' : page.kind === 'toast' ? 'Toast' : '页面')}`, page.id)));
+    $('aiTarget').value = targetActive === project.activePageId && project.pages?.some(page => page.id === previous) ? previous : project.activePageId || '';
+    targetActive = project.activePageId;
+  }
+  function selectedTarget() {
+    const project = getProject();
+    return project.pages && $('aiTarget').value ? switchPage(project, $('aiTarget').value) : clone(project);
+  }
+  function renderLayoutReference() {
+    try {
+      const mode = $('aiMode').value;
+      for (const id of ['aiRefWidth', 'aiRefHeight']) $(id).min = mode === 'component' ? '1' : '100';
+      $('aiRefWidth').readOnly = $('aiRefHeight').readOnly = mode === 'image';
+      const spec = readReferenceSpec();
+      const board = mode === 'modify' ? selectedTarget() : generationBase(getProject(), mode === 'image' && !referenceImage ? 'page' : mode, getDesignAssets?.().context, referenceImage, spec);
+      const reference = layoutReference(board, spec, mode), { typography, layout } = reference;
+      $('aiRefWidth').placeholder = mode === 'component' ? t('自动') : String(board.canvas.width);
+      $('aiRefHeight').placeholder = mode === 'component' ? t('自动') : String(board.canvas.height);
+      $('aiRefName').placeholder = mode === 'modify' ? activePage(board)?.name || t('名称') : t('留空由 AI 命名');
+      $('aiTypographySummary').textContent = t`字号：正文 ${typography.body} px（1 倍），标题 ${typography.title} px（${typography.titleRatio} 倍），辅助 ${typography.small} px（${typography.smallRatio} 倍）。组件间距 ${layout.gap} px。`;
+      const b = layout.bounds;
+      $('aiLayoutSummary').textContent = t`画布 ${layout.width} × ${layout.height} px；可排版区域 x ${b.x}～${b.x + b.width}，y ${b.y}～${b.y + b.height}；最大组件 ${b.width} × ${b.height} px，最多 ${layout.maxItems} 个组件。组件需完整位于区域内，避免意外重叠与文字裁切。`;
+      const area = layout.safeArea;
+      $('aiSafeAreaSummary').textContent = t`安全区限制：${t(area.enabled ? '已启用' : '未启用')}；留白上 ${area.top || 0} / 右 ${area.right || 0} / 下 ${area.bottom || 0} / 左 ${area.left || 0} px。坐标为画布实际像素。`;
+      renderReferenceRows($('aiLayoutRows'), reference);
+    } catch (error) { $('aiLayoutSummary').textContent = t(error.message); }
+  }
+  function renderReferenceRows(body, reference) {
+      body.replaceChildren();
+      for (const item of reference.components) {
+        const row = document.createElement('tr');
+        for (const value of [item.name, `${item.x} / ${item.y}`, `${item.width} × ${item.height}`, item.fontSize ? `${item.fontSize} px / ${item.fontRatio}×` : t('未指定'), item.color || t('未指定')]) {
+          const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
+        }
+        const detail = document.createElement('small'); detail.textContent = item.function; row.firstChild.append(detail);
+        body.append(row);
+      }
+      if (!reference.components.length) {
+        const row = document.createElement('tr'), cell = document.createElement('td'); cell.colSpan = 5;
+        cell.textContent = t('新内容生成后在预览中查看；优化已有页面时展示当前组件。'); row.append(cell); body.append(row);
+      }
+  }
+  $('aiTarget').addEventListener('change', renderLayoutReference);
+  for (const id of ['aiRefWidth', 'aiRefHeight', 'aiRefBodyFont', 'aiRefTitleFont', 'aiRefSmallFont', 'aiRefGap']) $(id).addEventListener('input', renderLayoutReference);
   $('aiCancelBtn').addEventListener('click', () => controller?.abort());
   $('mergeOpenBtn').addEventListener('click', openMerge);
   $('discardAIBtn').addEventListener('click', () => { pending = null; addMessage('system', t('已放弃应用 AI 修改，AI 版本仍保留在版本记录中。')); $('aiStatus').textContent = t('可以继续发送需求。'); });
@@ -340,6 +411,9 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       versions = createVersions(project, workspace.versions);
       messages = clone(workspace.messages); pending = clone(workspace.pending); generated = null; choices = {}; mergeHead = null;
       for (const id of ['mergeDialog', 'generationDialog']) if ($(id).open) $(id).close();
+      for (const id of ['aiRefName', 'aiRefWidth', 'aiRefHeight', 'aiRefColor', 'aiRefFunction']) $(id).value = '';
+      $('aiRefBodyFont').value = '16'; $('aiRefTitleFont').value = '24'; $('aiRefSmallFont').value = '12'; $('aiRefGap').value = '16';
+      targetActive = null;
       $('aiRequirement').value = ''; $('aiStatus').textContent = ''; $('aiMode').value = 'modify'; renderMode(); renderMessages();
     },
     persist(savedAt) { writeStorage(WORKSPACE_KEY, { ...serialize(), savedAt }); },

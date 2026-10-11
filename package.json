@@ -23,6 +23,7 @@
     "test:collapse": "node scripts/collapse-browser-test.mjs",
     "test:guides": "node scripts/guides-browser-test.mjs",
     "test:project": "node scripts/project-browser-test.mjs",
+    "test:ai-reference": "node scripts/ai-reference-browser-test.mjs",
     "test:ai": "node scripts/ai-browser-test.mjs",
     "test:image-ui": "node scripts/image-ui-browser-test.mjs",
     "test:orientation": "node scripts/orientation-browser-test.mjs",

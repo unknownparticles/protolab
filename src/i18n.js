@@ -88,7 +88,7 @@ export function bindStaticTranslations(root) {
   visit(root);
   return () => bindings.forEach(apply => apply());
 }
-const ignored = 'script, style, [data-i18n-ignore], .prototype-content, .device-decoration, .component-preview, .item-label, .component-name, .merge-values pre, .merge-conflict>strong, #projectSelect, #propClickTarget, #propVisibilityTargets, #engineeringManifest, #engineeringLibraryGroups, #layerList, #pageList, #artboardName, #customGroup, #manageComponentGroup, #customGroupFilter, #aiPendingSummary, #aiGeneratedSummary, #generationSummary, #aiMessages span';
+const ignored = 'script, style, [data-i18n-ignore], .prototype-content, .device-decoration, .component-preview, .item-label, .component-name, .merge-values pre, .merge-conflict>strong, #projectSelect, #propClickTarget, #propVisibilityTargets, #engineeringManifest, #engineeringLibraryGroups, #layerList, #pageList, #artboardName, #customGroup, #manageComponentGroup, #customGroupFilter, #aiPendingSummary, #aiGeneratedSummary, #generationSummary, #aiMessages span, #aiTarget, #aiLayoutRows, #generationLayoutRows';
 function refreshChrome(root, previous) {
   const visit = node => {
     if (node.nodeType === 3 && node.textContent.trim()) {

@@ -84,7 +84,7 @@ test('拒绝单层整图、设备外框或安全区、引用组件库和跨页�
     assert.throws(() => parseGenerationResponse(reply(changes), base(), 'image', clean));
   }
 });
-test('视觉请求发送多模态图片与尺寸，隔离历史和工程清单，其他模式保持文本请求', async () => {
+test('视觉请求发送多模态图片与尺寸，隔离历史和工程清单，其他模式按需携带图片', async () => {
   let sent;
   const fetcher = async (_, options) => { sent = JSON.parse(options.body); return { ok: true, json: async () => ({ choices: [{ message: { content: reply([]) } }] }) }; };
   const settings = { url: 'https://example.com/v1', model: 'vision' };
@@ -97,6 +97,9 @@ test('视觉请求发送多模态图片与尺寸，隔离历史和工程清单�
   assert.equal(task.mode, 'image'); assert.deepEqual(task.referenceImage, { width: 375, height: 667 });
   assert.equal(task.designContext, undefined); assert.equal(task.project.items.length, 0);
   await requestAI(settings, '生成页面', generationBase(emptyProject(), 'page'), [], undefined, fetcher, { mode: 'page', referenceImage: image });
-  assert.equal(typeof sent.messages[1].content, 'string'); assert.equal(JSON.stringify(sent).includes(image.dataURL), false);
+  assert.equal(sent.messages[1].content[1].image_url.url, image.dataURL);
+  assert.equal(JSON.parse(sent.messages[1].content[0].text).mode, 'page');
+  await requestAI(settings, '生成页面', generationBase(emptyProject(), 'page'), [], undefined, fetcher, { mode: 'page' });
+  assert.equal(typeof sent.messages[1].content, 'string');
   await assert.rejects(requestAI(settings, '还原界面', base(), [], undefined, async () => ({ ok: false, status: 400 }), { mode: 'image', referenceImage: image }), /视觉模型/);
 });
