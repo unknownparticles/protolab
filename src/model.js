@@ -95,6 +95,7 @@ export function createItem(component, canvas, x = 40, y = 40, bounds) {
     ...(component.container ? { container: component.container } : {}),
     ...(component.imageSlot ? { imageSlot: true } : {}),
     ...(component.appearance ? { appearance: component.appearance } : {}),
+    ...(component.textBasis ? { textBasis: component.textBasis } : {}),
   }, canvas, bounds);
 }
 export function validateLibrary(raw, sanitize) {
@@ -121,6 +122,10 @@ export function validateLibrary(raw, sanitize) {
       orientationResponse: normalizeOrientationResponse(entry.orientationResponse),
       ...(entry.imageSlot === true ? { imageSlot: true } : {}),
       ...(entry.appearance != null ? { appearance: normalizeAppearance(entry.appearance) } : {}),
+      ...(type === 'html' && entry.textBasis != null ? { textBasis: {
+        width: number(entry.textBasis.width, number(entry.defaultWidth, 120, 1, 2000), 1, 2000),
+        height: number(entry.textBasis.height, number(entry.defaultHeight, 60, 1, 2000), 1, 2000),
+      } } : {}),
       defaultWidth: number(entry.defaultWidth, 120, 1, 2000), defaultHeight: number(entry.defaultHeight, 60, 1, 2000) };
   });
 }

@@ -16,7 +16,8 @@ export function fitItemText(node, { maxWidth = parseFloat(node.style.width), gro
   // 单行文案可以拉长；段落、换行和复合布局保留原来的排版宽度。
   const simple = roots.length <= 1 && !content.querySelector('br,textarea,pre,svg,img') &&
     (!root || !root.querySelector('div,p,h1,h2,h3,h4,h5,h6,section,article,input,button,select')) &&
-    !content.textContent.includes('\n') && (!root || !['UL', 'OL', 'TABLE'].includes(root.tagName));
+    !content.textContent.includes('\n') && (!root || !['UL', 'OL', 'TABLE'].includes(root.tagName)) &&
+    (!root?.style.whiteSpace || root.style.whiteSpace === 'nowrap');
   const apply = scale => {
     if (fixed) return;
     for (const { element, font, line } of node.textMetrics) {
