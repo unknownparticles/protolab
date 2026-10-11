@@ -65,7 +65,7 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom, fitText) 
   }
   function position(entry) {
     for (const key of ['x', 'y', 'width', 'height']) entry.node.style[{ x: 'left', y: 'top' }[key] || key] = `${entry.item[key] - (key === 'y' ? entry.offsetY || 0 : 0)}px`;
-    fitText(entry.node);
+    entry.item.width = fitText(entry.node, { growWidth: !entry.node.dataset.parentId, maxWidth: Math.min(entry.page.bounds.x + entry.page.bounds.width, entry.node.parentElement.clientWidth) - entry.item.x });
     if (entry.overlay) {
       entry.overlay.style.cssText = `left:${entry.item.x}px;top:${entry.item.y - (entry.offsetY || 0)}px;width:${entry.item.width}px;height:${entry.item.height}px;transform:rotate(${entry.item.angle}deg)`;
     }

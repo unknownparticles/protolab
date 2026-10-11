@@ -13,7 +13,7 @@ try {
   browser = await chromium.launch({ headless: true, ...(process.env.PROTOLAB_BROWSER_EXECUTABLE ? { executablePath: process.env.PROTOLAB_BROWSER_EXECUTABLE } : {}) });
   const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
   const page = await context.newPage(), errors = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
   await page.goto(base);
   const item = (id, content, x, y, width, height, extra = {}) => ({ id, name: id, type: 'html', content, x, y, width, height, radius: 0, padding: '0', margin: '0', ...extra });
   const data = { version: 1, canvas: { width: 600, height: 600, preset: 'custom' }, frame: { device: 'pc', style: 'none' }, items: [
@@ -61,7 +61,7 @@ try {
 
   await page.locator('#previewBtn').click();
   const preview = page.frameLocator('#previewFrame');
-  console.log(await preview.locator('[data-name="button"]').evaluate(node => ({ style: node.style.cssText, basis: node.dataset.textBasis, rect: node.getBoundingClientRect().toJSON(), metrics: !!node.textMetrics, html: node.innerHTML })));
+  for (let index = 0; index < 40 && await preview.locator('[data-name="button"] button').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) !== 28; index++) await page.waitForTimeout(50);
   assert.equal(await preview.locator('[data-name="button"] button').evaluate(element => parseFloat(getComputedStyle(element).fontSize)), 28);
   await preview.getByRole('button', { name: '编辑文字与尺寸', exact: true }).click();
   await preview.locator('[data-name="text"]').click({ position: { x: 5, y: 5 } });

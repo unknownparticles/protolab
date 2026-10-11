@@ -76,6 +76,9 @@ function runPrototype(layoutItems, layoutContainers, fitText) {
     }
   }
   document.addEventListener('prototype-layout', updateLayout);
+  // 预览 iframe 可能先在关闭的对话框内加载，显示后再测量文字。
+  const sizeObserver = new ResizeObserver(updateLayout);
+  for (const board of document.querySelectorAll('.prototype')) sizeObserver.observe(board);
   function execute(element) {
     const type = element.dataset.action;
     if (type === 'navigate') showPage(element.dataset.target);
