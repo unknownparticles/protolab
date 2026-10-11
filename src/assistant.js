@@ -327,10 +327,12 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiBuiltinRules').textContent = t(DESIGN_SPEC);
   }
   function readReferenceSpec() {
+    const mode = $('aiMode').value;
+    const ignores = key => mode === 'selection' && ['name', 'width', 'height'].includes(key) || mode === 'image' && ['width', 'height'].includes(key);
     return normalizeReferenceSpec(Object.fromEntries([
       ['name', 'Name'], ['width', 'Width'], ['height', 'Height'], ['color', 'Color'], ['function', 'Function'],
       ['bodyFont', 'BodyFont'], ['titleFont', 'TitleFont'], ['smallFont', 'SmallFont'], ['gap', 'Gap'],
-    ].map(([key, suffix]) => [key, $('aiMode').value === 'selection' && ['name', 'width', 'height'].includes(key) || $('aiMode').value === 'image' && ['width', 'height'].includes(key) ? '' : $(`aiRef${suffix}`).value])), $('aiMode').value);
+    ].map(([key, suffix]) => [key, ignores(key) ? '' : $(`aiRef${suffix}`).value])), mode);
   }
   function refreshTargets() {
     const project = getProject(), previous = $('aiTarget').value;
