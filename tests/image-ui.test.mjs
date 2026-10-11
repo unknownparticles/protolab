@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generationBase, parseGenerationResponse, requestAI } from '../src/ai.js';
 import { imageCanvasSize, validateReferenceImage, nameImageComponents } from '../src/image-ui.js';
+import { normalizeItem } from '../src/model.js';
 import { emptyProject } from '../src/projects.js';
 
 const image = { dataURL: 'data:image/png;base64,YWJj', width: 375, height: 667 };
@@ -9,6 +10,13 @@ const clean = text => text.replace(/<script>.*?<\/script>/g, '');
 const heading = { id: 'title', name: '登录标题', type: 'html', content: '<h1>欢迎登录</h1><script>bad()</script>', x: 20, y: 40, width: 200, height: 50 };
 const button = { id: 'submit', name: '登录按钮', type: 'html', content: '<button>登录</button>', x: 20, y: 150, width: 200, height: 40 };
 const reply = changes => JSON.stringify({ version: 1, name: '图片登录页', summary: '已还原登录界面', changes });
+const containerReply = changes => reply(changes.flatMap(change => {
+  if (change.op !== 'add') return [change];
+  const item = change.item, id = `${item.id}-section`;
+  const region = normalizeItem({ ...item, id, name: `${item.name || '内容'}区域`, content: '<div></div>', padding: '0', radius: 0, container: { mode: 'vertical', gap: 0 }, appearance: { background: 'transparent' } }, image);
+  return [{ op: 'add', item: region }, { ...change, item: { ...item, parentId: id } }];
+}));
+const contentItems = result => result.project.items.filter(item => !item.container);
 const base = () => generationBase(emptyProject(), 'image', undefined, image);
 
 test('参考图等比缩放，拒绝不支持格式、过小、过长和过大图片', () => {
@@ -22,15 +30,15 @@ test('图片空白画布隔离工程配色安全区，生成保留尺寸并清�
   const blank = generationBase(emptyProject(), 'image', context, image);
   assert.deepEqual(blank.canvas, { width: 375, height: 667, preset: 'custom' });
   assert.equal(blank.frame.style, 'none'); assert.equal(blank.safeArea.enabled, false);
-  const result = parseGenerationResponse(reply([
+  const result = parseGenerationResponse(containerReply([
     { op: 'canvas', fields: { background: '#f8fafc' } },
     { op: 'add', item: heading }, { op: 'add', item: { ...button, name: '' } },
     { op: 'add', item: { ...button, id: 'second', name: '', y: 200 } },
   ]), blank, 'image', clean, { designContext: context });
-  assert.deepEqual(result.project.items.map(item => item.name), ['登录标题', '登录 · 按钮', '登录 · 按钮 2']);
-  assert.equal(result.project.items[0].content, '<h1>欢迎登录</h1>');
-  assert.equal(result.project.items[0].x, 20); assert.equal(result.project.items[0].radius, 0);
-  assert.equal(result.project.items[0].imported, true);
+  assert.deepEqual(contentItems(result).map(item => item.name), ['登录标题', '登录 · 按钮', '登录 · 按钮 2']);
+  assert.equal(contentItems(result)[0].content, '<h1>欢迎登录</h1>');
+  assert.equal(contentItems(result)[0].x, 20); assert.equal(contentItems(result)[0].radius, 0);
+  assert.equal(contentItems(result)[0].imported, true);
   assert.equal(result.project.safeArea.enabled, false);
   assert.equal(result.project.canvas.background, '#f8fafc');
   assert.equal(result.project.canvas.width, 375);
@@ -46,14 +54,14 @@ test('模型重复返回参考尺寸、默认预设或其他尺寸时保留本�
     { preset: 'phone' },
   ]) {
     // 放在新增组件之后，确保处理顺序不会改变组件位置。
-    const result = parseGenerationResponse(reply([...valid, { op: 'canvas', fields: canvasFields }]), base(), 'image', clean);
+    const result = parseGenerationResponse(containerReply([...valid, { op: 'canvas', fields: canvasFields }]), base(), 'image', clean);
     assert.equal(result.project.canvas.width, 375); assert.equal(result.project.canvas.height, 667);
     assert.equal(result.project.canvas.preset, 'custom');
-    assert.deepEqual(result.project.items.map(({ x, y, width, height }) => ({ x, y, width, height })), [heading, button].map(({ x, y, width, height }) => ({ x, y, width, height })));
+    assert.deepEqual(contentItems(result).map(({ x, y, width, height }) => ({ x, y, width, height })), [heading, button].map(({ x, y, width, height }) => ({ x, y, width, height })));
     if (canvasFields.background) assert.equal(result.project.canvas.background, '#f8fafc');
   }
   for (const canvasFields of [{ width: '375' }, { height: null }, { unknown: true }, {}]) {
-    assert.throws(() => parseGenerationResponse(reply([...valid, { op: 'canvas', fields: canvasFields }]), base(), 'image', clean));
+    assert.throws(() => parseGenerationResponse(containerReply([...valid, { op: 'canvas', fields: canvasFields }]), base(), 'image', clean));
   }
 });
 test('图片组件轻微越界、负坐标及过大尺寸自动约束到参考画布，保留其他组件和内容', () => {
@@ -65,23 +73,23 @@ test('图片组件轻微越界、负坐标及过大尺寸自动约束到参考�
     [{ x: 0, y: 0, width: 0.2, height: 0.4 }, { x: 0, y: 0, width: 1, height: 1 }],
     [{ x: 175.2, y: 627.2, width: 200, height: 40 }, { x: 175, y: 627, width: 200, height: 40 }],
   ]) {
-    const result = parseGenerationResponse(reply([{ op: 'add', item: heading }, { op: 'add', item: { ...button, ...geometry } }]), base(), 'image', clean);
-    const fitted = result.project.items[1];
+    const result = parseGenerationResponse(containerReply([{ op: 'add', item: heading }, { op: 'add', item: { ...button, ...geometry } }]), base(), 'image', clean);
+    const fitted = contentItems(result)[1];
     assert.deepEqual({ x: fitted.x, y: fitted.y, width: fitted.width, height: fitted.height }, expected);
     assert.equal(fitted.content, button.content); assert.equal(fitted.name, button.name);
-    assert.equal(result.project.items[0].x, heading.x); assert.equal(result.project.items[0].y, heading.y);
+    assert.equal(contentItems(result)[0].x, heading.x); assert.equal(contentItems(result)[0].y, heading.y);
     assert.equal(result.project.canvas.width, 375); assert.equal(result.project.canvas.height, 667);
   }
 });
 test('图片生成拒绝无效坐标、缺少尺寸、零或负宽高', () => {
   for (const geometry of [{ x: null }, { y: '150' }, { x: undefined }, { width: 0 }, { height: -1 }, { width: undefined }, { height: null }, { x: 1e400 }]) {
-    assert.throws(() => parseGenerationResponse(reply([{ op: 'add', item: heading }, { op: 'add', item: { ...button, ...geometry } }]), base(), 'image', clean), /有效数字/);
+    assert.throws(() => parseGenerationResponse(containerReply([{ op: 'add', item: heading }, { op: 'add', item: { ...button, ...geometry } }]), base(), 'image', clean), /有效数字/);
   }
 });
 test('拒绝单层整图、设备外框或安全区、引用组件库和跨页动作', () => {
   const valid = [{ op: 'add', item: heading }, { op: 'add', item: button }];
   for (const changes of [valid.slice(0, 1), [...valid, { op: 'frame', fields: { style: 'browser' } }], [...valid, { op: 'safeArea', fields: { enabled: true } }], [valid[0], { op: 'add', item: { ...button, libraryId: 'existing' } }], [valid[0], { op: 'add', item: { ...button, interaction: { type: 'navigate', targetId: 'home' } } }]]) {
-    assert.throws(() => parseGenerationResponse(reply(changes), base(), 'image', clean));
+    assert.throws(() => parseGenerationResponse(containerReply(changes), base(), 'image', clean));
   }
 });
 test('视觉请求发送多模态图片与尺寸，隔离历史和工程清单，其他模式按需携带图片', async () => {

@@ -24,7 +24,7 @@ test('弹窗独立生成保留指定尺寸和名称，关闭外框与安全区�
   const spec = { name: '删除确认', width: 480, height: 300 };
   const base = generationBase(emptyProject(), 'popup', { safeArea: { enabled: true, top: 40 } }, null, spec);
   assert.equal(base.frame.style, 'none'); assert.equal(base.safeArea.enabled, false);
-  const result = parseGenerationResponse(reply([{ op: 'canvas', fields: { width: 900, height: 800 } }, { op: 'add', item }]), base, 'popup', v => v, { referenceSpec: spec });
+  const result = parseGenerationResponse(reply([{ op: 'canvas', fields: { width: 900, height: 800 } }, { op: 'add', item: { ...item, id: 'section', name: '弹窗容器', content: '<div></div>', container: { mode: 'vertical', gap: 0 } } }, { op: 'add', item: { ...item, parentId: 'section' } }]), base, 'popup', v => v, { referenceSpec: spec });
   assert.equal(result.name, spec.name); assert.equal(result.project.canvas.width, 480); assert.equal(result.project.canvas.height, 300);
   assert.throws(() => parseGenerationResponse(reply([{ op: 'remove', id: 'title' }]), base, 'popup', v => v));
   const componentBase = generationBase(emptyProject(), 'component', null, null, { width: 80, height: 40 });

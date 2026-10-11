@@ -1,5 +1,6 @@
 // 界面文案以中文为键；插值使用 {0}、{1}，用户内容不参与翻译。
 export const EN = Object.freeze({
+  "颜色支持透明、半透明色值和 rgba；留空恢复组件原始颜色。": "Use transparent, hex colors with alpha or rgba; leave blank to restore the original color.",
   "透明": "Transparent",
   "画布背景颜色": "Canvas background color",
   "画布背景颜色选择器": "Canvas background color picker",

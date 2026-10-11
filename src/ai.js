@@ -42,7 +42,7 @@ export function parseGenerationResponse(text, base, mode, sanitize, options = {}
   const allowed = mode === 'component' ? ['add'] : mode === 'page' ? ['add', 'canvas', 'frame', 'safeArea'] : ['image', 'popup'].includes(mode) ? ['add', 'canvas'] : [];
   if (!allowed.length || raw.changes.some(change => !change || !allowed.includes(change.op) || change.item?.interaction && change.item.interaction.type !== 'none')) throw new Error('独立生成只能创建新内容，不能修改已有组件或引用其他页面');
   if (mode === 'image') {
-    const additions = raw.changes.filter(change => change.op === 'add');
+    const additions = raw.changes.filter(change => change.op === 'add' && !change.item?.container);
     if (additions.length < 2) throw new Error('图片界面须拆分为多个可独立编辑的组件，请重新生成');
     for (const change of raw.changes) {
       if (change.op === 'canvas') {

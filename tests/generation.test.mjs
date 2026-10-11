@@ -4,6 +4,7 @@ import { generationBase, parseGenerationResponse, requestAI, DESIGN_SPEC } from 
 import { emptyProject } from '../src/projects.js';
 const clean = value => value.replace(/<script>.*?<\/script>/g, '');
 const item = { id: 'generated', name: '卡片', type: 'html', content: '<div>卡片</div><script>bad()</script>', x: 0, y: 0, width: 240, height: 140 };
+const container = { id: 'section', name: '内容区', type: 'html', content: '<div></div>', x: 0, y: 0, width: 240, height: 320, padding: '0', container: { mode: 'vertical', gap: 40 }, appearance: { background: 'transparent' } };
 const reply = changes => JSON.stringify({ version: 1, name: '欢迎卡片', summary: '已生成欢迎卡片', changes });
 test('独立生成基于空白画布，组件保存尺寸与清理后的内容', () => {
   const source = emptyProject(); source.items.push({ ...item });
@@ -17,8 +18,8 @@ test('独立生成基于空白画布，组件保存尺寸与清理后的内容',
 });
 test('页面生成允许调整画布并拆分组件，拒绝修改删除、跨页引用和空结果', () => {
   const base = generationBase(emptyProject(), 'page');
-  const result = parseGenerationResponse(reply([{ op: 'canvas', fields: { width: 768, height: 1024 } }, { op: 'add', item }, { op: 'add', item: { ...item, id: 'second', y: 180 } }]), base, 'page', clean);
-  assert.equal(result.project.items.length, 2); assert.equal(result.project.canvas.width, 768);
+  const result = parseGenerationResponse(reply([{ op: 'canvas', fields: { width: 768, height: 1024 } }, { op: 'add', item: container }, { op: 'add', item: { ...item, parentId: container.id } }, { op: 'add', item: { ...item, id: 'second', y: 180, parentId: container.id } }]), base, 'page', clean);
+  assert.equal(result.project.items.length, 3); assert.equal(result.project.canvas.width, 768);
   for (const changes of [[], [{ op: 'remove', id: 'existing' }], [{ op: 'update', id: 'existing', fields: { name: '覆盖' } }], [{ op: 'add', item: { ...item, interaction: { type: 'navigate', targetId: 'page-home' } } }]]) {
     assert.throws(() => parseGenerationResponse(reply(changes), base, 'page', clean));
   }
