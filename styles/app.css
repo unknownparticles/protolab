@@ -249,4 +249,18 @@ html[lang=en] .panel-tabs button{font-size:10px}
 .toolbox-tabs{padding-bottom:10px}
 .editor-item.container-item{outline:1px dashed #94a3b8;outline-offset:-1px}
 .editor-item.container-item.selected{outline:2px solid var(--brand)}
+.canvas-resize{position:absolute;display:none;width:10px;height:10px;padding:0;border:1px solid var(--brand);border-radius:2px;background:white;touch-action:none;z-index:3}
+.editor-item.selected>.canvas-resize{display:block}
+.canvas-resize.nw{left:-5px;top:-5px;cursor:nwse-resize}.canvas-resize.ne{right:-5px;top:-5px;cursor:nesw-resize}.canvas-resize.sw{left:-5px;bottom:-5px;cursor:nesw-resize}.canvas-resize.se{right:-5px;bottom:-5px;cursor:nwse-resize}
+.canvas-resize.n{left:calc(50% - 5px);top:-5px;cursor:ns-resize}.canvas-resize.s{left:calc(50% - 5px);bottom:-5px;cursor:ns-resize}.canvas-resize.e{right:-5px;top:calc(50% - 5px);cursor:ew-resize}.canvas-resize.w{left:-5px;top:calc(50% - 5px);cursor:ew-resize}
+.canvas-text-editor{position:fixed;z-index:90;width:min(320px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow:auto;padding:12px;border:1px solid var(--brand);border-radius:8px;background:white;box-shadow:0 8px 28px #0f172a26;font-size:12px;color:var(--text)}
+.canvas-text-editor label{display:block;margin-bottom:8px}.canvas-text-editor textarea{display:block;width:100%;margin-top:5px;padding:8px;border:1px solid var(--border);border-radius:5px;resize:vertical;user-select:text;line-height:1.5}
+.canvas-text-editor small{font-size:10px;color:var(--muted)}.canvas-text-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
 .layer-item.container-child{padding-left:24px}
+
+.color-field{flex-wrap:wrap;position:relative}
+.color-field input:not([type=color]){flex:1 1 96px;width:0}
+.color-swatch{position:absolute;left:4px;top:4px;width:24px;height:26px;border-radius:3px;pointer-events:none;background:conic-gradient(#e2e8f0 25%,#fff 0 50%,#e2e8f0 0 75%,#fff 0);background-size:8px 8px}
+.color-swatch::after{content:"";position:absolute;inset:0;background:var(--swatch-color,transparent);border:1px solid #94a3b8;border-radius:3px}
+.color-transparent{padding:6px;border:1px solid var(--border);border-radius:6px;background:white;color:var(--muted);font-size:11px;cursor:pointer}
+.color-transparent[aria-pressed=true]{color:var(--brand);border-color:#93c5fd;background:#eff6ff}

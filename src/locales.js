@@ -1,5 +1,12 @@
 // 界面文案以中文为键；插值使用 {0}、{1}，用户内容不参与翻译。
 export const EN = Object.freeze({
+  "透明": "Transparent",
+  "画布背景颜色": "Canvas background color",
+  "画布背景颜色选择器": "Canvas background color picker",
+  "颜色请输入十六进制色值、rgba 或 transparent": "Enter a hex color, rgba or transparent",
+  "调整画布尺寸与背景": "Update canvas size and background",
+  "画布设置已更新": "Canvas settings updated",
+  "生成页面或弹窗须使用布局容器，所有内容组件须指定所属容器，请重新生成": "Generate the page or popup with layout containers and assign every content element to a container. Please try again.",
   "隐藏 AI 对话": "Hide AI chat",
   "生成中": "Generating",
   "正在生成…": "Generating…",
@@ -658,6 +665,10 @@ export const EN = Object.freeze({
   "调整尺寸 {0}": "Resize {0}",
   "此组件没有可编辑文字，可拖动控制点调整尺寸": "No editable text in this component. Drag handles to resize.",
   "编辑组件文字": "Edit component text",
+  "修改组件文字": "Edit component text",
+  "调整组件尺寸": "Resize component",
+  "回车保存 · Shift + 回车换行 · Esc 取消": "Enter to save · Shift + Enter for a new line · Esc to cancel",
+  "双击文字编辑 · 拖动边缘或角点调整尺寸 · 滚轮 / 双指缩放 · 空格 / 中键平移": "Double-click text to edit · Drag edges or corners to resize · Scroll / pinch to zoom · Space / middle button to pan",
   "编辑文字": "Edit text",
   "保存文字": "Save text",
   "双击文字编辑 · 拖动边缘或角点调整尺寸 · 修改自动保存": "Double-click text to edit · Drag edges or corners to resize · Changes autosave",

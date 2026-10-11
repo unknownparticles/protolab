@@ -28,6 +28,8 @@ import { initializeTabs } from './panel-tabs.js';
 import { initializeMenus } from './menus.js';
 import { createMCPEditor } from './mcp-editor.js';
 import { initializeMCPConnection } from './mcp-connection.js';
+import { resizePreviewItem } from './preview-resize.js';
+import { createCanvasTextEditor } from './canvas-text-editor.js';
 
 const $ = id => document.getElementById(id);
 const refreshStaticTranslations = bindStaticTranslations(document);
@@ -290,6 +292,18 @@ try { guides = readStorage(GUIDES_KEY, normalizeGuides) || guides; }
 catch { startupWarnings.push(t('辅助线设置读取失败，已使用默认设置')); }
 const itemNodes = new Map();
 const selectedItem = () => project.items.find(item => item.id === selectedId);
+const canvasTextEditor = createCanvasTextEditor({
+  notify,
+  apply(original, changes) {
+    const item = project.items.find(item => item.id === original.id);
+    if (!item || item.content !== original.content) throw new Error(t('组件内容已变化，请重新选择组件'));
+    const values = editableContent(item).texts.map(text => text.value);
+    for (const change of changes) values[change.index] = change.value;
+    const content = updateTextContent(item, values);
+    if (!contentSizeValid(content, item.type)) throw new Error(t('组件文字过长，请缩短内容'));
+    if (content !== item.content) { item.content = content; commit(t('修改组件文字')); }
+  },
+});
 const selectionGroup = () => project.items.filter(item => selectedIds.has(item.id) || selectedIds.has(item.parentId));
 const selectionStarts = () => new Map(selectionGroup().map(item => [item.id, { x: item.x, y: item.y }]));
 
@@ -721,7 +735,7 @@ function renderCanvas() {
     node.style.transform = presentation.angle ? `rotate(${presentation.angle}deg)` : '';
     const html = itemHTML(item);
     if (node.contentHTML !== html) {
-      node.innerHTML = `${html}<span class="item-label">${escapeHTML(item.name)}</span>${['a','b','c','d'].map(corner => `<span class="selection-dot ${corner}"></span>`).join('')}`;
+      node.innerHTML = `${html}<span class="item-label">${escapeHTML(item.name)}</span>${['nw','n','ne','e','se','s','sw','w'].map(direction => `<button type="button" class="canvas-resize ${direction}" data-canvas-resize="${direction}" aria-label="${escapeHTML(t`调整尺寸 ${direction}`)}"></button>`).join('')}`;
       node.querySelector('.prototype-item').inert = true;
       node.contentHTML = html;
     }
@@ -798,9 +812,17 @@ function restore(direction) {
   renderCanvas(); scheduleSave();
 }
 function finishGesture(cancel = false) {
+  canvasTextEditor.finish(cancel);
   renderSnapGuides();
   if (!gesture) return;
   const old = gesture; gesture = null;
+  if (old.kind === 'resize') {
+    const changed = JSON.stringify(project.items) !== JSON.stringify(old.items);
+    if (cancel) { project.items = old.items; renderCanvas(); }
+    else if (changed) commit(t('调整组件尺寸'));
+    if (old.node.hasPointerCapture(old.pointerId)) old.node.releasePointerCapture(old.pointerId);
+    return;
+  }
   const changed = project.items.some(item => old.starts.has(item.id) && (item.x !== old.starts.get(item.id).x || item.y !== old.starts.get(item.id).y));
   if (cancel) { project = moveItems(project, old.starts, 0, 0); renderCanvas(); }
   else if (changed) {
@@ -825,6 +847,18 @@ $('canvas').addEventListener('pointerdown', event => {
   const node = event.target.closest('.editor-item');
   if (!node) { select(null); return; }
   event.preventDefault();
+  const handle = event.target.closest('[data-canvas-resize]');
+  if (handle) {
+    select(node.dataset.itemId);
+    const item = selectedItem();
+    gesture = { kind: 'resize', itemId: item.id, items: clone(project.items),
+      start: { x: item.x, y: item.y, width: item.width, height: item.height },
+      bounds: itemBounds(project), angle: orientationPresentation(item, project.canvas).angle,
+      direction: handle.dataset.canvasResize, pointerId: event.pointerId, node,
+      clientX: event.clientX, clientY: event.clientY };
+    node.setPointerCapture(event.pointerId); $('canvas').focus({ preventScroll: true });
+    return;
+  }
   if (event.shiftKey || !selectedIds.has(node.dataset.itemId)) select(node.dataset.itemId, event.shiftKey);
   if (!selectedIds.has(node.dataset.itemId)) return;
   selectedId = node.dataset.itemId; renderProperties();
@@ -834,6 +868,19 @@ $('canvas').addEventListener('pointerdown', event => {
 });
 $('canvas').addEventListener('pointermove', event => {
   if (!gesture || event.pointerId !== gesture.pointerId) return;
+  if (gesture.kind === 'resize') {
+    const g = gesture;
+    const geometry = resizePreviewItem(g.start, g.direction, (event.clientX - g.clientX) / zoom, (event.clientY - g.clientY) / zoom, g.bounds, g.angle);
+    const items = g.items.map(item => {
+      if (item.id !== g.itemId) return item;
+      return { ...item, ...geometry, ...(item.parentId ? { layoutBasis: {
+        width: geometry.width === g.start.width ? item.layoutBasis?.width || item.width : geometry.width,
+        height: geometry.height === g.start.height ? item.layoutBasis?.height || item.height : geometry.height,
+      } } : {}) };
+    });
+    project = constrainProject({ ...project, items }); renderCanvas();
+    return;
+  }
   gesture.point = clientToCanvas(event.clientX, event.clientY, $('canvas').getBoundingClientRect(), zoom);
   const snapped = snapItems(project, gesture.starts, (event.clientX - gesture.clientX) / zoom, (event.clientY - gesture.clientY) / zoom, zoom, guides.snap && !event.altKey);
   project = snapped.project; renderSnapGuides(snapped.guides);
@@ -847,6 +894,12 @@ $('canvas').addEventListener('pointerup', event => { if (event.pointerId === ges
 $('canvas').addEventListener('pointercancel', () => finishGesture(true));
 $('canvas').addEventListener('lostpointercapture', () => finishGesture());
 window.addEventListener('blur', () => finishGesture());
+$('canvas').addEventListener('dblclick', event => {
+  const node = event.target.closest('.editor-item');
+  if (!node || event.target.closest('[data-canvas-resize]')) return;
+  event.preventDefault(); finishGesture(); select(node.dataset.itemId);
+  canvasTextEditor.open(selectedItem(), node, event);
+});
 $('libraryPanel').addEventListener('dragstart', event => {
   const button = event.target.closest('[data-comp-id]');
   if (!button) return;
@@ -1291,7 +1344,7 @@ const mcpEditor = createMCPEditor({
   getState: () => ({ projectId: catalog.activeId, ...projectDetails(currentRecord()), project, library, libraryGroups }),
   getAssets: value => designAssets(currentRecord()?.design, value, library, libraryGroups),
   sanitize: sanitizeContent,
-  isBusy: () => !!gesture || assistant.isBusy(),
+  isBusy: () => !!gesture || canvasTextEditor.active || assistant.isBusy(),
   apply(value, label) {
     assistant.saveVersion(t('MCP 修改前'));
     project = withPages(value); selectedId = null; selectedIds.clear(); commit(label);
