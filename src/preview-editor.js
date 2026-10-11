@@ -5,8 +5,9 @@ import { itemBounds } from './model.js';
 import { orientationPresentation } from './orientation.js';
 import { frameLayout } from './frames.js';
 import { attachViewportZoom } from './viewport-zoom.js';
+import { fitItemText } from './typography.js';
 
-function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
+function runPreviewEditor(config, textTargets, resizeItem, attachZoom, fitText) {
   // iframe 内自包含翻译，不依赖编辑器全局变量。
   const t = (source, ...values) => {
     const key = Array.isArray(source) ? source.reduce((text, part, index) => text + (index ? '{' + (index - 1) + '}' : '') + part, '') : source;
@@ -64,6 +65,7 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
   }
   function position(entry) {
     for (const key of ['x', 'y', 'width', 'height']) entry.node.style[{ x: 'left', y: 'top' }[key] || key] = `${entry.item[key] - (key === 'y' ? entry.offsetY || 0 : 0)}px`;
+    fitText(entry.node);
     if (entry.overlay) {
       entry.overlay.style.cssText = `left:${entry.item.x}px;top:${entry.item.y - (entry.offsetY || 0)}px;width:${entry.item.width}px;height:${entry.item.height}px;transform:rotate(${entry.item.angle}deg)`;
     }
@@ -184,7 +186,7 @@ function runPreviewEditor(config, textTargets, resizeItem, attachZoom) {
 export function previewEditorScript(project, token) {
   const labels = Object.fromEntries(["文本", "输入提示", "输入内容", "预览编辑","编辑文字与尺寸","点击组件体验跳转与弹窗","预览缩放","重置缩放","滚轮 / 双指缩放","调整尺寸 {0}","此组件没有可编辑文字，可拖动控制点调整尺寸","编辑组件文字","编辑文字","保存文字","取消","双击文字编辑 · 拖动边缘或角点调整尺寸 · 修改自动保存","点击组件体验跳转与弹窗","修改已同步 · 双击文字编辑 · 拖动控制点调整尺寸"].map(key => [key, translate(key)]));
   const config = { token, labels, pages: project.pages.map(page => ({ id: page.id, bounds: itemBounds(page), layout: frameLayout(page.canvas, page.frame), items: page.items.map(item => ({ id: item.id, x: item.x, y: item.y, width: item.width, height: item.height, angle: orientationPresentation(item, page.canvas).angle })) })) };
-  return `(${runPreviewEditor.toString()})(${JSON.stringify(config).replace(/</g, '\\u003c')},${textTargets.toString()},${resizePreviewItem.toString()},${attachViewportZoom.toString()});`;
+  return `(${runPreviewEditor.toString()})(${JSON.stringify(config).replace(/</g, '\\u003c')},${textTargets.toString()},${resizePreviewItem.toString()},${attachViewportZoom.toString()},${fitItemText.toString()});`;
 }
 
 export const PREVIEW_EDIT_CSS = `

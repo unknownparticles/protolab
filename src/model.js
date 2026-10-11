@@ -53,6 +53,12 @@ export function normalizeItem(item, canvas, bounds = { x: 0, y: 0, ...canvas }) 
   else delete result.interaction;
   if (item.appearance != null) result.appearance = normalizeAppearance(item.appearance);
   if (item.container != null) result.container = normalizeContainer(item.container);
+  if (item.type === 'html' && !item.container) {
+    result.textBasis = {
+      width: number(item.textBasis?.width ?? item.width, width, 1, 2000),
+      height: number(item.textBasis?.height ?? item.height, height, 1, 2000),
+    };
+  } else delete result.textBasis;
   if (item.layoutBasis != null) result.layoutBasis = { width: number(item.layoutBasis.width, width, 1, 2000), height: number(item.layoutBasis.height, height, 1, 2000) };
   return result;
 }

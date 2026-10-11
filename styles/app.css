@@ -264,3 +264,10 @@ html[lang=en] .panel-tabs button{font-size:10px}
 .color-swatch::after{content:"";position:absolute;inset:0;background:var(--swatch-color,transparent);border:1px solid #94a3b8;border-radius:3px}
 .color-transparent{padding:6px;border:1px solid var(--border);border-radius:6px;background:white;color:var(--muted);font-size:11px;cursor:pointer}
 .color-transparent[aria-pressed=true]{color:var(--brand);border-color:#93c5fd;background:#eff6ff}
+
+.canvas-viewport.marquee-ready,.canvas-viewport.marquee-ready .editor-item{cursor:crosshair}
+.canvas-viewport.marquee-ready{touch-action:none;user-select:none}
+#marqueeBtn[aria-pressed="true"]{color:var(--brand);background:#eff6ff;border-color:#93c5fd}
+.canvas-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--brand);background:#3b82f622}
+.ai-selection-summary{padding:10px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:var(--secondary)}
+@media(max-width:899px){.canvas-topbar{height:auto;min-height:48px;flex-wrap:wrap;gap:8px;padding-top:8px;padding-bottom:8px}.canvas-view-controls{flex-wrap:wrap}}

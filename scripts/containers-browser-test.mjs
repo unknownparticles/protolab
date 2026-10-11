@@ -46,6 +46,24 @@ try {
   assert.equal(project.items[2].y, project.items[1].y + project.items[1].height + 12);
   console.log('通过：并列页签、键盘切换、搜索和选中容器后添加组件');
 
+  await select(parentId);
+  await page.locator('#propBackground').fill('#33669980'); await apply();
+  assert.equal(await page.locator('#propBackgroundPicker').inputValue(), '#336699');
+  await page.locator('#propBackgroundPicker').evaluate(node => { node.value = '#112233'; node.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await page.locator('#propBackground').inputValue(), '#11223380'); await apply();
+  assert.equal(await page.locator(`.editor-item[data-item-id="${parentId}"] > .prototype-item`).evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(17, 34, 51, 0.5)');
+  await page.locator('#propBackgroundTransparent').click(); await apply();
+  assert.equal((await state()).items[0].appearance.background, 'transparent');
+  assert.equal(await page.locator('#propBackgroundTransparent').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator(`.editor-item[data-item-id="${parentId}"] > .prototype-item`).evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+  await page.locator('#canvasPropertiesTab').click();
+  await page.locator('#canvasBackgroundTransparent').click(); await page.locator('#applyCanvasSizeBtn').click();
+  assert.equal((await state()).canvas.background, 'transparent');
+  assert.equal(await page.locator('#canvas').evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+  await select(parentId); await page.locator('#propBackground').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: resolve(output, 'colors-transparent.png') });
+  console.log('通过：容器与画布一键透明、半透明色值、选择器保留透明度');
+
   await select(parentId); await page.locator('#propContainerMode').selectOption('horizontal');
   await page.locator('#propContainerGap').fill('20'); await apply();
   project = await state();
@@ -102,8 +120,12 @@ try {
   await saved(); await page.reload(); await page.locator('.editor-item').first().waitFor();
   project = await page.evaluate(() => JSON.parse(localStorage.getItem('protolab.project.v1')));
   assert.equal(project.items[0].container.mode, 'grid');
+  assert.equal(project.items[0].appearance.background, 'transparent'); assert.equal(project.canvas.background, 'transparent');
+  assert.equal(await page.locator('#canvasBackground').inputValue(), 'transparent');
   await page.locator('#previewBtn').click();
   const preview = page.frameLocator('#previewFrame');
+  assert.equal(await preview.locator('.prototype').evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+  assert.equal(await preview.locator(`[data-element-id="${parentId}"]`).evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
   const geometry = locator => locator.evaluate(node => [parseFloat(node.style.left),parseFloat(node.style.top),parseFloat(node.style.width),parseFloat(node.style.height)]);
   for (const item of project.items) assert.deepEqual(await geometry(preview.locator(`[data-element-id="${item.id}"]`)), [item.x,item.y,item.width,item.height]);
   await preview.locator('.preview-edit-tools button').first().click();
@@ -118,6 +140,8 @@ try {
   const download = page.waitForEvent('download'); await clickAction(page, '#exportHtmlBtn');
   const html = await readFile(await (await download).path(), 'utf8');
   const exported = await browser.newPage(); exported.on('pageerror', error => errors.push(error.message)); await exported.setContent(html);
+  assert.equal(await exported.locator('.prototype').evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+  assert.equal(await exported.locator(`[data-element-id="${parentId}"]`).evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
   for (const item of project.items) assert.deepEqual(await geometry(exported.locator(`[data-element-id="${item.id}"]`)), [item.x,item.y,item.width,item.height]);
   await select(parentId); await page.locator('#propVisible').uncheck(); await apply();
   assert.equal(await page.locator('#canvas .editor-item:visible').count(), 0);

@@ -1,3 +1,4 @@
+import { selectionScope } from './selection.js';
 import { t, getLocale } from './i18n.js';
 import { switchPage, activePage } from './pages.js';
 import { normalizeReferenceSpec, layoutReference } from './ai-reference.js';
@@ -10,7 +11,7 @@ import { MAX_REFERENCE_IMAGE, IMAGE_UI_REQUIREMENT, imageCanvasSize } from './im
 
 const $ = id => document.getElementById(id);
 const validate = value => validateProject(value, sanitizeContent);
-export function createAssistant({ initial, initialSavedAt, initialWorkspace, getProject, getRules, getDesignAssets, restoreInitial, applyProject, applyGeneration, finishGesture, notify, scheduleSave, startupWarning }) {
+export function createAssistant({ initial, initialSavedAt, initialWorkspace, getProject, getSelection = () => [], getRules, getDesignAssets, restoreInitial, applyProject, applyGeneration, finishGesture, notify, scheduleSave, startupWarning }) {
   let saved = initialWorkspace;
   try { if (initialWorkspace === undefined) saved = readStorage(WORKSPACE_KEY, value => validateWorkspace(value, validate)); }
   catch { startupWarning(t('版本或对话记录读取失败，已使用本地草稿')); }
@@ -33,6 +34,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   let mergeProject = null;
   const serialize = () => ({ version: 1, project: clone(getProject()), versions: versions.serialize(), messages: clone(messages), pending: clone(pending) });
   let targetActive = null;
+  let requestSelection = null;
   function setPanel(open) {
     $('aiPanel').hidden = !open;
     $('aiToggleBtn').setAttribute('aria-expanded', String(open));
@@ -45,8 +47,9 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiToggleProgress').hidden = !busy;
     $('aiForm').setAttribute('aria-busy', String(busy));
     $('aiRequirement').disabled = busy;
+    $('optimizeSelectionBtn').disabled = busy || !!pending || !!generated || !getSelection().length;
     const mode = $('aiMode').value;
-    $('aiSendBtn').textContent = busy ? t('正在生成…') : mode === 'image' ? t('根据图片生成 UI') : mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : mode === 'popup' ? t('生成弹窗') : t('生成页面');
+    $('aiSendBtn').textContent = busy ? t('正在生成…') : mode === 'image' ? t('根据图片生成 UI') : mode === 'selection' ? t('优化所选组件') : mode === 'modify' ? t('发送需求') : mode === 'component' ? t('生成组件') : mode === 'popup' ? t('生成弹窗') : t('生成页面');
   }
   function renderMessages() {
     $('aiMessages').replaceChildren();
@@ -67,7 +70,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiSendBtn').disabled ||= !!generated;
     $('aiSendBtn').disabled ||= imageLoading;
     for (const id of ['aiImageFile', 'aiImageRemoveBtn', 'aiTarget', 'aiRefName', 'aiRefWidth', 'aiRefHeight', 'aiRefColor', 'aiRefFunction', 'aiRefBodyFont', 'aiRefTitleFont', 'aiRefSmallFont', 'aiRefGap']) $(id).disabled = !!controller || !!pending || !!generated || imageLoading;
-    renderRequestState();
+    renderRequestState(); renderSelection();
   }
   function addMessage(role, content) { messages.push({ role, content }); renderMessages(); scheduleSave(); }
   function renderVersions() {
@@ -201,7 +204,9 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   $('aiForm').addEventListener('submit', async event => {
     event.preventDefault();
     if (controller || pending || generated || imageLoading) return;
-    const mode = $('aiMode').value;
+    const selectionMode = $('aiMode').value === 'selection';
+    const mode = selectionMode ? 'modify' : $('aiMode').value;
+    if (selectionMode && !getSelection().length) { $('aiStatus').textContent = t('请先框选或选中要优化的组件'); return; }
     if (mode === 'image' && !referenceImage) { $('aiStatus').textContent = t('请先上传参考图片'); $('aiImageFile').focus(); return; }
     let referenceSpec;
     try { referenceSpec = readReferenceSpec(); } catch (error) { $('aiStatus').textContent = t(error.message); return; }
@@ -212,8 +217,9 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     const currentSession = session;
     const requestProject = clone(getProject());
     const target = selectedTarget();
+    const selection = selectionMode ? selectionScope(target, getSelection()) : null;
     const assets = getDesignAssets ? clone(getDesignAssets(mode === 'modify' ? target : requestProject)) : {};
-    const designOptions = { designContext: assets.context, library: assets.library, referenceSpec };
+    const designOptions = { designContext: assets.context, library: assets.library, referenceSpec, ...(selection ? { selection } : {}) };
     const baseId = versions.add(requestProject, t('AI 生成前'), { force: true });
     const image = referenceImage ? clone(referenceImage) : null;
     const base = mode === 'modify' ? target : generationBase(requestProject, mode, assets.context, image, referenceSpec);
@@ -222,6 +228,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       if (mode === 'popup') designOptions.designContext.safeArea = { ...base.safeArea, mode: 'none', bounds: layoutReference(base, referenceSpec, mode).layout.bounds };
     }
     const context = clone(messages);
+    requestSelection = selection;
     controller = new AbortController(); const active = controller;
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; active.abort(); }, 120_000);
@@ -242,7 +249,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
         return;
       }
       const response = parseAIResponse(text, base, sanitizeContent, designOptions);
-      if (referenceSpec.name && response.project.pages) response.project.pages = response.project.pages.map(page => page.id === base.activePageId ? { ...page, name: referenceSpec.name } : page);
+      if (!selection && referenceSpec.name && response.project.pages) response.project.pages = response.project.pages.map(page => page.id === base.activePageId ? { ...page, name: referenceSpec.name } : page);
       if (requestProject.pages) response.project = switchPage(response.project, requestProject.activePageId);
       const aiId = versions.add(response.project, `AI：${response.summary}`, { parent: baseId, branch: true });
       addMessage('assistant', response.summary);
@@ -260,7 +267,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
       const message = active.signal.aborted ? timedOut ? t('AI 请求超时，请重试') : t('AI 请求已取消') : error.message;
       $('aiStatus').textContent = t(message); addMessage('system', message); notify(message, !active.signal.aborted);
       if (!$('aiRequirement').value) $('aiRequirement').value = requirement;
-    } finally { clearTimeout(timeout); if (currentSession === session) { controller = null; renderMessages(); renderVersions(); scheduleSave(); } }
+    } finally { clearTimeout(timeout); if (currentSession === session) { controller = null; requestSelection = null; renderMessages(); renderMode(); renderVersions(); scheduleSave(); } }
   });
   function showGenerated() {
     if (!generated) return;
@@ -311,8 +318,10 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     $('aiRequirement').required = false;
     refreshTargets();
     renderLayoutReference();
-    $('aiModeHelp').textContent = mode === 'image' ? t('上传界面图片，AI 还原布局和文案，拆分可编辑组件并自动命名，预览后添加为新页面。') : mode === 'modify' ? t('发送当前工程和最近对话，修改当前页。') : mode === 'component' ? t('根据提示词和规范独立生成组件，预览后保存到当前工程组件库。') : mode === 'popup' ? t('根据提示词、参考图片和基础信息生成弹窗，预览后添加为新弹窗。') : t('根据提示词和规范独立生成页面，预览后添加为新页面。');
-    renderRequestState();
+    $('aiModeHelp').textContent = mode === 'image' ? t('上传界面图片，AI 还原布局和文案，拆分可编辑组件并自动命名，预览后添加为新页面。') : mode === 'selection' ? t('框选或多选组件后发送需求，仅优化所选组件；选中容器会包含内部组件。') : mode === 'modify' ? t('发送当前工程和最近对话，修改当前页。') : mode === 'component' ? t('根据提示词和规范独立生成组件，预览后保存到当前工程组件库。') : mode === 'popup' ? t('根据提示词、参考图片和基础信息生成弹窗，预览后添加为新弹窗。') : t('根据提示词和规范独立生成页面，预览后添加为新页面。');
+    renderRequestState(); renderSelection();
+    const selectionMode = mode === 'selection';
+    for (const id of ['aiRefName', 'aiRefWidth', 'aiRefHeight']) $(id).readOnly = selectionMode || mode === 'image' && id !== 'aiRefName';
     const design = getDesignAssets?.().context;
     $('aiRulesSummary').textContent = mode === 'image' ? t('优先还原图片的布局、颜色和原文案；提示词可留空，也可填写额外要求。') : t`自动使用内置规范${getRules() ? t('、工程规范') : ''}${design?.palette ? t`、${design.palette.name}配色` : ''}${design ? t`、${design.library.components.length} 个关联组件及安全区信息` : ''}，可在「工程设置」中编辑。`;
     $('aiBuiltinRules').textContent = t(DESIGN_SPEC);
@@ -321,7 +330,7 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     return normalizeReferenceSpec(Object.fromEntries([
       ['name', 'Name'], ['width', 'Width'], ['height', 'Height'], ['color', 'Color'], ['function', 'Function'],
       ['bodyFont', 'BodyFont'], ['titleFont', 'TitleFont'], ['smallFont', 'SmallFont'], ['gap', 'Gap'],
-    ].map(([key, suffix]) => [key, $('aiMode').value === 'image' && ['width', 'height'].includes(key) ? '' : $(`aiRef${suffix}`).value])), $('aiMode').value);
+    ].map(([key, suffix]) => [key, $('aiMode').value === 'selection' && ['name', 'width', 'height'].includes(key) || $('aiMode').value === 'image' && ['width', 'height'].includes(key) ? '' : $(`aiRef${suffix}`).value])), $('aiMode').value);
   }
   function refreshTargets() {
     const project = getProject(), previous = $('aiTarget').value;
@@ -331,16 +340,21 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
   }
   function selectedTarget() {
     const project = getProject();
-    return project.pages && $('aiTarget').value ? switchPage(project, $('aiTarget').value) : clone(project);
+    return $('aiMode').value !== 'selection' && project.pages && $('aiTarget').value ? switchPage(project, $('aiTarget').value) : clone(project);
   }
   function renderLayoutReference() {
     try {
       const mode = $('aiMode').value;
       for (const id of ['aiRefWidth', 'aiRefHeight']) $(id).min = mode === 'component' ? '1' : '100';
-      $('aiRefWidth').readOnly = $('aiRefHeight').readOnly = mode === 'image';
+      $('aiRefWidth').readOnly = $('aiRefHeight').readOnly = ['image', 'selection'].includes(mode);
       const spec = readReferenceSpec();
-      const board = mode === 'modify' ? selectedTarget() : generationBase(getProject(), mode === 'image' && !referenceImage ? 'page' : mode, getDesignAssets?.().context, referenceImage, spec);
-      const reference = layoutReference(board, spec, mode), { typography, layout } = reference;
+      const board = ['modify', 'selection'].includes(mode) ? selectedTarget() : generationBase(getProject(), mode === 'image' && !referenceImage ? 'page' : mode, getDesignAssets?.().context, referenceImage, spec);
+      const reference = layoutReference(board, spec, mode === 'selection' ? 'modify' : mode);
+      if (mode === 'selection') {
+        const ids = new Set((requestSelection || (getSelection().length ? selectionScope(board, getSelection()) : null))?.itemIds || []);
+        reference.components = reference.components.filter(item => ids.has(item.id));
+      }
+      const { typography, layout } = reference;
       $('aiRefWidth').placeholder = mode === 'component' ? t('自动') : String(board.canvas.width);
       $('aiRefHeight').placeholder = mode === 'component' ? t('自动') : String(board.canvas.height);
       $('aiRefName').placeholder = mode === 'modify' ? activePage(board)?.name || t('名称') : t('留空由 AI 命名');
@@ -366,6 +380,14 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
         const row = document.createElement('tr'), cell = document.createElement('td'); cell.colSpan = 5;
         cell.textContent = t('新内容生成后在预览中查看；优化已有页面时展示当前组件。'); row.append(cell); body.append(row);
       }
+  }
+  function renderSelection() {
+    const enabled = $('aiMode').value === 'selection';
+    $('aiSelectionSummary').hidden = !enabled;
+    if (!enabled) return;
+    const board = getProject();
+    const scope = requestSelection || (getSelection().length ? selectionScope(board, getSelection()) : null);
+    $('aiSelectionSummary').textContent = scope ? t`本轮优化 ${scope.itemIds.length} 个组件（含所选容器内部组件）：${board.items.filter(item => scope.itemIds.includes(item.id)).map(item => item.name).join('、')}` : t('请先框选或选中要优化的组件');
   }
   $('aiTarget').addEventListener('change', renderLayoutReference);
   for (const id of ['aiRefWidth', 'aiRefHeight', 'aiRefBodyFont', 'aiRefTitleFont', 'aiRefSmallFont', 'aiRefGap']) $(id).addEventListener('input', renderLayoutReference);
@@ -415,9 +437,15 @@ export function createAssistant({ initial, initialSavedAt, initialWorkspace, get
     snapshot: serialize,
     isBusy: () => !!controller || !!pending || !!generated,
     refreshRules: renderMode,
+    refreshSelection() { renderSelection(); if ($('aiMode').value === 'selection') renderLayoutReference(); },
+    optimizeSelection() {
+      setPanel(true);
+      if (!controller && !pending && !generated && getSelection().length) { $('aiMode').value = 'selection'; renderMode(); }
+      $('aiRequirement').focus();
+    },
     refreshLocale() { renderMessages(); renderVersions(); renderMode(); renderImage(); if ($('mergeDialog').open) renderMerge(); },
     activate(project, workspace) {
-      session++; controller?.abort(); controller = null;
+      session++; controller?.abort(); controller = null; requestSelection = null;
       clearImage();
       versions = createVersions(project, workspace.versions);
       messages = clone(workspace.messages); pending = clone(workspace.pending); generated = null; choices = {}; mergeHead = null;

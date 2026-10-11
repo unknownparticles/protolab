@@ -1,7 +1,8 @@
 import { visibilityLayout } from './visibility.js';
 import { containerLayout } from './containers.js';
+import { fitItemText } from './typography.js';
 /** 固定的原型交互脚本；组件代码仍只允许静态内容。 */
-function runPrototype(layoutItems, layoutContainers) {
+function runPrototype(layoutItems, layoutContainers, fitText) {
   const pages = [...document.querySelectorAll('[data-prototype-page]')];
   const popups = [...document.querySelectorAll('dialog[data-prototype-popup]')];
   const body = document.body;
@@ -22,11 +23,13 @@ function runPrototype(layoutItems, layoutContainers) {
     const label = document.getElementById('prototypePageName');
     if (label) label.textContent = page.dataset.pageName;
     if (remember) page.focus({ preventScroll: true });
+    updateLayout();
   }
   function openPopup(id) {
     const popup = findPopup(id);
     if (!popup || popup.open) return;
     popup.showModal(); opened.push(popup);
+    updateLayout();
   }
   function back() {
     if (opened.length) opened.at(-1).close();
@@ -40,6 +43,7 @@ function runPrototype(layoutItems, layoutContainers) {
     const toast = [...document.querySelectorAll('[data-prototype-toast]')].find(value => value.dataset.prototypeToast === id);
     if (!toast) return;
     closeToast(); currentToast = toast; toast.showPopover();
+    updateLayout();
     if (!persistent) {
       const dismiss = () => {
         if (body.classList.contains('preview-editing')) toastTimer = setTimeout(dismiss, 500);
@@ -67,6 +71,7 @@ function runPrototype(layoutItems, layoutContainers) {
         Object.assign(node.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` });
         const parent = item.parentId && nodes.find(value => value.dataset.elementId === item.parentId);
         node.hidden = item.visible === false || node.dataset.orientationHidden === 'true' || !!parent && parent.hidden;
+        fitText(node, { growWidth: !item.parentId, maxWidth: board.clientWidth - item.x });
       });
     }
   }
@@ -109,7 +114,7 @@ function runPrototype(layoutItems, layoutContainers) {
   if (body.dataset.initialPopup) openPopup(body.dataset.initialPopup);
   if (body.dataset.initialToast) showToast(body.dataset.initialToast, 2500, true);
 }
-export const PROTOTYPE_RUNTIME = `(${runPrototype.toString()})(${visibilityLayout.toString()},${containerLayout.toString()});`;
+export const PROTOTYPE_RUNTIME = `(${runPrototype.toString()})(${visibilityLayout.toString()},${containerLayout.toString()},${fitItemText.toString()});`;
 export const INTERACTION_CSS = `
 [hidden]{display:none!important}
 .prototype-item[data-action]{cursor:pointer}.prototype-item[data-action]:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}

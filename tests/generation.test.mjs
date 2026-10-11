@@ -40,7 +40,7 @@ test('生成请求同时注入固定协议、内置规范与工程规范，独�
   assert.equal(task.mode, 'page'); assert.equal(task.requirement, '设计登录页'); assert.equal(task.project.items.length, 0);
 });
 
-test('生成必须含真实容器且所有内容归属容器，布局与透明背景在恢复导出后保留', () => {
+test('生成必须含真实容器且所有内容归属容器，布局及透明背景按协议生效', () => {
   const base = generationBase(emptyProject(), 'page');
   for (const mode of ['vertical', 'horizontal', 'grid']) {
     const region = { ...container, width: 300, height: 300, padding: '10px', container: { mode, gap: 16, columns: 2 }, appearance: { background: '#ffffff80' } };

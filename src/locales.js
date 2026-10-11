@@ -1,5 +1,16 @@
 // 界面文案以中文为键；插值使用 {0}、{1}，用户内容不参与翻译。
 export const EN = Object.freeze({
+  "框选": "Box select",
+  "AI 优化所选": "Optimize selection with AI",
+  "优化所选组件": "Optimize selected components",
+  "拖动框选组件，按住 Shift 追加选择，Esc 退出": "Drag to select components. Hold Shift to extend the selection. Press Esc to exit.",
+  "请先框选或选中要优化的组件": "Select the components to optimize first",
+  "点击框选后拖动选择多个组件；按住 Shift 可追加选择，再点击 AI 优化所选。": "Click Box select and drag to select components. Hold Shift to extend the selection, then click Optimize selection with AI.",
+  "框选或多选组件后发送需求，仅优化所选组件；选中容器会包含内部组件。": "Select components and describe your changes. Selected containers include their contents.",
+  "本轮优化 {0} 个组件（含所选容器内部组件）：{1}": "Optimize {0} components (including selected container contents): {1}",
+  "AI 修改超出了所选组件范围，请重新生成": "AI changes exceeded the selection. Please try again.",
+  "AI 修改影响了未选组件或页面设置，请重新生成；调整容器布局时请选中整个容器": "AI changes affected unselected components or page settings. Please try again; select the whole container to adjust its layout.",
+  "AI 新增组件超出了所选区域，请重新生成": "AI added a component outside the selected region. Please try again.",
   "颜色支持透明、半透明色值和 rgba；留空恢复组件原始颜色。": "Use transparent, hex colors with alpha or rgba; leave blank to restore the original color.",
   "透明": "Transparent",
   "画布背景颜色": "Canvas background color",

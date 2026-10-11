@@ -1,5 +1,5 @@
 /** 画布超出窗口时拖动空白区域，或使用空格、中键平移；组件仍可直接拖动。 */
-export function attachViewportPan(viewport, { beforePan = () => {}, onBlankClick = () => {} } = {}) {
+export function attachViewportPan(viewport, { beforePan = () => {}, onBlankClick = () => {}, canBlankPan = () => true } = {}) {
   const doc = viewport.ownerDocument, win = doc.defaultView;
   let gesture = null, space = false, suppressClick = false;
   const editable = target => target.closest('input,textarea,select,[contenteditable],button,a,[role="button"]');
@@ -20,6 +20,7 @@ export function attachViewportPan(viewport, { beforePan = () => {}, onBlankClick
   viewport.addEventListener('pointerdown', event => {
     if (event.pointerType === 'touch' || gesture || !overflows() || editable(event.target)) return;
     if (event.button !== 1 && (event.button !== 0 || (!space && event.target.closest('.editor-item')))) return;
+    if (event.button === 0 && !space && !canBlankPan()) return;
     // 保留原生滚动条的拖动操作。
     const rect = viewport.getBoundingClientRect();
     if (event.clientX >= rect.left + viewport.clientWidth || event.clientY >= rect.top + viewport.clientHeight) return;

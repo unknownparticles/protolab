@@ -29,7 +29,9 @@ import { initializeMenus } from './menus.js';
 import { createMCPEditor } from './mcp-editor.js';
 import { initializeMCPConnection } from './mcp-connection.js';
 import { resizePreviewItem } from './preview-resize.js';
+import { attachMarquee } from './selection.js';
 import { createCanvasTextEditor } from './canvas-text-editor.js';
+import { fitItemText } from './typography.js';
 
 const $ = id => document.getElementById(id);
 const refreshStaticTranslations = bindStaticTranslations(document);
@@ -60,6 +62,7 @@ let library = clone(COMPONENTS);
 let libraryGroups = [];
 let groupFilter = 'all';
 let project = withPages(validateProject({ version: 1, canvas: { ...PRESETS.phone, preset: 'phone' }, frame: normalizeFrame({ camera: 'island' }), items: [] }, sanitizeContent));
+let marqueeMode = false;
 let selectedId = null;
 let selectedIds = new Set();
 let guides = normalizeGuides();
@@ -142,7 +145,7 @@ try {
   if (catalog) { project = currentRecord().project; library = completeLibrary(currentRecord().library); libraryGroups = currentRecord().libraryGroups; initialSavedAt = null; }
 } catch { catalogReadable = false; startupWarnings.push(t('工程列表读取失败，原始数据已保留；请备份本地数据后恢复，暂不允许新建或切换工程')); }
 const assistant = createAssistant({
-  initial: project, initialSavedAt, initialWorkspace: currentRecord()?.workspace, getProject: () => project, getRules: () => currentRecord()?.rules || '',
+  initial: project, initialSavedAt, initialWorkspace: currentRecord()?.workspace, getProject: () => project, getSelection: () => [...selectedIds], getRules: () => currentRecord()?.rules || '',
   getDesignAssets: (target = project) => designAssets(currentRecord()?.design, target, library, libraryGroups), finishGesture, notify, scheduleSave,
   restoreInitial(value) { project = withPages(value); },
   applyProject(value, label) { finishGesture(); project = withPages(value); selectedId = null; selectedIds.clear(); commit(label); },
@@ -369,6 +372,8 @@ function setLibraryTab(category, focus = false) {
 }
 function renderProperties() {
   const item = selectedItem();
+  $('optimizeSelectionBtn').disabled = !selectedIds.size || assistant.isBusy();
+  assistant.refreshSelection();
   $('menuDuplicateBtn').disabled = !item;
   $('menuDeleteBtn').disabled = !item;
   $('saveSelectionComponentBtn').disabled = !item || !!item.container;
@@ -388,7 +393,7 @@ function renderProperties() {
   $('propContainerGap').value = item.container?.gap ?? 12;
   $('propContainerColumns').value = item.container?.columns ?? 2;
   $('containerColumnsField').hidden = item.container?.mode !== 'grid';
-  $('selectionDetail').textContent = selectedIds.size > 1 ? t`已选 ${selectedIds.size} 个组件，以下属性仅编辑「${item.name}」；拖动、复制、删除作用于全部所选组件。` : t('按住 Shift 点击组件可多选并对齐。');
+  $('selectionDetail').textContent = selectedIds.size > 1 ? t`已选 ${selectedIds.size} 个组件，以下属性仅编辑「${item.name}」；拖动、复制、删除作用于全部所选组件。` : t('点击框选后拖动选择多个组件；按住 Shift 可追加选择，再点击 AI 优化所选。');
   for (const [field, key] of Object.entries({ propName: 'name', propX: 'x', propY: 'y', propW: 'width', propH: 'height', propRadius: 'radius' })) $(field).value = item[key];
   $('propY').value = visibilityLayout(project.items).find(value => value.id === item.id).y;
   for (const key of ['padding', 'margin']) for (const [side, value] of Object.entries(spacingSides(item[key]))) $(`prop${key[0].toUpperCase()}${key.slice(1)}${side[0].toUpperCase()}${side.slice(1)}`).value = value;
@@ -740,11 +745,19 @@ function renderCanvas() {
       node.contentHTML = html;
     }
     $('canvas').append(node);
+    fitItemText(node.querySelector('.prototype-item'));
   }
   $('emptyHint').hidden = project.items.length > 0;
   $('componentCount').textContent = t`${project.items.length} 个组件`;
   $('undoBtn').disabled = !history.canUndo; $('redoBtn').disabled = !history.canRedo;
   updateZoom(); renderProperties(); renderLayers(); renderSafeArea();
+}
+function setSelection(ids) {
+  selectedIds = new Set(ids.filter(id => project.items.some(item => item.id === id)));
+  selectedId = [...selectedIds].at(-1) || null;
+  if (selectedId) setPropertiesTab('component');
+  for (const [key, node] of itemNodes) node.classList.toggle('selected', selectedIds.has(key));
+  renderProperties(); renderLayers();
 }
 function select(id, toggle = false) {
   if (!project.items.some(item => item.id === id)) id = null;
@@ -759,8 +772,23 @@ function select(id, toggle = false) {
   renderProperties(); renderLayers();
 }
 function commit(label = t('修改设计')) {
-  project = constrainProject(withPages(project)); history.push({ project, library, libraryGroups }, label);
+  project = fitBoardText(constrainProject(withPages(project))); history.push({ project, library, libraryGroups }, label);
   renderCanvas(); assistant.refreshVersions(); assistant.refreshRules(); renderHistory(); scheduleSave();
+}
+/** 文字驱动的宽度写入模型，历史、自动保存及工程导出使用同一尺寸。 */
+function fitBoardText(board) {
+  const stage = document.createElement('div'); stage.className = 'prototype';
+  Object.assign(stage.style, { position: 'fixed', left: '-10000px', top: '0', width: `${board.canvas.width}px`, height: `${board.canvas.height}px`, visibility: 'hidden', pointerEvents: 'none' });
+  document.body.append(stage);
+  const bounds = itemBounds(board);
+  try {
+    const items = board.items.map(item => {
+      stage.innerHTML = itemHTML(item, board.canvas);
+      const width = fitItemText(stage.firstElementChild, { growWidth: !item.parentId, maxWidth: Math.min(board.canvas.width, bounds.x + bounds.width) - item.x });
+      return width === item.width ? item : { ...item, width };
+    });
+    return constrainProject({ ...board, items });
+  } finally { stage.remove(); }
 }
 function saveProject(label = t('手动保存')) {
   finishGesture(); assistant.saveVersion(label);
@@ -878,7 +906,7 @@ $('canvas').addEventListener('pointermove', event => {
         height: geometry.height === g.start.height ? item.layoutBasis?.height || item.height : geometry.height,
       } } : {}) };
     });
-    project = constrainProject({ ...project, items }); renderCanvas();
+    project = fitBoardText(constrainProject({ ...project, items })); renderCanvas();
     return;
   }
   gesture.point = clientToCanvas(event.clientX, event.clientY, $('canvas').getBoundingClientRect(), zoom);
@@ -1038,12 +1066,24 @@ $('undoBtn').addEventListener('click', () => restore('undo')); $('redoBtn').addE
 $('zoomSelect').addEventListener('change', () => { finishGesture(); zoom = Number($('zoomSelect').value); updateZoom(); });
 const viewportPan = attachViewportPan($('canvasViewport'), {
   beforePan: () => finishGesture(true),
+  canBlankPan: () => !marqueeMode,
   onBlankClick: target => { if (target.closest('#canvas')) select(null); }
 });
+function setMarqueeMode(enabled) {
+  marqueeMode = enabled;
+  $('marqueeBtn').setAttribute('aria-pressed', String(enabled));
+  $('canvasViewport').classList.toggle('marquee-ready', enabled);
+}
+const marquee = attachMarquee($('canvasViewport'), $('canvas'), {
+  isEnabled: () => marqueeMode, beforeSelect: () => finishGesture(true),
+  getIds: () => [...selectedIds], setIds: setSelection, onExit: () => setMarqueeMode(false),
+});
+$('marqueeBtn').addEventListener('click', () => { marquee.cancel(); setMarqueeMode(!marqueeMode); });
+$('optimizeSelectionBtn').addEventListener('click', () => { marquee.cancel(); setMarqueeMode(false); assistant.optimizeSelection(); });
 attachViewportZoom($('canvasViewport'), $('canvasScaler'), {
   getZoom: () => zoom,
   setZoom: value => { zoom = value; updateZoom(); },
-  beforeZoom: () => { viewportPan.cancel(); finishGesture(true); }
+  beforeZoom: () => { marquee.cancel(); viewportPan.cancel(); finishGesture(true); }
 });
 function fitCanvas() {
   const layout = frameLayout(project.canvas, project.frame);
@@ -1305,7 +1345,7 @@ window.addEventListener('message', event => {
       if (item.parentId) item.layoutBasis = { width: item.width, height: item.height };
     } else return;
     if (JSON.stringify(item) !== JSON.stringify(original)) {
-      const items = constrainProject({ ...page, items: page.items.map(value => value.id === item.id ? item : value) }).items;
+      const items = fitBoardText(constrainProject({ ...page, items: page.items.map(value => value.id === item.id ? item : value) })).items;
       item = items.find(value => value.id === item.id);
       project = { ...snapshot, pages: snapshot.pages.map(value => value.id === page.id ? { ...value, items } : value), ...(page.id === snapshot.activePageId ? { items } : {}) };
       commit(message.kind === 'text' ? t('预览修改文字') : t('预览调整尺寸'));
