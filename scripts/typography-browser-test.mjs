@@ -80,6 +80,15 @@ try {
   assert.equal(await exported.locator('[data-name="text"] span').evaluate(element => parseFloat(getComputedStyle(element).fontSize)), 42);
   assert.equal(await exported.locator('[data-name="fixed"] button').evaluate(element => parseFloat(getComputedStyle(element).fontSize)), 20);
   assert.equal(await exported.locator('[data-name="button"]').evaluate(element => parseFloat(element.style.width)), wide);
+  await node('text').click({ position: { x: 5, y: 5 } });
+  await page.locator('#customTab').click();
+  await page.locator('#saveSelectionComponentBtn').click(); await page.locator('#customName').fill('缩放文本');
+  await page.locator('#componentForm button[type="submit"]').click();
+  const reusable = page.locator('#customList .component-item').filter({ hasText: '缩放文本' });
+  assert.equal(await reusable.locator('.component-preview').evaluate(host => parseFloat(getComputedStyle(host.shadowRoot.querySelector('span')).fontSize)), 42);
+  await reusable.click();
+  assert.equal(await page.locator('.editor-item.selected .prototype-content span').evaluate(element => parseFloat(getComputedStyle(element).fontSize)), 42);
+  console.log('通过：缩放后的组件存入组件库、预览并再次添加保持字号');
   const output = resolve(process.env.PROTOLAB_TEST_OUTPUT || 'test-results'); await mkdir(output, { recursive: true });
   await page.screenshot({ path: resolve(output, 'typography.png') });
   assert.deepEqual(errors, []);

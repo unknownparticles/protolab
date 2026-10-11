@@ -71,7 +71,7 @@ function runPrototype(layoutItems, layoutContainers, fitText) {
         Object.assign(node.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` });
         const parent = item.parentId && nodes.find(value => value.dataset.elementId === item.parentId);
         node.hidden = item.visible === false || node.dataset.orientationHidden === 'true' || !!parent && parent.hidden;
-        fitText(node, { growWidth: !item.parentId, maxWidth: board.clientWidth - item.x });
+        fitText(node, { growWidth: !item.parentId && item.x + item.width <= board.clientWidth, maxWidth: board.clientWidth - item.x });
       });
     }
   }

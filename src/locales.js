@@ -1,5 +1,7 @@
 // 界面文案以中文为键；插值使用 {0}、{1}，用户内容不参与翻译。
 export const EN = Object.freeze({
+  "随组件缩放": "Scale with component",
+  "字号留空随组件缩放，单行文字按内容延长至画布或容器边界；填写字号后固定。字体需已安装在当前设备。": "Leave font size blank to scale with the component. Single-line text expands to fit within the canvas or container; enter a size to keep it fixed. Fonts must be installed on this device.",
   "框选": "Box select",
   "AI 优化所选": "Optimize selection with AI",
   "优化所选组件": "Optimize selected components",

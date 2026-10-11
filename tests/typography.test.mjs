@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeItem, createItem, validateProject } from '../src/model.js';
+import { normalizeItem, createItem, validateProject, validateLibrary } from '../src/model.js';
 import { COMPONENTS } from '../src/presets.js';
 import { itemHTML, exportHTML } from '../src/content.js';
 
@@ -29,4 +29,11 @@ test('显式字号保留覆盖标识，导出携带统一文字布局逻辑', ()
   const html = exportHTML(validateProject({ version: 1, canvas, items: [item] }, value => value));
   assert.match(html, /function fitItemText/);
   assert.match(html, /data-text-basis/);
+});
+
+test('放大后的组件保存到组件库后保留原始字号基准', () => {
+  const [component] = validateLibrary([{ ...COMPONENTS[0], defaultWidth: 224, defaultHeight: 80, textBasis: { width: 112, height: 40 } }], value => value);
+  const restored = createItem(JSON.parse(JSON.stringify(component)), canvas);
+  assert.equal(restored.height, 80);
+  assert.deepEqual(restored.textBasis, { width: 112, height: 40 });
 });

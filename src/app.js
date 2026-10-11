@@ -785,7 +785,8 @@ function fitBoardText(board) {
   try {
     const items = board.items.map(item => {
       stage.innerHTML = itemHTML(item, board.canvas);
-      const width = fitItemText(stage.firstElementChild, { growWidth: !item.parentId, maxWidth: Math.min(board.canvas.width, bounds.x + bounds.width) - item.x });
+      const right = Math.min(board.canvas.width, bounds.x + bounds.width);
+      const width = fitItemText(stage.firstElementChild, { growWidth: !item.parentId && item.x + item.width <= right, maxWidth: right - item.x });
       return width === item.width ? item : { ...item, width };
     });
     return constrainProject({ ...board, items });
