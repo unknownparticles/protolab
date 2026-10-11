@@ -129,3 +129,16 @@ test('相同内容的每次主动保存仍形成版本，未保存草稿独立�
   delete workspace.project;
   assert.equal(validateWorkspace(workspace, valid).project, undefined);
 });
+
+test('AI 可调整容器布局与透明外观、移出组件和整组删除，非法归属不改变基线', () => {
+  const region = { ...item, id: 'region', name: '表单容器', content: '<div></div>', width: 300, height: 200, container: { mode: 'vertical', gap: 12 }, appearance: { background: 'transparent' } };
+  const initial = parseAIResponse(reply([{ op: 'add', item: region }, { op: 'update', id: item.id, fields: { parentId: region.id, layoutBasis: { width: 100, height: 40 } } }]), base(), clean).project;
+  const changed = parseAIResponse(reply([{ op: 'update', id: region.id, fields: { container: { mode: 'horizontal', gap: 20 }, appearance: { background: 'rgba(255,255,255,0.5)' } } }]), initial, clean).project;
+  assert.equal(changed.items[0].container.mode, 'horizontal');
+  assert.equal(changed.items[0].appearance.background, 'rgba(255,255,255,0.5)');
+  assert.equal(parseAIResponse(reply([{ op: 'update', id: item.id, fields: { parentId: null } }]), initial, clean).project.items[1].parentId, null);
+  assert.equal(parseAIResponse(reply([{ op: 'remove', id: region.id }]), initial, clean).project.items.length, 0);
+  for (const fields of [{ parentId: 'missing' }, { layoutBasis: { width: -1, height: 40 } }, { container: { mode: 'grid', gap: 'bad' } }, { appearance: { background: '#fff;display:none' } }]) assert.throws(() => parseAIResponse(reply([{ op: 'update', id: item.id, fields }]), initial, clean));
+  assert.equal(initial.items[0].container.mode, 'vertical');
+  assert.equal(initial.items[1].parentId, region.id);
+});

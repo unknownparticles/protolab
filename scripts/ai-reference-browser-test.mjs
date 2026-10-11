@@ -24,9 +24,13 @@ try {
     const content = body.messages.at(-1).content;
     sent = { body, task: JSON.parse(Array.isArray(content) ? content[0].text : content) };
     const { task } = sent;
-    const changes = task.mode === 'modify' ? [{ op: 'update', id: task.project.items[0].id, fields: { name: '优化后的标题' } }] : [{ op: 'add', item: {
+    const changes = task.mode === 'modify' ? [{ op: 'update', id: task.project.items.find(item => !item.container).id, fields: { name: '优化后的标题' } }] : [{ op: 'add', item: {
       id: 'generated-title', name: '参考标题', type: 'html', content: '<h1 style="font-size:24px;color:#2563eb">确认操作</h1>', x: 0, y: 0, width: 280, height: 60,
     } }];
+    if (['page', 'popup'].includes(task.mode)) {
+      changes[0].item.parentId = 'generated-section';
+      changes.unshift({ op: 'add', item: { id: 'generated-section', name: '内容容器', type: 'html', content: '<div></div>', x: 0, y: 0, width: 280, height: 60, container: { mode: 'vertical', gap: 0 }, appearance: { background: 'transparent' } } });
+    }
     if (task.requirement === '等待优化') await new Promise(resolve => { release = resolve; });
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ version: 1, name: '自动名称', summary: '参考生成完成', changes }) } }] }) });
   });
@@ -70,6 +74,10 @@ try {
     } else {
       const generated = record.project.pages.find(item => item.name === `参考${mode}`);
       assert.equal(generated.kind, mode); assert.equal(generated.canvas.width, width); assert.equal(generated.canvas.height, height);
+      assert.equal(generated.items[0].container.mode, 'vertical');
+      assert.equal(generated.items[1].parentId, generated.items[0].id);
+      assert.equal(generated.items[0].appearance.background, 'transparent');
+      assert.match(sent.body.messages[0].content, /必须先规划真实布局容器/);
       if (mode === 'popup') { assert.equal(generated.frame.style, 'none'); assert.equal(generated.safeArea.enabled, false); }
     }
   }
@@ -85,7 +93,7 @@ try {
   await page.waitForFunction(() => document.getElementById('aiStatus').textContent.includes('完成，可以继续提出修改需求。')); await saved();
   const optimized = (await current()).project;
   assert.equal(optimized.activePageId, before.activePageId);
-  assert.equal(optimized.pages.find(item => item.id === target.id).items[0].name, '优化后的标题');
+  assert.equal(optimized.pages.find(item => item.id === target.id).items.find(item => !item.container).name, '优化后的标题');
   assert.deepEqual(optimized.pages.find(item => item.id === popup.id), popup);
   // 跨页优化等待期间修改正在编辑的弹窗，应保留两份修改。
   await page.locator('#aiRequirement').fill('等待优化'); await page.locator('#aiSendBtn').click();

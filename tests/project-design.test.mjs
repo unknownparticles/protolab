@@ -71,8 +71,13 @@ test('智能引用由本地还原真实内容和默认尺寸，安全区约束�
   assert.throws(() => parseAIResponse(reply([{ op: 'add', item: { id: 'x', libraryId: 'login', content: '<p>篡改</p>', x: 0, y: 0 } }]), project, clean, options), /无需提供/);
   for (const mode of ['page', 'component']) {
     const base = generationBase(project, mode, assets.context);
-    const generated = parseGenerationResponse(reply(changes.slice(0, 1)), base, mode, clean, options);
-    assert.equal(generated.project.items[0].content, '<button>登录</button>');
+    const additions = changes.slice(0, 1);
+    if (mode === 'page') {
+      additions[0] = { ...additions[0], item: { ...additions[0].item, parentId: 'section' } };
+      additions.unshift({ op: 'add', item: { id: 'section', name: '登录区', type: 'html', content: '<div></div>', x: 16, y: 80, width: 180, height: 48, container: { mode: 'vertical', gap: 0 }, appearance: { background: 'transparent' } } });
+    }
+    const generated = parseGenerationResponse(reply(additions), base, mode, clean, options);
+    assert.equal(generated.project.items.find(item => !item.container).content, '<button>登录</button>');
     if (mode === 'component') { assert.equal(generated.component.defaultHeight, 48); assert.equal(generated.project.items[0].x, 0); }
   }
 });

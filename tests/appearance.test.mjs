@@ -47,3 +47,23 @@ test('矢量内嵌图片分别支持拉伸、裁剪和完整显示，保留其�
     assert.ok(value.includes('href="data:image/png;base64,AA=="'));
   }
 });
+
+test('透明与半透明颜色经过保存恢复导出保留，拒绝非法透明度及样式注入', async () => {
+  const { colorPickerValue, colorWithRGB } = await import('../src/appearance.js');
+  for (const color of ['transparent', '#1230', '#11223380', 'rgba(12, 34, 56, 0.5)']) {
+    const project = validateProject({ version: 1, canvas: { ...canvas, background: color }, items: [{ ...item, appearance: { background: color, color, textColor: color }, container: { mode: 'vertical' } }] }, value => value);
+    const restored = validateProject(JSON.parse(JSON.stringify(project)), value => value);
+    assert.equal(restored.canvas.background, color);
+    assert.equal(restored.items[0].appearance.background, color);
+    assert.ok(exportHTML(restored).includes(`background:${color}`));
+    assert.ok(exportHTML(restored).includes(`--item-color:${color}`));
+  }
+  assert.equal(colorPickerValue('#1238'), '#112233');
+  assert.equal(colorPickerValue('#11223380'), '#112233');
+  assert.equal(colorPickerValue('rgba(12, 34, 56, 0.5)'), '#0c2238');
+  assert.equal(colorWithRGB('#1238', '#abcdef'), '#abcdef88');
+  assert.equal(colorWithRGB('#11223380', '#abcdef'), '#abcdef80');
+  assert.equal(colorWithRGB('rgba(12, 34, 56, 0.5)', '#abcdef'), '#abcdef80');
+  assert.equal(colorWithRGB('transparent', '#abcdef'), '#abcdef');
+  for (const background of ['rgba(256,0,0,0.5)', 'rgba(0,0,0,1.5)', 'rgba(0,0,0,-1)', 'rgba(0,0,0,0);position:fixed', '#12345']) assert.throws(() => normalizeAppearance({ background }));
+});

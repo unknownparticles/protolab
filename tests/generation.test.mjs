@@ -39,3 +39,22 @@ test('生成请求同时注入固定协议、内置规范与工程规范，独�
   const task = JSON.parse(sent.messages[1].content);
   assert.equal(task.mode, 'page'); assert.equal(task.requirement, '设计登录页'); assert.equal(task.project.items.length, 0);
 });
+
+test('生成必须含真实容器且所有内容归属容器，布局与透明背景在恢复导出后保留', () => {
+  const base = generationBase(emptyProject(), 'page');
+  for (const mode of ['vertical', 'horizontal', 'grid']) {
+    const region = { ...container, width: 300, height: 300, padding: '10px', container: { mode, gap: 16, columns: 2 }, appearance: { background: '#ffffff80' } };
+    const changes = [{ op: 'add', item: { ...item, parentId: region.id } }, { op: 'add', item: region }, { op: 'add', item: { ...item, id: 'second', parentId: region.id, layoutBasis: { width: 100, height: 60 } } }];
+    const result = parseGenerationResponse(reply(changes), base, 'page', clean);
+    const [parent, first, second] = result.project.items;
+    assert.equal(parent.container.mode, mode); assert.equal(parent.appearance.background, '#ffffff80');
+    assert.equal(first.parentId, parent.id); assert.equal(second.parentId, parent.id);
+    if (mode === 'vertical') assert.equal(second.y, first.y + first.height + 16);
+    else assert.equal(second.x, first.x + first.width + 16);
+    assert.equal(second.layoutBasis.height, 60);
+  }
+  for (const additions of [[item], [container], [container, item], [container, { ...item, parentId: 'missing' }], [container, { ...item, parentId: container.id }, { ...item, id: 'loose' }], [{ ...container, parentId: 'nested' }, { ...container, id: 'nested' }]]) {
+    assert.throws(() => parseGenerationResponse(reply(additions.map(item => ({ op: 'add', item }))), base, 'page', clean), /容器/);
+  }
+  assert.throws(() => parseGenerationResponse(reply([{ op: 'add', item: { ...container, container: { mode: 'absolute' } } }, { op: 'add', item: { ...item, parentId: container.id } }]), base, 'page', clean), /容器/);
+});
