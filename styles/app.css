@@ -249,7 +249,7 @@ html[lang=en] .panel-tabs button{font-size:10px}
 .toolbox-tabs{padding-bottom:10px}
 .editor-item.container-item{outline:1px dashed #94a3b8;outline-offset:-1px}
 .editor-item.container-item.selected{outline:2px solid var(--brand)}
-.canvas-resize{position:absolute;display:none;width:10px;height:10px;padding:0;border:1px solid var(--brand);border-radius:2px;background:white;touch-action:none;z-index:3}
+.canvas-resize{position:absolute;display:none;width:10px;height:10px;padding:0;border:1px solid var(--brand);border-radius:2px;background:white;touch-action:none;z-index:3;transform:scale(var(--resize-handle-scale,1))}
 .editor-item.selected>.canvas-resize{display:block}
 .canvas-resize.nw{left:-5px;top:-5px;cursor:nwse-resize}.canvas-resize.ne{right:-5px;top:-5px;cursor:nesw-resize}.canvas-resize.sw{left:-5px;bottom:-5px;cursor:nesw-resize}.canvas-resize.se{right:-5px;bottom:-5px;cursor:nwse-resize}
 .canvas-resize.n{left:calc(50% - 5px);top:-5px;cursor:ns-resize}.canvas-resize.s{left:calc(50% - 5px);bottom:-5px;cursor:ns-resize}.canvas-resize.e{right:-5px;top:calc(50% - 5px);cursor:ew-resize}.canvas-resize.w{left:-5px;top:calc(50% - 5px);cursor:ew-resize}

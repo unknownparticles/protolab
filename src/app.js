@@ -608,6 +608,7 @@ const CANVAS_CAPTION_HEIGHT = 28;
 function updateZoom() {
   const layout = frameLayout(project.canvas, project.frame);
   const inset = guides.rulers ? 22 : 0;
+  $('canvas').style.setProperty('--resize-handle-scale', 1 / zoom);
   $('canvasScaler').style.transform = `scale(${zoom})`;
   $('canvasScaler').style.left = `${inset}px`;
   $('canvasScaler').style.top = `${CANVAS_CAPTION_HEIGHT + inset}px`;
@@ -906,7 +907,18 @@ $('canvas').addEventListener('pointermove', event => {
         height: geometry.height === g.start.height ? item.layoutBasis?.height || item.height : geometry.height,
       } } : {}) };
     });
-    project = fitBoardText(constrainProject({ ...project, items })); renderCanvas();
+    project = fitBoardText(constrainProject({ ...project, items }));
+    // 保留捕获指针的节点和手柄，实时投影容器重排，松开后再完整渲染。
+    const displayed = visibilityLayout(project.items);
+    for (const item of displayed) {
+      const node = itemNodes.get(item.id);
+      Object.assign(node.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` });
+      const content = node.querySelector('.prototype-item');
+      Object.assign(content.style, { width: `${item.width}px`, height: `${item.height}px` });
+      fitItemText(content);
+    }
+    const item = displayed.find(item => item.id === g.itemId);
+    for (const [field, key] of Object.entries({ propX: 'x', propY: 'y', propW: 'width', propH: 'height' })) $(field).value = item[key];
     return;
   }
   gesture.point = clientToCanvas(event.clientX, event.clientY, $('canvas').getBoundingClientRect(), zoom);
